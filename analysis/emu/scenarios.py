@@ -11,7 +11,11 @@ the coolant temperature and time since start change:
 2. ``steady_sweep``: the same start at each coolant temperature, reading the values
    after ``settle_s`` seconds, when the after-start terms have run out.
 
-The fixed airflow signal is a stand-in (GUESS) because the SE056's volts-to-delay
+The O2 sensor is held at 0.1 V. With that reading the ROM leaves its O2 trim
+``word_76`` at the neutral $8000, so the results show the open-loop warm-up fuel. A fixed
+0.45 V or 0.8 V reading instead drives the trim down to about $1A00 when warm (fuel
+ratio 1.90 -> 1.52), which would distort the comparison [EMU:scenario probe]. The fixed airflow signal
+is a stand-in (GUESS) because the SE056's volts-to-delay
 relation is unknown. So read the fuel results as **ratios against the warm engine**,
 not as absolute fuel mass. Pulse widths in µs are what the ROM commands for that
 airflow signal.
@@ -34,7 +38,7 @@ OUT = ROOT / "analysis/bluetop/sim"
 FIELDS = [
     "t_s", "coolant_f", "coolant_c", "rpm", "mode", "fuel_ratio", "inj_load_pulse_us", "pulse_us",
     "dead_time_us", "inj_per_rev", "fuel_us_per_cycle", "advance_deg", "thw_tadv",
-    "byte_83", "byte_84", "byte_8B", "word_8C",
+    "o2_trim", "byte_83", "byte_84", "byte_8B", "word_8C",
 ]  # fmt: skip
 
 
@@ -47,15 +51,18 @@ def sample(sim: Simulation, window_us: int = 500_000) -> dict:
     rpm = sim.inputs.rpm
     revs = window_us * rpm / 60e6
     inj_per_rev = len(pulses) / revs if revs else 0.0
-    # open time beyond the dead time, per 720° engine cycle, for one injector
-    fuel = sum(max(0, p - dead) for p in pulses) / revs * 2 if revs else 0.0
+    mode = "grouped" if sim.ram("byte_69") >= 0x80 else "simultaneous"
+    # open time beyond the dead time, per 720° engine cycle, for one injector:
+    # 4 pulses per cycle when simultaneous, 2 when grouped
+    per_cycle = 4 if mode == "simultaneous" else 2
+    fuel = sum(max(0, p - dead) for p in pulses) / len(pulses) * per_cycle if pulses else 0.0
     adv = sim.spark_advance(since)
     return {
         "t_s": round(now / 1e6, 2),
         "coolant_f": sim.inputs.coolant_f,
         "coolant_c": round((sim.inputs.coolant_f - 32) / 1.8, 1),
         "rpm": rpm,
-        "mode": "grouped" if sim.ram("byte_69") >= 0x80 else "simultaneous",
+        "mode": mode,
         "fuel_ratio": round(sim.ram("FuelRatioH", 2) / 256, 3),
         "inj_load_pulse_us": sim.ram("InjLoadPulse", 2),
         "pulse_us": round(sum(pulses) / len(pulses)) if pulses else 0,
@@ -64,6 +71,7 @@ def sample(sim: Simulation, window_us: int = 500_000) -> dict:
         "fuel_us_per_cycle": round(fuel),
         "advance_deg": round(sum(adv) / len(adv), 1) if adv else "",
         "thw_tadv": sim.ram("ThW_tADV"),
+        "o2_trim": round(sim.ram("word_76", 2) / 0x8000, 3),
         "byte_83": sim.ram("byte_83"),
         "byte_84": sim.ram("byte_84"),
         "byte_8B": sim.ram("byte_8B"),
@@ -76,6 +84,7 @@ def start(coolant_f: float, *, idle_rpm: float = 1000, airflow_us: float = 800) 
     i = sim.inputs
     i.coolant_f = i.intake_f = coolant_f
     i.airflow_us = airflow_us
+    i.o2_v = 0.1  # keeps the O2 trim word_76 at its neutral $8000 (see module notes)
     sim.engine.update_sensors()
     sim.run_ms(300)  # key on
     i.starter, i.rpm = True, 250

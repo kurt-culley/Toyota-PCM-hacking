@@ -140,6 +140,17 @@ Pin 1 is next to the notch or dot. From the **component side**, pins 1–20 run 
 - The repo README notes the D151801 uses P10/P11 for its extra input-capture/output-compare timer.
 - The D151801 is a Denso custom part. The pinout above is the standard HD6301V1, assumed because the board's silkscreen names the "6356/6801" footprint. Test A also checks this: Vss and Vcc must land where expected.
 
+### Results so far (owner, 2026-10-09) [BENCH: owner continuity tests]
+
+- **The ECU case is not bonded to board ground.** No IC7 corner beeps to any point on the case. The board is grounded only through the connector's E pins. Use IC7 pin 1 as the ground reference. CONFIRMED.
+- **IC7 orientation, three ways:**
+  - the half-moon notch is at the X-TAL end;
+  - the crystal leads beep to the 2nd and 3rd joints from solder-side corner B;
+  - so **pin 1 is corner B** in [`guide/step1-ic7-corners.jpg`](photos/89661-17140/guide/step1-ic7-corners.jpg).
+
+  This matches the standard HD6301V1 pinout, where XTAL and EXTAL are pins 2 and 3. CONFIRMED.
+- **Fitted links:** J4 and J8 (top-side photo 20, wire stubs visible on the solder side). J3 is empty. This corrects the earlier "two links among J3/J4/J8". The solder-side pad map is [`guide/step2-jumper-pads.jpg`](photos/89661-17140/guide/step2-jumper-pads.jpg). CONFIRMED.
+
 ### Test A: where do the jumpers go?
 1. Find IC7 **pin 1 (Vss)**: it beeps to the case or ground. Then find **pin 21 (Vcc)**.
 2. For **each pad** of J1–J10 (two pads per jumper, 20 pads in total):

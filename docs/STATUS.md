@@ -51,8 +51,10 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
 - [x] `analysis/defs/bluetop.yaml` with its generator:
   - 13 maps, including coolant linearisation, THA correction, injector dead time and decel-cut rpm;
   - output in [`../analysis/bluetop/maps.md`](../analysis/bluetop/maps.md).
-- [ ] Architecture write-up (scheduler, interrupts, ADC sequence, RAM map).
-- [~] Tier-A claim statuses: 10 of 24 set with ROM/EMU evidence.
+- [x] Architecture write-up ([`bluetop/architecture.md`](bluetop/architecture.md)): reset, the event-driven main loop, ISR roles, ADC sequencer, RAM map.
+- [x] Fuel and ignition chains ([`bluetop/fuel_chain.md`](bluetop/fuel_chain.md)). `Calc72` is proven in the emulator [EMU:tests/test_fuel_chain.py]. The ratio-vs-coolant shape (≈2.5× at 0 °C) comes from a routine-level experiment.
+- [ ] **Peripheral model + whole-ROM simulation:** timer IC/OC, SCI-ADC, and NE/G + airflow pulse stimulus. This is needed for realistic warm-up and after-start numbers, and for the rev-limit and IGF cut effects.
+- [~] Tier-A claim statuses: 18 of 24 set with ROM/EMU evidence (plus R-F11 and R-F22). Remaining: R-F10, R-F12, R-F24, R-I08, R-I14, R-I15.
   - CONFIRMED (Bluetop): R-F17, R-F23, R-F25, R-I05.
   - PARTIAL: R-F11, R-I01.
   - DIFFERS-BY-ECU: R-F21, R-F22 (the Bluetop uses grouped injection), R-I02 (14×6 map).

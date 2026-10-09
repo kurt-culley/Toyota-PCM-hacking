@@ -52,7 +52,12 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
   - 13 maps, including coolant linearisation, THA correction, injector dead time and decel-cut rpm;
   - output in [`../analysis/bluetop/maps.md`](../analysis/bluetop/maps.md).
 - [ ] Architecture write-up (scheduler, interrupts, ADC sequence, RAM map).
-- [ ] Tier-A claim statuses.
+- [~] Tier-A claim statuses: 10 of 24 set with ROM/EMU evidence.
+  - CONFIRMED (Bluetop): R-F17, R-F23, R-F25, R-I05.
+  - PARTIAL: R-F11, R-I01.
+  - DIFFERS-BY-ECU: R-F21, R-F22 (the Bluetop uses grouped injection), R-I02 (14×6 map).
+  - NOT-APPLICABLE: R-F01 (the Bluetop has no MAP channel).
+  - The rest need the fuel-chain trace.
 - [ ] Characterise the remaining tables (`$FE9C`, `$FEA7`, `$FEE9`, `$FF11`) and the scaling of `Load` and the advance degrees.
 - [ ] XDF / TunerStudio output from the YAML.
 

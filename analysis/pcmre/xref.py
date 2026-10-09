@@ -83,6 +83,13 @@ def _ints(v) -> list[int] | None:
     return sorted(v)
 
 
+def _concrete(v):
+    """X passed into a callee: return-relative atoms belong to the caller, so drop them."""
+    if v is None or any(isinstance(a, tuple) for a in v):
+        return None
+    return v
+
+
 def _union(a, b):
     if a is None or b is None:
         return None
@@ -174,6 +181,8 @@ class Xref:
     accesses: set[Access] = field(default_factory=set)
     jumps: set[tuple[int, int]] = field(default_factory=set)  # (site, target) for branches/jmp
     indirect: set[tuple[int, int, str]] = field(default_factory=set)  # (site, routine, mnemonic)
+    # Indexed data accesses reached at least once with X unknown (including loops after the first pass).
+    idx_unknown: set[int] = field(default_factory=set)
     errors: set[str] = field(default_factory=set)
 
     def name(self, addr: int) -> str:
@@ -284,7 +293,7 @@ class _Analyser:
     def call(self, entry: int, ins: Instr, target: int, how: str, st: State, nxt: int) -> list[tuple[int, State]]:
         self.x.calls.add(Call(ins.addr, entry, target, how))
         out = []
-        exits = self.analyse(target, st.x)
+        exits = self.analyse(target, _concrete(st.x))
         if not exits:
             return []  # never returns
         for ex in exits:
@@ -301,7 +310,7 @@ class _Analyser:
     def tail(self, entry: int, ins: Instr, target: int, st: State, exits: set[Exit]) -> None:
         """A jmp into another routine: its exits become ours."""
         self.x.calls.add(Call(ins.addr, entry, target, "jmp"))
-        sub = self.analyse(target, st.x)
+        sub = self.analyse(target, _concrete(st.x))
         if st.stack or st.below:
             self.x.errors.add(f"tail call at ${ins.addr:04X} with a modified stack")
         exits.update(sub)
@@ -329,6 +338,8 @@ class _Analyser:
             eas = [ins.operand]
         elif mode in (IDX, BIT_IDX):
             eas, via_x = _ints(_add(st.x, ins.operand)), True
+            if eas is None and m not in ("jsr", "jmp"):
+                self.x.idx_unknown.add(ins.addr)
 
         # ---- control flow
         if m == "rts":
@@ -380,8 +391,11 @@ class _Analyser:
         # ---- data accesses
         if eas is not None:
             kind = "r" if m == "tim" else _data_kind(m)
+            width = 2 if m in WIDE else 1
             for ea in eas:
-                self.x.accesses.add(Access(ins.addr, entry, ea, kind, 2 if m in WIDE else 1, via_x))
+                # A 16-bit access touches both bytes; record each so both rows show it.
+                for k in range(width):
+                    self.x.accesses.add(Access(ins.addr, entry, (ea + k) & 0xFFFF, kind, width, via_x))
         elif mode == IMM16 and _is_rom(self.x, ins.operand) and m in ("ldx", "ldd"):
             self.x.accesses.add(Access(ins.addr, entry, ins.operand, "ptr", 2, False))
 
@@ -412,7 +426,8 @@ class _Analyser:
         if m == "ldx":
             s = s.with_(x=_vs(ins.operand) if mode == IMM16 else None)
             # ldx from a table in ROM (e.g. a jump table): X is one of the stored words.
-            if mode != IMM16 and eas is not None and len(eas) <= MAX_SET and all(_is_rom(self.x, a) for a in eas):
+            in_rom = eas is not None and all(_is_rom(self.x, a) and _is_rom(self.x, a + 1) for a in eas)
+            if mode != IMM16 and in_rom and len(eas) <= MAX_SET:
                 words = {(self.rom[a - self.org] << 8) | self.rom[a - self.org + 1] for a in eas}
                 s = s.with_(x=frozenset(words))
         elif m == "inx":
@@ -433,7 +448,9 @@ class _Analyser:
             s = s.with_(b=_vs(ins.operand & 0xFF))
         elif m == "clrb":
             s = s.with_(b=_vs(0))
-        elif m == "andb" and mode == IMM8:
+        elif m == "andb" and mode != IMM8:
+            s = s.with_(b=None)
+        elif m == "andb":
             bs = _ints(st.b)
             s = s.with_(b=frozenset(b & ins.operand for b in bs) if bs is not None else _submasks(ins.operand))
         elif m in B_CLOBBER and m != "pulb":
@@ -494,12 +511,7 @@ def render(x: Xref, listing: Listing, title: str) -> str:
         callers[c.callee].add(c.caller)
         callees[c.caller].add(c.callee)
 
-    resolved_sites = {a.site for a in x.accesses}
-    unresolved_idx = sorted(
-        a
-        for a, i in x.instrs.items()
-        if i.mode in (IDX, BIT_IDX) and i.mnemonic not in ("jsr", "jmp") and a not in resolved_sites
-    )
+    unresolved_idx = sorted(x.idx_unknown)
     listed_code = {it.addr for it in listing.items if it.kind == "code"}
     listed_data = {it.addr for it in listing.items if it.kind != "code"}
     reached = set(x.instrs)
@@ -526,7 +538,7 @@ def render(x: Xref, listing: Listing, title: str) -> str:
         f"| Call edges (unique caller → callee) | {len({(c.caller, c.callee) for c in x.calls})} |",
         f"| Memory accesses resolved | {len(x.accesses)} |",
         f"| Indirect calls/jumps not resolved | {len(x.indirect)} |",
-        f"| Indexed data accesses with X unknown (not in the tables below) | {len(unresolved_idx)} |",
+        f"| Indexed data sites reached with X unknown, wholly or after a loop's first pass | {len(unresolved_idx)} |",
         f"| Listing code lines never reached | {len(unreached)} |",
         f"| Reached instructions the listing calls data | {len(code_in_data)} |",
         "",
@@ -590,10 +602,20 @@ def render(x: Xref, listing: Listing, title: str) -> str:
     out += [
         "## RAM and I/O registers",
         "",
-        "`$00`–`$1F` are the HD6301 on-chip registers; `$80`–`$FF` is on-chip RAM. "
-        "Read-modify-write instructions (`inc`, `aim` …) count as both. **A dash means no access was",
-        "*resolved*, not that none exists:** indexed accesses with an unknown X (for example the ADC result",
-        "store at `$54` + channel) are counted in the summary but not attributed here.",
+        "`$00`–`$1F` are the HD6301 on-chip registers; `$80`–`$FF` is on-chip RAM; `$40`–`$7F` is external",
+        "RAM on this board. Read-modify-write instructions (`inc`, `aim` …) count as both, and a 16-bit",
+        "access (`ldd`, `std`, `ldx` …) is listed on both of its bytes.",
+        "",
+        "**These lists are not complete.** A dash means no access was *resolved*, not that none exists:",
+        "",
+        "- indexed accesses with an unknown X (for example the ADC result store at `$54` + channel) are not",
+        "  attributed;",
+        "- in a loop that walks X, only the first pass is attributed. For example, reset's RAM clear",
+        "  (`clr $4B,x` / `dex` loop at `$F02B`) shows up only on `$FF`, and the RAM and ROM self-tests only on",
+        "  their first address.",
+        "",
+        f"Both kinds are counted in the summary; the sites are: "
+        f"{_md_list([f'`${a:04X}`' for a in unresolved_idx], limit=40)}.",
         "",
         "| Address | Name | Width | Read by | Written by |",
         "|---|---|---|---|---|",

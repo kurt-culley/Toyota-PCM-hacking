@@ -63,6 +63,17 @@ def test_exit_x_flows_back_into_shared_tail(xr):
     assert (0xFFE1, 0x98) in rw
 
 
+def test_16bit_access_covers_both_bytes(xr):
+    # reset: std Port1 at $F019 writes Port1 ($02) and Port2 ($03).
+    writes = {a.addr for a in xr.accesses if a.site == 0xF019 and a.kind == "w"}
+    assert writes == {0x02, 0x03}
+
+
+def test_loop_sites_counted_as_unresolved(xr):
+    # reset's RAM clear: ldx #$B4 / clr $4B,x / dex / bne -- only the first pass is resolved.
+    assert 0xF02B in xr.idx_unknown
+
+
 def test_inline_parameter_routine(xr, listing):
     bound = _addr(listing, "boundData")
     assert {e.offset for e in xr.exits[bound]} == {2}
@@ -136,7 +147,7 @@ def test_ida_xrefs_agree(xr, listing, rom):
             # A pointer table entry (e.g. JumpTable): the stored word is the target.
             ok = (rom[src - listing.org] << 8 | rom[src - listing.org + 1]) == target
         elif kind in "rw":
-            ok = any(kind in k for k in kinds[(src, target)])
+            ok = bool(kinds[(src, target)] & {kind, "rw"})
         elif kind == "o":
             ok = (src, target) in kinds
         elif kind == "p":

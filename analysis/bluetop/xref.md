@@ -15,9 +15,9 @@ wrap past `$FFFF` into RAM. Accesses marked † were resolved that way. IDA's ow
 | Routines (vector entries + call targets) | 68 |
 | Instructions reached | 1989 |
 | Call edges (unique caller → callee) | 137 |
-| Memory accesses resolved | 905 |
+| Memory accesses resolved | 1194 |
 | Indirect calls/jumps not resolved | 1 |
-| Indexed data accesses with X unknown (not in the tables below) | 18 |
+| Indexed data sites reached with X unknown, wholly or after a loop's first pass | 24 |
 | Listing code lines never reached | 1 |
 | Reached instructions the listing calls data | 5 |
 
@@ -125,43 +125,67 @@ caller's stack removed besides the return address.
 
 ## RAM and I/O registers
 
-`$00`–`$1F` are the HD6301 on-chip registers; `$80`–`$FF` is on-chip RAM. Read-modify-write instructions (`inc`, `aim` …) count as both. **A dash means no access was
-*resolved*, not that none exists:** indexed accesses with an unknown X (for example the ADC result
-store at `$54` + channel) are counted in the summary but not attributed here.
+`$00`–`$1F` are the HD6301 on-chip registers; `$80`–`$FF` is on-chip RAM; `$40`–`$7F` is external
+RAM on this board. Read-modify-write instructions (`inc`, `aim` …) count as both, and a 16-bit
+access (`ldd`, `std`, `ldx` …) is listed on both of its bytes.
+
+**These lists are not complete.** A dash means no access was *resolved*, not that none exists:
+
+- indexed accesses with an unknown X (for example the ADC result store at `$54` + channel) are not
+  attributed;
+- in a loop that walks X, only the first pass is attributed. For example, reset's RAM clear
+  (`clr $4B,x` / `dex` loop at `$F02B`) shows up only on `$FF`, and the RAM and ROM self-tests only on
+  their first address.
+
+Both kinds are counted in the summary; the sites are: `$F02B`, `$F03A`, `$F03F`, `$F048`, `$F411`, `$F6EB`, `$F6F0`, `$F6F3`, `$F896`, `$F898`, `$FB04`, `$FB47`, `$FB4B`, `$FB4F`, `$FB53`, `$FC2D`, `$FE50`, `$FE68`, `$FE6F`, `$FE74`, `$FF30`, `$FF32`, `$FF3D`, `$FFAC`.
 
 | Address | Name | Width | Read by | Written by |
 |---|---|---|---|---|
 | `$00` | Port1DDR | 2 | – | reset |
+| `$01` | Port2DDR | 2 | – | reset |
 | `$02` | Port1 | 2 | CPUModeTst, ForceInjAccD, ForceInjAccD2, inj1off, inj2on, injector2, jmptable1, jmptable4, loc_F131, sub_F194, sub_F96A, sub_FD41 | CPUModeTst, jmptable1, jmptable4, reset, sub_F96A, sub_FD41 |
-| `$03` | Port2 | 1 | BeginCalcADV, CPUModeTst, IRQinpcap, forceIGToff, jmptable4 | – |
+| `$03` | Port2 | 2 | BeginCalcADV, CPUModeTst, IRQinpcap, forceIGToff, jmptable4 | reset |
 | `$04` | Port3DDR | 2 | – | reset |
+| `$05` | Port4DDR | 2 | – | reset |
 | `$06` | Port3 | 2 | IRQSerial, IRQinpcap, TXtoADC, jmptable3, loc_FAA7, procJmpTable, reset, sub_F420, sub_F96A, txadc3 | IRQSerial, TXtoADC, loc_FAA7, procJmpTable, reset, sub_F96A, txadc3 |
-| `$07` | Port4 | 1 | BeginCalcADV, Calc76, FlagBadStuff, IRQinpcap, flagbadstuf3, inj1off, inj1on, jmptable1, jmptable3, jmptable4, loc_F7F1, reset, … (+2) | IRQinpcap, inj1off, inj1on |
+| `$07` | Port4 | 2 | BeginCalcADV, Calc76, FlagBadStuff, IRQinpcap, flagbadstuf3, inj1off, inj1on, jmptable1, jmptable3, jmptable4, loc_F7F1, reset, … (+2) | IRQinpcap, inj1off, inj1on, reset |
 | `$08` | TmrCntStat1 | 2 | BeginCalcADV, IRQinpcap, IRQoutcmp, OC1HighDtoOC1, forceIGToff | BeginCalcADV, IRQinpcap, IRQoutcmp, OC1HighDtoOC1, forceIGToff, reset |
-| `$09` | Timer | 2 | CalcInjOffTime, ForceInjAccD, ForceInjAccD2, IRQSerial, IRQinpcap, OC1HighDtoOC1, TXtoADC, forceIGToff, inj1off, inj2on, injector2, loc_F131, … (+5) | reset |
+| `$09` | Timer | 2 | BeginCalcADV, CalcInjOffTime, ForceInjAccD, ForceInjAccD2, IRQSerial, IRQinpcap, OC1HighDtoOC1, TXtoADC, forceIGToff, inj1off, inj2on, injector2, … (+6) | reset |
+| `$0A` | – | 2 | CalcInjOffTime, ForceInjAccD, ForceInjAccD2, IRQSerial, IRQinpcap, OC1HighDtoOC1, TXtoADC, forceIGToff, inj1off, inj2on, injector2, loc_F131, … (+4) | reset |
 | `$0B` | OutCmp1 | 2 | IRQinpcap, IRQoutcmp | BeginCalcADV, IRQinpcap, IRQoutcmp, OC1HighDtoOC1, forceIGToff, stdOC1 |
+| `$0C` | – | 2 | IRQinpcap, IRQoutcmp | BeginCalcADV, IRQinpcap, IRQoutcmp, OC1HighDtoOC1, forceIGToff, stdOC1 |
 | `$0D` | InpCap1 | 2 | IRQinpcap | – |
+| `$0E` | – | 2 | IRQinpcap | – |
 | `$0F` | Port3CntStat | 1 | sub_F420 | sub_F420 |
 | `$10` | UARTRateMode | 1 | – | TXtoADC, loc_FAA7, procJmpTable, sub_F96A, txadc3 |
 | `$11` | TxRxCntStat | 2 | IRQSerial, TXtoADC, loc_FAA7, procJmpTable, reset, sub_F96A, txadc3 | TXtoADC, loc_FAA7, procJmpTable, reset, sub_F96A, txadc3 |
+| `$12` | RxReg | 2 | IRQSerial, reset | – |
 | `$13` | TxReg | 1 | – | IRQSerial, TXtoADC, loc_FAA7, procJmpTable, sub_F96A, txadc3 |
 | `$14` | RAMCnt | 1 | – | reset |
 | `$18` | TmrCntStat2 | 1 | ForceInjAccD, ForceInjAccD2, IRQinpcap, IRQoutcmp, inj1off, inj2on, injector2, loc_F131, sub_F194 | ForceInjAccD, ForceInjAccD2, IRQinpcap, inj1off, inj2on, injector2, loc_F131, reset, sub_F194 |
 | `$1B` | OutCmp2 | 2 | inj1off, sub_F194 | ForceInjAccD, ForceInjAccD2, inj1off, inj2on, injector2, loc_F131, sub_F194 |
+| `$1C` | – | 2 | inj1off, sub_F194 | ForceInjAccD, ForceInjAccD2, inj1off, inj2on, injector2, loc_F131, sub_F194 |
 | `$1D` | InpCap2 | 2 | IRQinpcap | – |
+| `$1E` | – | 2 | IRQinpcap | – |
 | `$40` | word_40 | 2 | sub_F751 | jmptable4, sub_F751 |
+| `$41` | – | 2 | – | jmptable4, sub_F751 |
 | `$42` | word_42 | 2 | BeginCalcADV, jmptable1, loc_F534, sub_F70A, sub_F751 | jmptable4, sub_F751 |
+| `$43` | – | 2 | – | jmptable4, sub_F751 |
 | `$44` | word_44 | 2 | sub_F70A, sub_F751 | jmptable4, sub_F751 |
+| `$45` | – | 2 | – | jmptable4, sub_F751 |
 | `$46` | word_46 | 2 | sub_FD41 | jmptable4, sub_FD41 |
+| `$47` | – | 2 | – | jmptable4, sub_FD41 |
 | `$48` | word_48 | 2 | FlagBadStuff, flagbadstuf3, jmptable1, jmptable3, jmptable4†, sub_FD41 | FlagBadStuff, flagbadstuf3, jmptable1, jmptable3, jmptable4 |
+| `$49` | – | 2 | jmptable4† | FlagBadStuff, flagbadstuf3, jmptable1, jmptable3, jmptable4 |
 | `$4A` | byte_4A | 1 | jmptable4 | jmptable4 |
 | `$4B` | byte_4B | 1 | IRQinpcap, sub_F96A | sub_F96A |
 | `$4C` | byte_4C | 2 | Calc76, IRQinpcap, loc_F534, reset, sub_F420, sub_F96A, sub_FD41 | loc_F534, reset, sub_F420, sub_F96A, sub_FD41 |
-| `$4D` | byte_4D | 1 | Calc76, ForceInjAccD, loc_F534, reset, sub_F420, sub_F6BB, sub_F96A, sub_FD41 | Calc76, sub_F96A |
+| `$4D` | byte_4D | 2 | Calc76, ForceInjAccD, loc_F534, reset, sub_F420, sub_F6BB, sub_F96A, sub_FD41 | Calc76, reset, sub_F96A |
 | `$4E` | byte_4E | 1 | BeginCalcADV, IRQinpcap, IRQoutcmp, comAmask4E, loc_F534, mask4E, reset, sub_F420 | IRQinpcap, IRQoutcmp, comAmask4E, mask4E, sub_F420 |
 | `$4F` | ADCflags | 2 | IRQSerial, loc_FAA7, procJmpTable, reset, sub_F96A | IRQSerial, loc_FAA7, procJmpTable, reset, sub_F96A |
-| `$50` | ADCRxData | 1 | – | IRQSerial |
+| `$50` | ADCRxData | 2 | loc_FAA7, procJmpTable, sub_F96A | IRQSerial |
 | `$51` | EndTxByteTime | 2 | TXtoADC, loc_FAA7, procJmpTable, sub_F96A | IRQSerial |
+| `$52` | – | 2 | TXtoADC, loc_FAA7, procJmpTable, sub_F96A | IRQSerial |
 | `$53` | ADCcontrol | 1 | ADCchanSelect, IRQSerial, TXtoADC, loc_FAA7, procJmpTable, reset, sub_F96A | TXtoADC, loc_FAA7, procJmpTable, reset, sub_F96A |
 | `$54` | ADC_TPS | 1 | jmptable2 | – |
 | `$55` | ADC_12V | 1 | jmptable3 | – |
@@ -174,45 +198,62 @@ store at `$54` + channel) are counted in the summary but not attributed here.
 | `$5C` | byte_5C | 1 | sub_F751, sub_F96A | sub_F751, sub_F96A |
 | `$5D` | byte_5D | 1 | jmptable2, loc_F534, sub_F96A, sub_FD41 | jmptable2 |
 | `$5E` | NextADCsamptime | 2 | reset | reset |
-| `$5F` | byte_5F | 1 | reset, sub_F96A | – |
+| `$5F` | byte_5F | 2 | reset, sub_F96A | reset |
 | `$60` | SpdPlsdiff | 2 | loc_F534, sub_F420, sub_FD41 | reset |
-| `$61` | speedpulses | 1 | reset | reset |
+| `$61` | speedpulses | 2 | reset | reset |
 | `$62` | FullRPM | 2 | loc_F534, sub_F420 | sub_F420 |
+| `$63` | – | 2 | loc_F534, sub_F420 | sub_F420 |
 | `$64` | RPMish | 1 | BeginCalcADV | sub_F420 |
 | `$65` | lilRPM | 1 | ForceInjAccD, ForceInjAccD2, jmptable1, jmptable2, jmptable3, jmptable4, loc_F534, sub_F420, sub_F70A, sub_F96A, sub_FD41 | sub_F420, sub_F96A |
 | `$66` | deltaNE | 2 | BeginCalcADV, IRQoutcmp, OutCmp1Sub1, sub_F420 | IRQinpcap |
+| `$67` | – | 2 | BeginCalcADV, IRQoutcmp, OutCmp1Sub1, sub_F420 | IRQinpcap |
 | `$68` | SatCount_68 | 1 | IRQinpcap, loc_FFE3†, sub_F96A | IRQinpcap, loc_FFE3† |
 | `$69` | byte_69 | 2 | IRQinpcap, loc_F534 | IRQinpcap, loc_F534, sub_F96A |
 | `$6A` | SE056plstime | 2 | IRQinpcap, jmptable2, loc_F534 | IRQinpcap |
+| `$6B` | – | 2 | IRQinpcap, jmptable2, loc_F534 | IRQinpcap |
 | `$6C` | SE056Maxtime | 2 | IRQinpcap, jmptable2 | loc_F534 |
+| `$6D` | – | 2 | IRQinpcap, jmptable2 | loc_F534 |
 | `$6E` | SE056Mintime | 2 | IRQinpcap | sub_F420 |
+| `$6F` | – | 2 | IRQinpcap | sub_F420 |
 | `$70` | word_70 | 2 | loc_F534, sub_F6BB, sub_F6D4 | loc_F534 |
+| `$71` | – | 2 | loc_F534, sub_F6BB, sub_F6D4 | loc_F534 |
 | `$72` | word_72 | 2 | Calc72, loc_F534, loc_F6E6+1, sub_F6BB, sub_F6E3, sub_F700, sub_F70A | Calc72, loc_F534 |
+| `$73` | – | 2 | Calc72, loc_F534, loc_F6E6+1, sub_F6BB, sub_F6E3, sub_F700, sub_F70A | Calc72, loc_F534 |
 | `$74` | FuelRatioH | 2 | IRQinpcap | loc_F534, sub_F6BB, sub_F6D4 |
-| `$75` | FuelRatioL | 1 | IRQinpcap | – |
+| `$75` | FuelRatioL | 2 | IRQinpcap | loc_F534, sub_F6BB, sub_F6D4 |
 | `$76` | word_76 | 2 | Calc76, loc_F534, loc_F7F1, sub_F6BB, sub_F6D4, sub_F96A, sub_FD41 | Calc76, loc_F7F1 |
+| `$77` | – | 2 | Calc76, loc_F7F1 | Calc76, loc_F7F1 |
 | `$78` | IC2LowCnt | 1 | IRQinpcap | IRQinpcap |
 | `$79` | Inj10OffTime | 2 | inj1off, inj1on, sub_F194 | inj1on |
+| `$7A` | – | 2 | inj1off, inj1on, sub_F194 | inj1on |
 | `$7B` | Inj20OffTime | 2 | ForceInjAccD, ForceInjAccD2, inj2on, injector2, loc_F131 | ForceInjAccD, ForceInjAccD2, inj2on, loc_F131 |
+| `$7C` | – | 2 | ForceInjAccD, ForceInjAccD2, inj2on, injector2, loc_F131 | ForceInjAccD, ForceInjAccD2, inj2on, loc_F131 |
 | `$7D` | InjLoadPulse | 2 | IRQinpcap | IRQinpcap |
+| `$7E` | – | 2 | IRQinpcap | IRQinpcap |
 | `$7F` | Load | 2 | BeginCalcADV, Calc76, jmptable4, loc_F534, reinitLoads, sub_F70A, sub_F96A | loc_F534 |
+| `$80` | – | 2 | BeginCalcADV, Calc76, jmptable4, loc_F534, reinitLoads, sub_F70A, sub_F96A | loc_F534 |
 | `$81` | InjDeadTime | 2 | CalcInjOffTime | jmptable3 |
+| `$82` | – | 2 | CalcInjOffTime | jmptable3 |
 | `$83` | byte_83 | 2 | Calc76, loc_F534 | sub_FD41 |
-| `$84` | byte_84 | 2 | loc_F534 | loc_F534 |
+| `$84` | byte_84 | 2 | Calc76, loc_F534 | loc_F534 |
+| `$85` | – | 2 | loc_F534 | loc_F534 |
 | `$86` | byte_86 | 1 | loc_F534 | loc_F534 |
 | `$87` | byte_87 | 2 | Calc76, loc_F534 | loc_F534, sub_F420, sub_F96A |
-| `$88` | byte_88 | 2 | loc_F534 | loc_F534 |
-| `$89` | byte_89 | 1 | – | loc_F534, reinitLoads |
+| `$88` | byte_88 | 2 | Calc76, loc_F534 | loc_F534 |
+| `$89` | byte_89 | 2 | loc_F534 | loc_F534, reinitLoads |
 | `$8A` | ThAcorr | 1 | Calc72 | jmptable4 |
 | `$8B` | byte_8B | 1 | loc_F534, sub_F6BB | sub_FD41 |
 | `$8C` | word_8C | 2 | loc_F534, sub_F6BB | loc_F534 |
+| `$8D` | – | 2 | loc_F534 | loc_F534 |
 | `$8E` | Loadfilt1 | 2 | loc_F534 | loc_F534, reinitLoads |
+| `$8F` | – | 2 | loc_F534 | loc_F534, reinitLoads |
 | `$90` | Loadfilt2 | 2 | loc_F534 | loc_F534, reinitLoads |
+| `$91` | – | 2 | loc_F534 | loc_F534, reinitLoads |
 | `$92` | byte_92 | 1 | loc_F534, sub_F70A, sub_FD41 | sub_F70A |
 | `$93` | byte_93 | 1 | sub_F751, sub_F96A | sub_F96A |
 | `$94` | byte_94 | 1 | sub_F96A | Calc76, sub_F96A |
 | `$95` | byte_95 | 2 | BeginCalcADV, IRQinpcap, jmptable1, jmptable2, jmptable4, reset, sub_F420, sub_F751, sub_F96A, sub_FD41 | sub_F96A |
-| `$96` | byte_96 | 1 | sub_F96A | reset |
+| `$96` | byte_96 | 2 | reset, sub_F751, sub_F96A | reset |
 | `$97` | SatCount_97 | 1 | Calc76, IRQinpcap, loc_FFE3† | loc_FFE3†, sub_F420 |
 | `$98` | SatCount_98 | 1 | IRQinpcap, loc_FFE1† | loc_FFE1†, sub_F420 |
 | `$99` | TVIScounter | 1 | BeginCalcADV, jmptable4 | jmptable4 |
@@ -222,31 +263,49 @@ store at `$54` + channel) are counted in the summary but not attributed here.
 | `$9D` | byte_9D | 1 | Calc76, loc_F7F1, reset | reset |
 | `$9E` | DecelCutRPM | 1 | loc_F534, sub_F420 | jmptable4 |
 | `$9F` | InCp2TrEg | 2 | CalcInjOffTime, IRQinpcap | IRQinpcap, inj1on, inj2on |
+| `$A0` | – | 2 | CalcInjOffTime, IRQinpcap | IRQinpcap, inj1on, inj2on |
 | `$A1` | AdvanceinUS | 2 | IRQinpcap, OutCmp1Sub1 | BeginCalcADV |
+| `$A2` | – | 2 | IRQinpcap, OutCmp1Sub1 | BeginCalcADV |
 | `$A3` | BaseAdvance | 1 | BeginCalcADV | BeginCalcADV |
 | `$A4` | ThW_tADV | 1 | BeginCalcADV | jmptable4 |
 | `$A5` | byte_A5 | 1 | BeginCalcADV | BeginCalcADV |
 | `$A6` | IDLcompADV | 1 | BeginCalcADV | BeginCalcADV |
 | `$A7` | NEhighWidth | 2 | BeginCalcADV, IRQinpcap | IRQinpcap |
+| `$A8` | – | 2 | BeginCalcADV, IRQinpcap | IRQinpcap |
 | `$A9` | NEhiDERV_3 | 2 | IRQinpcap | IRQinpcap |
+| `$AA` | – | 2 | IRQinpcap | IRQinpcap |
 | `$AB` | NEhiDERV_2 | 2 | IRQinpcap | IRQinpcap |
+| `$AC` | – | 2 | IRQinpcap | IRQinpcap |
 | `$AD` | NEhiDERV_1 | 2 | IRQinpcap | IRQinpcap |
+| `$AE` | – | 2 | IRQinpcap | IRQinpcap |
 | `$AF` | NEhiDERV | 2 | IRQinpcap | IRQinpcap |
+| `$B0` | – | 2 | IRQinpcap | IRQinpcap |
 | `$B1` | NEhiwidfilt | 2 | IRQinpcap | IRQinpcap |
+| `$B2` | – | 2 | IRQinpcap | IRQinpcap |
 | `$B3` | word_B3 | 2 | IRQinpcap | BeginCalcADV |
+| `$B4` | – | 2 | IRQinpcap | BeginCalcADV |
 | `$B5` | altDwell | 2 | BeginCalcADV, IRQoutcmp | jmptable3 |
+| `$B6` | – | 2 | BeginCalcADV, IRQoutcmp | jmptable3 |
 | `$B7` | NEtrEdge | 2 | IRQinpcap | IRQinpcap |
+| `$B8` | – | 2 | IRQinpcap | IRQinpcap |
 | `$B9` | NEleEdge | 2 | IRQinpcap, OutCmp1Sub1 | IRQinpcap |
+| `$BA` | – | 2 | IRQinpcap, OutCmp1Sub1 | IRQinpcap |
 | `$BB` | Dwell | 2 | IRQoutcmp, OutCmp1Sub1 | BeginCalcADV |
+| `$BC` | – | 2 | IRQoutcmp, OutCmp1Sub1 | BeginCalcADV |
 | `$BD` | word_BD | 2 | IRQoutcmp, OutCmp1Sub1 | IRQoutcmp |
+| `$BE` | – | 2 | IRQoutcmp, OutCmp1Sub1 | IRQoutcmp |
 | `$BF` | word_BF | 2 | BeginCalcADV, jmptable3 | jmptable3 |
+| `$C0` | – | 2 | BeginCalcADV, jmptable3 | jmptable3 |
 | `$C1` | IdleRPMfilt | 2 | BeginCalcADV, sub_F420 | sub_F420 |
+| `$C2` | – | 2 | sub_F420 | sub_F420 |
 | `$C3` | IdleRPMs | 1 | BeginCalcADV | sub_F420 |
 | `$C4` | word_C4 | 2 | sub_F420 | sub_F420 |
+| `$C5` | – | 2 | sub_F420 | sub_F420 |
 | `$C6` | byte_C6 | 1 | BeginCalcADV, IRQinpcap, IRQoutcmp, sub_F96A, sub_FD41 | IRQinpcap, sub_F96A |
 | `$C7` | SatCount_C7 | 1 | loc_FFE3† | BeginCalcADV, loc_FFE3† |
 | `$C8` | byte_C8 | 1 | sub_FD41 | FlagBadStuff, flagbadstuf3, jmptable1, jmptable3, sub_FD41 |
 | `$C9` | word_C9 | 2 | sub_FD41 | sub_FD41 |
+| `$CA` | – | 2 | sub_FD41 | sub_FD41 |
 | `$CB` | byte_CB | 1 | sub_FD41 | sub_FD41 |
 | `$CC` | byte_CC | 1 | FlagBadStuff, jmptable2 | FlagBadStuff |
 | `$CD` | unk_CD | 1 | BeginCalcADV, FlagBadStuff, IRQinpcap, flagbadstuf3, jmptable1, jmptable3, sub_F96A | FlagBadStuff, flagbadstuf3, jmptable1, jmptable3 |
@@ -256,12 +315,13 @@ store at `$54` + channel) are counted in the summary but not attributed here.
 | `$D1` | SatCount_D1 | 1 | jmptable1, jmptable3, loc_FFE3† | IRQinpcap, loc_FFE3†, sub_F420 |
 | `$D2` | SatCount_D2 | 1 | jmptable1, jmptable4, loc_F534, loc_FFE3† | loc_FFE3†, sub_F96A |
 | `$D3` | word_D3 | 2 | BeginCalcADV, loc_F534, sub_F420 | BeginCalcADV, loc_F534, sub_F420 |
+| `$D4` | – | 2 | BeginCalcADV, sub_F420 | BeginCalcADV, sub_F420 |
 | `$D5` | unk_D5 | 1 | sub_F420 | sub_F420 |
 | `$D6` | byte_D6 | 1 | sub_FD41 | sub_F70A |
 | `$D7` | byte_D7 | 1 | sub_F96A | sub_FD41 |
 | `$D8` | unk_D8 | 1 | – | BeginCalcADV |
 | `$FE` | – | 2 | – | sub_FD41† |
-| `$FF` | TopStack | 1 | – | reset† |
+| `$FF` | TopStack | 2 | – | reset†, sub_FD41† |
 
 ## ROM data and tables
 
@@ -271,16 +331,25 @@ X base for an indexed call). Code addresses that are only used as call or jump t
 | Address | Name | How | Used by |
 |---|---|---|---|
 | `$F000` | reset | ptr/r | sub_FD41, sub_FD41† |
+| `$F001` | – | r | sub_FD41† |
 | `$F7A2` | – | ptr/r | loc_F7F1†, sub_F96A |
+| `$F7A3` | – | r | loc_F7F1† |
 | `$F7A4` | – | r | loc_F7F1† |
+| `$F7A5` | – | r | loc_F7F1† |
 | `$F7A6` | – | ptr/r | Calc76, Calc76† |
+| `$F7A7` | – | r | Calc76† |
 | `$F7A8` | – | r | Calc76† |
+| `$F7A9` | – | r | Calc76† |
 | `$FA0D` | – | ptr | IRQinpcap |
 | `$FC81` | – | ptr | sub_F420 |
 | `$FD39` | JumpTable | ptr/r | procJmpTable, procJmpTable†, sub_F96A, sub_F96A† |
+| `$FD3A` | – | r | procJmpTable†, sub_F96A† |
 | `$FD3B` | – | r | procJmpTable†, sub_F96A† |
+| `$FD3C` | – | r | procJmpTable†, sub_F96A† |
 | `$FD3D` | – | r | procJmpTable†, sub_F96A† |
+| `$FD3E` | – | r | procJmpTable†, sub_F96A† |
 | `$FD3F` | – | r | procJmpTable†, sub_F96A† |
+| `$FD40` | – | r | procJmpTable†, sub_F96A† |
 | `$FDF3` | loc_FDF3 | ptr | IRQinpcap |
 | `$FE0C` | – | ptr | ForceInjAccD, ForceInjAccD2, inj2on, loc_F131 |
 | `$FE9C` | – | ptr | loc_F534 |

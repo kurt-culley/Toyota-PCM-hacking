@@ -2,13 +2,13 @@
 
 The Lead agent updates this file at the end of every session. The plan is in [`RE_PLAN.md`](RE_PLAN.md).
 
-**Last updated:** 2026-10-09 — P0 round-trip gate passed (asl + dasm byte-identical on the Bluetop ROM). Next: emulator, then Ghidra via CI.
+**Last updated:** 2026-10-09 — P0 round-trip gate passed (asl + dasm byte-identical on the Bluetop ROM). Ghidra made optional (owner decision). Next: cross-reference/call-graph generator, then the emulator.
 
 ## Phase checklist
 
 | Phase | Description | State | Gate signed off by Verifier |
 |---|---|---|---|
-| P0 | Foundations: tooling, Ghidra/asl round-trip, emulator | ◐ round-trip gate passed; Ghidra + emulator outstanding | ☐ |
+| P0 | Foundations: tooling, asl round-trip, xref, emulator | ◐ round-trip gate passed; xref + emulator outstanding | ☐ |
 | P1 | Ross claim register (skeleton done; figures and Mermaid diagrams outstanding) | ◐ started | — |
 | P2 | Bluetop analysis + Tier-A verification | ☐ | ☐ |
 | P3 | Dump the MR2 89661-17140 ROM (Arduino Zero reader) | ☐ | — |
@@ -25,7 +25,8 @@ The Lead agent updates this file at the end of every session. The plan is in [`R
 - [x] HD6301 opcode table and decoder: all 230 opcodes verified against `asl`.
 - [x] `cap.asm` → label/comment/code-data importer. It rebuilds every address by walking the listing alongside `cap.bin`: 1,980 instructions, 331 data lines, 339 ROM labels and 141 RAM labels, with every mnemonic matching the ROM.
 - [x] **Gate: [`analysis/bluetop/cap.s`](../analysis/bluetop/cap.s) reassembles byte-identical to `cap.bin` with `asl`, and the `dasm` cross-check agrees** (`uv run pytest`, 2026-10-09). The ROM's SHA-256 (`62b2a3f2…7f2`) is pinned in the tests.
-- [ ] Ghidra + pyghidra. **Blocked in the cloud container** (proxy denies GitHub release downloads). Options: run Ghidra headless in GitHub Actions, or on the owner's PC. Still to decide: whether an existing 6800/6801 module fits or a new HD6301 SLEIGH module is needed.
+- [ ] Cross-reference and call-graph generator: `analysis/bluetop/xref.md` lists the readers, writers and callers of every RAM variable and routine, with Mermaid call graphs.
+- [~] ~~Ghidra + pyghidra~~ **Made optional (owner decision, 2026-10-09).** There is no HD6301 module, and a decompiler adds little on hand-written 8-bit code. It is not a dependency or a gate. A later optional task may write a setup guide so the owner can browse the ROMs in Ghidra on their own PC.
 - [ ] Python HD6301 emulator passing the `suite6303` instruction tests (next P0 task).
 ### P1 tasks
 - [x] Claim register skeleton: [`ross/claims.md`](ross/claims.md).

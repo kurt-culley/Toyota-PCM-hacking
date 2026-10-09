@@ -1,0 +1,8 @@
+# Locally built assemblers (tools/setup_assemblers.sh)
+.tools/
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/

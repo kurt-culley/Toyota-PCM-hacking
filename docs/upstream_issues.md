@@ -49,12 +49,12 @@ These are the comments the web UI collapses ([#4](https://github.com/sparkiedk/T
 - **Failure mode: the data stream never stops, or there is far more data than expected** (one user got more than 30 KB). This means the **chip is running its own internal code**, not the reader, and is trying to talk to PCM peripherals that aren't there. The cause is mode pins or external memory not being set up correctly. The fix is to prove external execution first: run an **infinite-loop test** and probe the bus (only about 3 bus cycles to decode).
 - **"If a single bit is wired incorrectly, parts of your program may still work while others crash hard."** Verify every bus line. The Zero reader firmware gets a self-test mode that walks each address and data line.
 - **Prove the link before dumping.** Send a known string ("Hello world!") repeatedly with a ~100 ms pause, and adjust the baud rate until it reads correctly. The **serial clock pin** (pin 13 on the T8X) runs continuously once the SCI is up, so a frequency counter on it gives the baud rate. *Zero equivalent:* the reader firmware runs a known-pattern test program before the real dump.
-- **Disassembly workflow (IDA 4.x, which this project replaces with Ghidra):**
+- **Disassembly workflow (IDA 4.x, which this project replaces with the `pcmre` Python tooling):**
   - Set the binary's base offset.
   - Start disassembling from the **interrupt vectors** at the end of the ROM.
   - Manually mark code that the tool misses, especially **jump tables** (load index → add to table base → fetch a 16-bit pointer → jump). Each table entry must be flagged as code.
 
-  The Ghidra importer and scripts must handle jump tables explicitly. In the Bluetop, see `procJmpTable` and the `ADCcontrol` table at `$FA9B`.
+  The `pcmre` tooling must handle jump tables explicitly. In the Bluetop, see `procJmpTable` and the `ADCcontrol` table at `$FA9B`.
 - The author offered to help disassemble any new dump ("80% in an hour"). This is a possible upstream collaboration once the MR2 ROM is dumped, and agents must not contact him without the owner's approval.
 
 ## Later chips: mode pins are not guaranteed — [#1](https://github.com/sparkiedk/Toyota-PCM-hacking/issues/1) (2018–2021)

@@ -1,0 +1,7 @@
+# Intake air temperature sensor (THA), terminals 1-2. Source: Toyota MR2 AW11 EWD Nov 1984 (Pub. 36711E) p25 "Air thermo sensor".
+temp_c,r_min_kohm,r_max_kohm,note
+-30,26.8,26.8,scan reads 26.8 but 6/8 ambiguous; Beta model (B=3513 K) predicts 28.8 kOhm
+-20,16.2,16.2,
+20,2.2,2.7,
+80,0.32,0.32,scan prints "80 C" with "176 F" = 80 C
+120,0.12,0.12,

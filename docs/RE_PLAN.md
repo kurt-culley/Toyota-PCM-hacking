@@ -35,9 +35,16 @@ The project owner has a UK mk1b MR2 (ECU **89661-17140**). They know aftermarket
   - **The part-number prefix does not identify the CPU.**
   - How to convert spark-table values into degrees is disputed.
 
-### Framing hypothesis for goal 1 (to verify, not to assume)
+### Framing hypothesis for goal 1 (supported by the 1984 wiring diagram; one caveat from the 1988 manual)
 
-On the AW11/4A-GE, the cold start injector is driven by the **start injector time switch and STA**, not by the ECU. The IACV is a coolant-heated **wax auxiliary air valve**, not an ECU-driven ISC valve. Ross's claim R-I08 supports this. If it holds, the ECU never "knows" these parts are gone. The real question is how its own strategies react to less idle air and less cranking fuel: idle-stability spark advance, THW enrichment and advance, after-start enrichment and cranking fuel.
+On the AW11/4A-GE, the cold start injector is driven by the **start injector time switch and STA**, not by the ECU. The IACV is a coolant-heated **wax auxiliary air valve**, not an ECU-driven ISC valve. Ross's claim R-I08 supports this, and so does the **1984 factory wiring diagram** ([`hardware/ewd_aw11_1984.md`](hardware/ewd_aw11_1984.md)):
+- The CSI is wired starter → CSI → time switch, with no ECU connection.
+- The electrical idle-up VSV is switched by the electrical loads, and the ECU only senses it on I/UP.
+- The `STH` board pin is S/TH, the T-VIS output, not a cold-start terminal.
+
+**Caveat (1988 repair manual, [`hardware/repair_manual_aw11_1988.md`](hardware/repair_manual_aw11_1988.md)):** the 1988 US 4A-GE ECU *does* drive the idle-up VSV, from a `V-ISC` output, during cranking and for 10 s after start. The 17140 board has a `VISC` pad. If the UK 17140 drives it, the ECU adds its own start-up air through the idle-up VSV, separately from the IACV. The CSI is not ECU-driven in either manual.
+
+If the hypothesis holds, the ECU never "knows" the IACV and CSI are gone. It is **LIKELY** for the 17140 until continuity Test B in [`hardware/aw11_ecu.md`](hardware/aw11_ecu.md) and the P4 port audit show whether `VISC` is driven (STATUS Q2). The real question is how its own strategies react to less idle air and less cranking fuel: idle-stability spark advance, THW enrichment and advance, after-start enrichment and cranking fuel.
 
 ---
 
@@ -57,9 +64,10 @@ On the AW11/4A-GE, the cold start injector is driven by the **start injector tim
 - **Source-of-truth order:**
   1. the ROM bytes
   2. bench or car measurements
-  3. the Ross PDF (17030/17140)
-  4. existing `cap.asm` annotations
-  5. upstream issues and forums
+  3. factory service documentation (wiring diagram, repair manual); see [`hardware/ewd_aw11_1984.md`](hardware/ewd_aw11_1984.md) and [`hardware/repair_manual_aw11_1988.md`](hardware/repair_manual_aw11_1988.md)
+  4. the Ross PDF (17030/17140)
+  5. existing `cap.asm` annotations
+  6. upstream issues and forums
 
   Log conflicts in `STATUS.md`. Never resolve them silently.
 - **Evidence tags on every claim.** Use one of `[ROM:$F863]`, `[PDF:p12]`, `[EMU:test_id]` or `[BENCH:capture.sr]`, plus a confidence of **CONFIRMED**, **LIKELY** or **GUESS**.
@@ -79,7 +87,7 @@ On the AW11/4A-GE, the cold start injector is driven by the **start injector tim
 
 | Purpose | Use | Legacy (cross-check only) |
 |---|---|---|
-| Disassembly / decompilation | **Ghidra** (current), headless and scripted via **pyghidra**. First check whether an existing 6800/6801/6303 processor module fits. If not, write and test an `HD6301` SLEIGH module in `analysis/ghidra/`. Import labels and comments from `cap.asm` with a script | IDA 4.9 `.idb` |
+| Disassembly | **`analysis/pcmre`** (Python): a verified HD6301 decoder, the IDA listing importer, generated `asl` source that round-trips byte-identical, and a **cross-reference / call-graph generator** (Markdown + Mermaid). This is text-based, scriptable, checked in CI and diffable, which suits agent work. **Ghidra is optional**: an interactive browser for the owner to explore ROMs. It is never a gate or a dependency, because there is no HD6301 module and the decompiler adds little on hand-written 8-bit code with mid-instruction tricks | IDA 4.9 `.idb` |
 | Assembler | **Macroassembler AS (`asl`)**, maintained, with 6301/6303 support | dasm, TASM |
 | Emulation | A Python HD6301 core (`analysis/emu/`) with timer, OC/IC, SCI and ADC models, tested against `dasm/test/suite6303` and MAME's hd6301 core as reference. It runs single routines **and** the whole ROM with simulated NE/G and sensor inputs | — (Ross's 8086 port, conceptually) |
 | Scripting & tests | Python 3.12+, `uv`, `pytest`, `ruff`. GitHub Actions runs the round-trip and emulator tests | `.bat` files |
@@ -94,7 +102,7 @@ On the AW11/4A-GE, the cold start injector is driven by the **start injector tim
 | Role | Owns |
 |---|---|
 | **Lead** | `STATUS.md`, phase gates, task hand-out, conflict log |
-| **Toolsmith** | Ghidra module and scripts, emulator, generators (`defs/*.yaml` → XDF/INI/CSV/MD), CI |
+| **Toolsmith** | `pcmre` disassembly and cross-reference tooling, emulator, generators (`defs/*.yaml` → XDF/INI/CSV/MD), CI |
 | **Code analyst** | Control flow, RAM map, routine naming |
 | **Calibration analyst** | Map discovery, axes and scaling, physical-unit tables and plots |
 | **Hardware guide** | Beginner build guides (Markdown + Mermaid + photos), Zero firmware, bench procedures |
@@ -122,9 +130,10 @@ flowchart LR
 
 ### P0: Foundations
 
-- Set up the Python project (`uv`), CI, `asl` and Ghidra, and write the `cap.asm` → Ghidra label importer.
+- Set up the Python project (`uv`), CI and `asl`, and write the `cap.asm` label/comment importer. **Done.**
+- Build a cross-reference and call-graph generator. For every RAM variable and routine it lists its readers, writers and callers, and it produces Mermaid call graphs, written to `analysis/bluetop/xref.md`.
 - **Gate:**
-  - `analysis/bluetop/cap.s`, generated from the Ghidra export, reassembles with `asl` **byte-identical** to `cap.bin`, and a cross-check with `dasm` agrees.
+  - `analysis/bluetop/cap.s`, generated by `pcmre`, reassembles with `asl` **byte-identical** to `cap.bin`, and a cross-check with `dasm` agrees. **Passed 2026-10-09.**
   - The emulator passes the `suite6303` instruction tests.
 
 ### P1: Ross claim register (needs only the PDF)
@@ -153,7 +162,7 @@ flowchart LR
 
 1. Open the spare ECU and photograph both sides. Identify the CPU **by package and pinout**, not by part number. Record everything in `docs/hardware/aw11_ecu.md`.
    - **40-pin, HD6301-type** (expected): use the **§6a Arduino Zero breadboard reader**.
-   - **64-pin SDIP:** it is a **Toshiba 8X**. Use the same Zero approach with T8X bus timing, and Ghidra needs a T8X module.
+   - **64-pin SDIP:** it is a **Toshiba 8X**. Use the same Zero approach with T8X bus timing, and `pcmre` needs a T8X decoder (the instruction set is in `Toshiba 8x info/`).
 2. Write a beginner build guide (`docs/hardware/zero_reader_guide.md`). It covers wiring with Mermaid and photos, the Zero firmware (Arduino-CLI or PlatformIO, in `hardware/zero-reader/`), the Python capture script, and the relevant parts of the upstream bring-up checklist.
 3. Before dumping, the Zero firmware runs three self-tests, following the lessons from upstream #4:
    - a walking-ones test on every address and data line;
@@ -166,7 +175,7 @@ flowchart LR
 
 ### P4: MR2 analysis and Tier-B verification → "Ross verified" gate
 
-- Run the P0 and P2 steps on the MR2 ROM. Reuse Bluetop labels wherever routines match (Ghidra BSim or function-ID signatures).
+- Run the P0 and P2 steps on the MR2 ROM. Reuse Bluetop labels wherever routines match. A `pcmre` signature matcher compares instruction byte patterns with operands masked out, since addresses shift between ROMs.
 - Check every Tier-B claim, including:
   - the 11-site density maps split at 3200 rpm
   - the −10 %/+8 % speed correction
@@ -178,6 +187,7 @@ flowchart LR
   - the mixture screw: **3600 rpm** cut-off, **MX1 × MX2 / 32000**, and the end-stop fallback
   - injection doubling above 6000 rpm
   - the IGF fuel cut
+- **VISC/FPU port audit:** find every write to the port bits behind `VISC` and `FPU` (located by continuity Test B). Record the conditions, for example STA plus a 10 s timer as in the 1988 manual. Compare the decel fuel-cut and return rpm with the 1988 manual (1600/1200 rpm, A/C off).
 - Check Ross's 17030-only numbers against the 17140 and mark them `DIFFERS-BY-ECU` where they differ. A 17030 dump would close this gap.
 - Tier-C claims are settled by P8 measurements.
 - **Deliverable:** `docs/ross/verification_report.md`. It gives a status and evidence for every claim, plus Mermaid diagrams of the **verified** chains, with every difference from Ross highlighted.
@@ -192,7 +202,9 @@ flowchart LR
   - idle-stability advance (attack, decay, maximum)
   - fast idle
   - decel fuel cut versus temperature
-  - whether the ECU drives **any** cold-start-injector or idle-control output (port audit compared against the wiring diagrams)
+  - the load compensation the ECU applies when the **I/UP (idle-up) input** is active, if the 17140 has one
+  - the **`VISC` start-up idle-up output**, if the P4 port audit finds it driven (cranking + 10 s on the 1988 US car)
+  - confirm that the ECU drives **no** cold-start-injector output, and settle whether it drives the idle-up VSV (port audit compared against [`hardware/ewd_aw11_1984.md`](hardware/ewd_aw11_1984.md) and [`hardware/repair_manual_aw11_1988.md`](hardware/repair_manual_aw11_1988.md)). The ECU-side cold-start levers are STA, THW-based enrichment and advance, after-start enrichment, idle-stability advance, and either I/UP or `VISC`
 - Run whole-ROM emulator sweeps for starts at −5, 10 and 20 °C, each with normal and reduced idle air.
 - **Deliverable:** `docs/warmup_cold_start.md`. It contains:
   - a Mermaid state diagram of the cold-start sequence
@@ -234,7 +246,7 @@ CLAUDE.md
 docs/{RE_PLAN,STATUS,upstream_issues,variants,glossary}.md
 docs/ross/{claims.md,verification_report.md,diagrams.md,figures/}
 docs/bluetop/  docs/mr2/  docs/hardware/  docs/warmup_cold_start.md  docs/secret_maps.md
-analysis/{ghidra/,emu/,tools/,defs/*.yaml,generated/{xdf,ini,csv}/,captures/*.sr}
+analysis/{pcmre/,emu/,tools/,defs/*.yaml,generated/{xdf,ini,csv}/,captures/*.sr}
 hardware/{BOM.md,zero-reader/,bench-sim/,daughtercard/}
 ```
 
@@ -323,4 +335,4 @@ The full glossary lives in `docs/glossary.md`, written in tuner terms. Seed term
 
 - **Signals and sensors:** NE/G, IGT/IGF, THW/THA, PIM, VTA/IDL, STA, TVIS.
 - **ECU concepts:** D-type/L-type EFI, mask ROM, expanded mode, interrupt vector, RAM map, 2D/3D table, interpolation, checksum.
-- **Hardware and tooling:** SLEIGH, CPLD, level shifting (3.3 V ↔ 5 V), dual-port SRAM, cycle stealing.
+- **Hardware and tooling:** disassembler, cross-reference, CPLD, level shifting (3.3 V ↔ 5 V), dual-port SRAM, cycle stealing.

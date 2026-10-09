@@ -2,13 +2,13 @@
 
 The Lead agent updates this file at the end of every session. The plan is in [`RE_PLAN.md`](RE_PLAN.md).
 
-**Last updated:** 2026-10-09 — playbook, claim register skeleton, upstream digest (now complete) and BOM created.
+**Last updated:** 2026-10-09 — The 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.md`](hardware/repair_manual_aw11_1988.md); the PDF is not committed). Its US ECU drives the idle-up VSV from `V-ISC` (cranking + 10 s), so Q2 is partly reopened for the 17140; continuity Test B now also covers `FPU`. Earlier today: the 1984 EWD, the second photo set and the continuity-test guide. P0 next: cross-reference/call-graph generator, then the emulator.
 
 ## Phase checklist
 
 | Phase | Description | State | Gate signed off by Verifier |
 |---|---|---|---|
-| P0 | Foundations: tooling, Ghidra/asl round-trip, emulator | ☐ not started | ☐ |
+| P0 | Foundations: tooling, asl round-trip, xref, emulator | ◐ round-trip gate passed; xref + emulator outstanding | ☐ |
 | P1 | Ross claim register (skeleton done; figures and Mermaid diagrams outstanding) | ◐ started | — |
 | P2 | Bluetop analysis + Tier-A verification | ☐ | ☐ |
 | P3 | Dump the MR2 89661-17140 ROM (Arduino Zero reader) | ☐ | — |
@@ -20,13 +20,14 @@ The Lead agent updates this file at the end of every session. The plan is in [`R
 
 ### P0 tasks
 - [x] Archive the missing upstream comments (#4 and #1, all read through the API on 2026-10-09). See [`upstream_issues.md`](upstream_issues.md).
-- [ ] Set up the Python project (`uv`, `pytest`, `ruff`) and GitHub Actions CI.
-- [ ] Install Ghidra and pyghidra. Decide between an existing 6800/6801 module and a new HD6301 SLEIGH module.
-- [ ] Install `asl` (Macroassembler AS).
-- [ ] Write the `cap.asm` → Ghidra label/comment importer.
-- [ ] Gate: `cap.s` reassembles byte-identical to `cap.bin`.
-- [ ] Gate: the emulator passes `suite6303`.
-
+- [x] Set up the Python project (`uv`, `pytest`, `ruff`) and GitHub Actions CI (`.github/workflows/ci.yml`).
+- [x] Build `asl` 1.42 bld306 from source, plus `dasm` from the vendored copy: [`../tools/setup_assemblers.sh`](../tools/setup_assemblers.sh).
+- [x] HD6301 opcode table and decoder: all 230 opcodes verified against `asl`.
+- [x] `cap.asm` → label/comment/code-data importer. It rebuilds every address by walking the listing alongside `cap.bin`: 1,980 instructions, 331 data lines, 339 ROM labels and 141 RAM labels, with every mnemonic matching the ROM.
+- [x] **Gate: [`analysis/bluetop/cap.s`](../analysis/bluetop/cap.s) reassembles byte-identical to `cap.bin` with `asl`, and the `dasm` cross-check agrees** (`uv run pytest`, 2026-10-09). The ROM's SHA-256 (`62b2a3f2…7f2`) is pinned in the tests.
+- [ ] Cross-reference and call-graph generator: `analysis/bluetop/xref.md` lists the readers, writers and callers of every RAM variable and routine, with Mermaid call graphs.
+- [~] ~~Ghidra + pyghidra~~ **Made optional (owner decision, 2026-10-09).** There is no HD6301 module, and a decompiler adds little on hand-written 8-bit code. It is not a dependency or a gate. A later optional task may write a setup guide so the owner can browse the ROMs in Ghidra on their own PC.
+- [ ] Python HD6301 emulator passing the `suite6303` instruction tests (next P0 task).
 ### P1 tasks
 - [x] Claim register skeleton: [`ross/claims.md`](ross/claims.md).
 - [ ] Extract the 16 figures (`pdfimages`) and confirm the page mapping.
@@ -44,16 +45,22 @@ The Lead agent updates this file at the end of every session. The plan is in [`R
 
 | # | Question | Who / how |
 |---|---|---|
-| Q1 | Is the 17140's CPU a 40-pin HD6301-type (like the Bluetop) or a 64-pin Toshiba 8X? | Owner opens the spare ECU and sends photos (P3) |
-| Q2 | Does the ECU drive the cold start injector or any idle-air device at all? The hypothesis is no: they are driven by the time switch/STA and a wax valve | Port audit + wiring diagram (P5) |
+| Q1 | ~~Is the 17140's CPU a 40-pin HD6301-type (like the Bluetop) or a 64-pin Toshiba 8X?~~ **Answered 2026-10-09:** a 40-pin **D151801-7110** with silkscreen "6356/6801" and a 4.00 MHz crystal. It is the same family as the Bluetop, so P3 follows the HD6301 path. See [`hardware/aw11_ecu.md`](hardware/aw11_ecu.md) | Done (photos) |
+| Q2 | Does the ECU drive the cold start injector or any idle-air device? **CSI: no (LIKELY for the 17140).** Both factory manuals wire it starter → CSI → time switch, and the board label is `STH` = S/TH (T-VIS), not STJ. **Idle air: open.** The IACV is a mechanical wax valve in both manuals. The idle-up VSV is load-switched and only *sensed* (I/UP) in the 1984 EWD, but the 1988 US ECU **drives** it from `V-ISC` during cranking and for 10 s after start, and the 17140 board has a `VISC` pad. See [`hardware/ewd_aw11_1984.md`](hardware/ewd_aw11_1984.md) and [`hardware/repair_manual_aw11_1988.md`](hardware/repair_manual_aw11_1988.md) | Continuity **Test B** (is there a driver transistor behind `VISC`?), then the P4 port audit ([`hardware/aw11_ecu.md`](hardware/aw11_ecu.md)) |
 | Q3 | What converts raw ignition-table values to degrees BTDC, and does VR offset matter? | IGT tracing + Zero timing meter (P2/P8) |
 | Q4 | Can a 17030 or 17070 dump be found, to check Ross's 17030 numbers directly? | Community search (P3) |
-| Q5 | Do NE/G inputs need a VR-style bipolar waveform from the bench simulator? | ECU input-circuit inspection (P8) |
+| Q5 | Do NE/G inputs need a VR-style bipolar waveform from the bench simulator? | ECU input-circuit inspection (P8). IC3 (µPC177C comparator) is the likely conditioner |
+| Q6 | Do the factory jumpers next to the MCU (**two links fitted among J3/J4/J8**; the rest empty) set Ross's secret-map "logic level", or the HD6301 mode pins (P20–P22)? | Owner runs continuity **Test A** ([`hardware/aw11_ecu.md`](hardware/aw11_ecu.md)), then the ROM is searched for port-bit tests (P6) |
+| Q7 | What does the 17140 ROM do with the `OX`/`VF` pins on a UK car with no O2 sensor? | ROM analysis (P4) |
+| Q8 | Does the 17140's `OX` pin carry the mixture-screw CO resistor? The 1984 VAF pin is missing from the board (Ross R-M08) | Continuity **Test B**, then the ROM ADC channel map (P4) |
+| Q9 | Is there a **1986–89 UK mk1b wiring diagram** to confirm the 17140 pinout (VISC, OX, W, ACT, FPU ...)? The 1988 repair manual is mk1b-era but **US spec** (air flow meter, O2 sensor), so it defines `V-ISC`, `FPU` and `W` but cannot say what the UK car uses | Owner: a UK/European 1986–89 EWD or repair manual supplement |
 
 ## Conflicts log
 
 | Date | Topic | Source A says | Source B says | Resolution |
 |---|---|---|---|---|
+| 2026-10-09 | Idle-up VSV control | 1984 EWD (Europe, mk1a era): load-switched, ECU senses on I/UP | 1988 RM (US, mk1b era): ECU drives on `V-ISC`, cranking + 10 s | Era/market difference; the manuals do not contradict each other for their own cars. **Open for the 17140** (Q2): Test B + port audit |
+| 2026-10-09 | Injector harness grouping and impedance | 1984 EWD: #10 = No.1+3, #20 = No.2+4; injectors 1.5–3.0 Ω | 1988 RM: No.10 = No.3+4, No.20 = No.1+2; injectors about 13.8 Ω | Era/market difference. The grouping matters only if the ECU does not join #10/#20 (R-F22). Measure the UK car's injectors before P8 |
 | 2026-10-09 | Max ignition advance | Ross p16 graph: about 50° BTDC | Upstream #6: implausible, may include a VR offset | Open. Settle with a bench measurement (R-I06) |
 
 ## Exceptions to the Arduino-first rule

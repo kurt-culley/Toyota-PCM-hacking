@@ -9,13 +9,15 @@ This repo is used to reverse-engineer Denso/Toyota ECUs. The active project is t
 
 1. **Arduino-first, minimal purchases.** Design every hardware task around the owner's **Arduino Zero** (SAMD21, 3.3 V, native USB). Buy a part only when the Zero physically cannot do the job, and write the reason in [`hardware/BOM.md`](hardware/BOM.md). Two exceptions are already accepted: level shifters, and bus-speed memory/glue for the in-car board. Any new exception needs the owner's approval, logged in `STATUS.md`. **The Zero is not 5 V tolerant, so always level-shift.**
 2. **Modernise.** Use the current toolchain:
-   - Ghidra + pyghidra
+   - Python disassembly tooling (`analysis/pcmre`): verified decoder, generated source, cross-references and call graphs
    - the `asl` assembler
    - a Python HD6301 emulator
    - Python with `uv`, `pytest` and `ruff`
    - sigrok/PulseView
    - KiCad
    - TunerStudio, or TunerPro RT for raw ROM files
+
+   Ghidra is **optional**: an interactive browser for the owner, never a dependency or a gate.
 
    Legacy tools (IDA 4.9, TASM, dasm, ExpressPCB, WinCUPL, RS232) are for cross-checking only. When you touch a legacy file, convert it to an open format, and never delete the original.
 3. **Verify Ross first.** Cold-start work (P5) starts only after the "Ross verified" gate (P4). See [`docs/ross/claims.md`](docs/ross/claims.md).
@@ -25,9 +27,10 @@ This repo is used to reverse-engineer Denso/Toyota ECUs. The active project is t
 - **Source-of-truth order:**
   1. ROM bytes
   2. Bench or car measurement
-  3. Ross PDF (17030/17140)
-  4. Existing `cap.asm` annotations
-  5. Upstream issues ([`docs/upstream_issues.md`](docs/upstream_issues.md)) and forums
+  3. Factory service documentation ([`docs/hardware/ewd_aw11_1984.md`](docs/hardware/ewd_aw11_1984.md), [`docs/hardware/repair_manual_aw11_1988.md`](docs/hardware/repair_manual_aw11_1988.md); the original PDFs are Toyota copyright and are not committed)
+  4. Ross PDF (17030/17140)
+  5. Existing `cap.asm` annotations
+  6. Upstream issues ([`docs/upstream_issues.md`](docs/upstream_issues.md)) and forums
 
   Log every conflict in `STATUS.md`. Never resolve one silently.
 - **Tag every claim** with its evidence (`[ROM:$F863]`, `[PDF:p12]`, `[EMU:test]` or `[BENCH:file]`) and a confidence level (CONFIRMED, LIKELY or GUESS).
@@ -59,4 +62,4 @@ This repo is used to reverse-engineer Denso/Toyota ECUs. The active project is t
 | `Lifting The Lid on the mk1 MR2 ECU (Jeremy Ross).pdf` | UK MR2 ECU articles. Claims are tracked in `docs/ross/claims.md` |
 | `docs/` | Playbook, status, Ross verification, write-ups |
 | `hardware/` | BOM, Zero firmware, KiCad (as it is created) |
-| `analysis/` | Ghidra, emulator, map definitions, generated outputs (as they are created) |
+| `analysis/` | `pcmre` Python tooling, generated source, emulator, map definitions, generated outputs (as they are created) |

@@ -6,7 +6,9 @@ The Lead agent updates this file at the end of every session. The plan is in [`R
 - **Continuity Test A (jumpers) is done.** The links come in pairs, setting two **Port 3 option bits**: **P32 = 0** (J4) and **P34 = node N** (J8). These are the likely secret-map select bits.
 - The case floats. IC7 pin 1 is confirmed. Mode 7 is LIKELY.
 - P0 is signed off. P1's figures and data are done.
-- Next: the P1 Mermaid diagrams, Test B (VISC/FPU/OX/STH), and Q10 (a powered check, needing owner approval).
+- **P1 is complete,** including the Ross logic diagrams.
+- Next: P2, the Bluetop analysis with the emulator's peripheral models.
+- Test B (VISC/FPU/OX/STH) is deferred by the owner. Q10 is a powered check that needs owner approval.
 
 Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.md`](hardware/repair_manual_aw11_1988.md); the PDF is not committed). Its US ECU drives the idle-up VSV from `V-ISC` (cranking + 10 s), so Q2 is partly reopened for the 17140; continuity Test B now also covers `FPU`. Earlier today: the 1984 EWD, the second photo set and the continuity-test guide. P0 next: cross-reference/call-graph generator, then the emulator.
 
@@ -15,7 +17,7 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
 | Phase | Description | State | Gate signed off by Verifier |
 |---|---|---|---|
 | P0 | Foundations: tooling, asl round-trip, xref, emulator | ✅ done | ☑ 2026-10-09 (independent Verifier agents: xref and emulator, both after fixes) |
-| P1 | Ross claim register (skeleton, figures and data done; Mermaid diagrams outstanding) | ◐ | — |
+| P1 | Ross claim register, figures, digitised data, diagrams | ✅ done | — |
 | P2 | Bluetop analysis + Tier-A verification | ☐ | ☐ |
 | P3 | Dump the MR2 89661-17140 ROM (Arduino Zero reader) | ☐ | — |
 | P4 | MR2 analysis + Tier-B verification → **Ross verified** | ☐ | ☐ |
@@ -44,7 +46,7 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
 - [x] Claim register skeleton: [`ross/claims.md`](ross/claims.md).
 - [x] Extract the 16 figures (`pdfimages`, flipped upright) and confirm the page mapping ([`ross/figures/`](ross/figures/README.md)).
 - [x] Digitise the graphs to CSV ([`../analysis/ross/digitise.py`](../analysis/ross/digitise.py)) and transcribe the 17×8 ignition table. The transcription matches Ross's own p13 chart to within 1 count.
-- [ ] Mermaid diagrams of Ross's fuel chain, ignition chain and injection-mode state machine (`ross/diagrams.md`).
+- [x] Mermaid diagrams of Ross's fuel chain, ignition chain, injection modes, T-VIS, idle stability, mixture screw and cold start ([`ross/diagrams.md`](ross/diagrams.md)). All render with mermaid-cli 11.4.
 
 ### P3 pre-purchase checks (from the HD6301 handbook and `bluetopreader.sch`)
 - [ ] Mode-pin strapping for external vector fetch with the internal ROM still readable.

@@ -24,10 +24,10 @@ variables:
     confidence: LIKELY (assumes rpm = 30,000,000 / deltaNE, from the ROM's 7400 rpm rev-limit constant $0FD6)
   Load:
     addr: 0x7F
-    unit: raw (16-bit)
-    to_physical: "unknown: pulse-time based load (airflow meter on this L-type engine)"
-    evidence: "[ROM:$F86C]"
-    confidence: GUESS
+    unit: us (air-temperature-corrected airflow delay)
+    to_physical: "Load = Calc72(SE056plstime) = 3/4 x + x*ThAcorr/512, x = SE056 delay after the NE edge in us; mass-flow meaning unknown until the SE056 is measured"
+    evidence: "[ROM:$F550-$F556, $F6FC-$F709] [EMU:tests/test_fuel_chain.py, tests/test_sim.py]"
+    confidence: LIKELY (formula and unit); GUESS (airflow per stroke)
   ADC_ThW:
     addr: 0x57
     unit: degF (after the $FEF0 linearisation)
@@ -38,7 +38,7 @@ variables:
     addr: 0x55
     unit: raw ADC
     to_physical: "volts = raw * 25 / 255 (+B1 divided by 5, 5 V reference)"
-    evidence: "[cap.asm comment at $FF12 use]"
+    evidence: "[ROM:$FC8F-$FCAF] [cap.asm comment '+B1 terminal divided by 5']"
     confidence: LIKELY
 
 maps:
@@ -89,15 +89,91 @@ maps:
 
   - id: inj_dead_time
     name: Injector dead time vs battery voltage
+    addr: 0xFEE9
+    kind: 1d
+    entry: 0xFF25
+    length: 9
+    axis: {var: "ADC_12V - $53 (0 below 8.1 V)", shift: 5, unit: raw ADC}
+    cell:
+      unit: raw
+      note: "InjDeadTime = v*8 + 464 us (the helper's A:B/32 + $1D0); 255 -> 2504 us at 8.1 V or less. Input is at most $AC, so entries 7-8 (which overlap $FEF0) are never reached"
+    evidence: "[ROM:$FC8F-$FC9E suba #$53 / ldx #$FEE9 / DivDby32 / addd #$01D0 / std InjDeadTime] [EMU:tests/test_sim.py 1183 us at 14 V]"
+    confidence: CONFIRMED (use and scaling); LIKELY (volts axis)
+    claims: [R-F17]
+
+  - id: dwell_battery
+    name: Coil dwell term vs battery voltage
     addr: 0xFF12
     kind: 1d
     entry: 0xFF25
     length: 9
     axis: {var: ADC_12V, shift: 5, unit: raw ADC}
-    cell: {unit: raw (scaled by the caller; feeds InjDeadTime)}
-    evidence: "[ROM:$FCA5 ldaa ADC_12V / jsr $13,x]"
-    confidence: LIKELY
-    claims: [R-F17]
+    cell:
+      unit: raw
+      note: "word_BF is filtered towards v*32 us; Dwell = deltaNE/16 + word_BF. Shares bytes with $FF11"
+    evidence: "[ROM:$FCA2-$FCAF ldx #$FF12 / lsrd x3 / addd word_BF / lsrd] [ROM:$F913 Dwell = deltaNE/16 + word_BF]"
+    confidence: CONFIRMED (use); LIKELY (dwell meaning)
+
+  - id: se056_max
+    name: Maximum airflow delay (SE056Maxtime) vs engine speed
+    addr: 0xFE9C
+    kind: 1d
+    entry: 0xFF2D
+    length: 12
+    axis: {var: "FullRPM high byte (about rpm/800)", shift: 0, unit: "FullRPM/256", raw: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]}
+    cell:
+      unit: raw
+      note: "SE056Maxtime = v*8 + $800 us; clamps the measured airflow delay and scales the acceleration enrichment. FullRPM is at most $0A00, so only 12 entries are reached (the next bytes are $FEA7)"
+    evidence: "[ROM:$F582-$F58E ldd FullRPM / ldx #$FE9C / jsr $91,x / DivDby32 / adda #$08 / std SE056Maxtime] [ROM:$F1DA clamp]"
+    confidence: CONFIRMED (use); LIKELY (rpm axis)
+
+  - id: accel_enrich
+    name: Acceleration enrichment vs throttle opening rate
+    addr: 0xFEA7
+    kind: 1d
+    entry: 0xFF2B
+    length: 8
+    axis: {var: "TPS rise byte_5D - byte_5A, bounded 4..$1C", shift: 2, unit: raw ADC counts per pass, raw: [0, 4, 8, 12, 16, 20, 24, 28]}
+    cell:
+      unit: raw multiplier
+      note: "halved at 2000 rpm and above, then multiplied by (SE056Maxtime - SE056plstime); only off idle"
+    evidence: "[ROM:$FBA0-$FBD1]"
+    confidence: CONFIRMED (structure); LIKELY (meaning)
+
+  - id: overheat_adv
+    name: Over-temperature ignition retard (ThW_tADV when hot)
+    addr: 0xFF11
+    kind: 1d
+    entry: 0xFF2A
+    length: 3
+    axis: {var: "ADC_ThW - 218 F, bounded 0..15", shift: 3, unit: degF above 218, raw: [0, 8, 16]}
+    cell:
+      unit: raw advance (replaces ThW_tADV)
+      note: "28 at 218 F falling to 6 from 226 F: about -7.7 deg. Applied only off idle with Load >= $9C4; otherwise ThW_tADV = 28. Shares bytes with $FF12"
+    evidence: "[ROM:$FC03-$FC1E] [EMU:tests/test_sim.py::test_overheat_retard_only_at_high_load]"
+    confidence: CONFIRMED
+    claims: [R-I12]
+
+  - id: pwr_ign_trim
+    name: Ignition trim selected by the PWRr input (8-step staircase, no interpolation)
+    addr: 0xFF94
+    kind: step
+    length: 8
+    axis: {var: ADC_PWRr, shift: 5, unit: raw ADC}
+    cell: {unit: raw advance subtracted from the 3D-map value}
+    evidence: "[ROM:$F8A5 ldx #$FF94 / jsr $10,x -> $FFA4: ldab ADC_PWRr / lsrb x5 / abx / suba 0,x] [EMU:tests/test_sim.py::test_pwr_input_selects_a_staircase_trim]"
+    confidence: "CONFIRMED (structure); GUESS (what PWRr is: likely a calibration or option resistor)"
+    claims: [R-F10]
+
+  - id: pwr_o2_trim
+    name: O2-loop value selected by the PWRr input (8-step staircase)
+    addr: 0xFF9C
+    kind: step
+    length: 8
+    axis: {var: ADC_PWRr, shift: 5, unit: raw ADC}
+    cell: {unit: raw, note: "subtracted from $6C or $6F (by Load) and stored in unk_9B"}
+    evidence: "[ROM:$F7E7-$F7EC ldx #$FF9C / jsr $08,x -> $FFA4]"
+    confidence: CONFIRMED (structure); GUESS (meaning)
 
   - id: decel_cut_rpm
     name: Decel fuel-cut rpm vs coolant temperature

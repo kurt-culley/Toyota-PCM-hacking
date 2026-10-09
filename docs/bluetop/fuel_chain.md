@@ -29,7 +29,7 @@ flowchart TD
   MIX --> O2["Calc76: O2 trim word_76<br/>(ADC_Oxy; default $8000)<br/>[ROM:$F7BE]"]
   O2 --> FR["FuelRatioH $74 = max(word_70, corrected word_72)<br/>'ratio to multiply SE056plstime by'<br/>[ROM:$F6D8–$F6E0]"]
   FR --> PW["pulse width InCp2TrEg $9F<br/>= airflow time × FuelRatioH<br/>[ROM:$F138–$F160]"]
-  BAT["ADC_12V → table $FF12 → InjDeadTime $81<br/>[ROM:$FCA5] [EMU]"] --> OFF
+  BAT["ADC_12V → table $FEE9 → InjDeadTime $81<br/>= 8·v + 464 µs [ROM:$FC8F–$FC9E] [EMU]"] --> OFF
   PW --> OFF["injector off time = Timer + pulse + dead time<br/>(µs on the 1 MHz timer)<br/>[ROM:$F168 CalcInjOffTime]"]
   OFF --> INJ["#10 on P4-7 (software)<br/>#20 on OC2 / P1-1<br/>grouped, not simultaneous<br/>[ROM:$F138, $F154, $F196]"]
   CUT["decel cut: lilRPM ≥ DecelCutRPM (table $FEE2 vs ThW)<br/>→ enrichment halved / cut<br/>[ROM:$F666–$F671]"] -.-> MIX

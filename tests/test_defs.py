@@ -39,7 +39,7 @@ def test_every_1d_table_in_the_code_is_defined():
     t = TARGETS["bluetop"]
     defined = {m["addr"] for m in spec["maps"]}
     found = {u.base for u in find_1d_uses(analyse(rom, parse(t["listing"], rom)), rom)}
-    missing = sorted(found - defined - {0xFE9C, 0xFEA7, 0xFEE9, 0xFF11})  # not yet characterised; see maps.md
+    missing = sorted(found - defined)
     assert not missing, [f"${a:04X}" for a in missing]
 
 

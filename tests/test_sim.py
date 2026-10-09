@@ -153,3 +153,74 @@ def test_grouped_and_simultaneous_give_the_same_fuel_per_cycle():
         pulses = s.injector_pulses("#10", since)
         cycles = 0.3 * 1200 / 120
         assert sum(p - dead for p in pulses) / cycles == pytest.approx(4 * lp, rel=0.12)
+
+
+def _warm_off_idle(setup=None, ms=1200, airflow=1500):
+    s = Simulation()
+    s.inputs.rpm, s.inputs.idl, s.inputs.airflow_us = 2400, False, airflow
+    if setup:
+        setup(s)
+    s.engine.update_sensors()
+    s.run_ms(ms)
+    return s
+
+
+@pytest.mark.parametrize(("port", "bit"), [(3, 0), (3, 1), (3, 2), (3, 3), (1, 4)])
+def test_spare_input_pins_select_no_alternative_map(port, bit):
+    """No Bluetop digital input outside the known switches changes spark or fuel (R-F12/R-I15)."""
+    ref = _warm_off_idle()
+    for level in (0, 1):
+        s = _warm_off_idle(lambda s, level=level: s.periph.set_pin(port, bit, level))
+        for name, w in (("BaseAdvance", 1), ("FuelRatioH", 2), ("InjLoadPulse", 2)):
+            assert s.ram(name, w) == ref.ram(name, w), (port, bit, level, name)
+
+
+def test_pwr_input_selects_a_staircase_trim():
+    """BaseAdvance = map - $FF94[PWRr >> 5]: eight fixed steps, no interpolation [ROM:$F8A5, $FFA4]."""
+    trim = Simulation().rom[0xFF94 - 0xF000 : 0xFF94 - 0xF000 + 8]
+    ref = _warm_off_idle().ram("BaseAdvance")
+    for raw in (0x5F, 0x60, 0x7F, 0x80, 0xE0):
+        s = _warm_off_idle(lambda s, raw=raw: setattr(s.inputs, "pwr_raw", raw))
+        assert s.ram("BaseAdvance") == ref - trim[raw >> 5], hex(raw)
+
+
+def test_overheat_retard_only_at_high_load():
+    """Above 218 F the warm-up advance is replaced by table $FF11 (28 -> 6), but only with Load >= $9C4."""
+    hot = lambda s: setattr(s.inputs, "coolant_f", 230)  # noqa: E731
+    assert _warm_off_idle(hot, airflow=1500).ram("ThW_tADV") == 28
+    s = _warm_off_idle(hot, airflow=2800)
+    assert s.ram("Load", 2) >= 0x9C4 and s.ram("ThW_tADV") == 6
+
+
+def test_p1_5_output_on_for_ten_seconds_after_start():
+    """P1-5 is on from key-on through cranking until about 10 s after start, whatever the coolant temperature
+    [ROM:$FCBB-$FCD4]. The 1988 repair manual gives the same timing for the V-ISC idle-up VSV (FI-119)."""
+    from emu.scenarios import start
+
+    s = start(176)  # key on 0.3 s, crank 1.5 s, then idle
+    events = []
+    s.periph.listeners.append(lambda n, lv, t: events.append((t, lv)) if n == "P1-5" else None)
+    assert s.periph.read(0x02) & 0x20  # on during cranking
+    t_start = s.periph.now
+    s.run_ms(12_000)
+    off = [t for t, lv in events if lv == 0]
+    assert off and 9.5e6 < off[0] - t_start < 11e6
+
+
+def test_learned_values_survive_a_restart_in_standby_ram():
+    """$40-$4A is outside the reset RAM clear ($4C-$FF) and is kept if the $5A signature and each value/complement
+    pair check out; otherwise it is reinitialised [ROM:$F02B, $FC22-$FC47]. Fault codes live there too."""
+    s = Simulation()
+    s.run_ms(300)
+    assert s.ram(0x4A) == 0x5A
+    kept = bytearray(s.periph.mem[0x40:0x4B])
+    kept[2:4] = bytes([0x90, 0x6F])  # word_42 = value, complement
+    s2 = Simulation()
+    s2.periph.mem[0x40:0x4B] = kept
+    s2.run_ms(300)
+    assert s2.ram("word_42", 2) == 0x906F
+    kept[3] = 0x00  # break the complement
+    s3 = Simulation()
+    s3.periph.mem[0x40:0x4B] = kept
+    s3.run_ms(300)
+    assert s3.ram("word_42", 2) == 0x807F

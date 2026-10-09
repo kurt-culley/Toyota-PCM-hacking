@@ -9,9 +9,9 @@ ROM: `TOYOTA Bluetop PCM/cap.bin` (sha256 `62b2a3f29039…`), base `$F000`.
 | Variable | RAM | Unit | To physical | Evidence | Confidence |
 |---|---|---|---|---|---|
 | `RPMish` | `$64` | rpm index | rpm ~= (RPMish + 32) * 25 below RPMish 160 (4800 rpm); rpm ~= (RPMish - 64) * 50 above | [ROM:$F4B8 staa RPMish] [EMU:sweep of CalcRPM $F446 with deltaNE = 30e6/rpm] | LIKELY (assumes rpm = 30,000,000 / deltaNE, from the ROM's 7400 rpm rev-limit constant $0FD6) |
-| `Load` | `$7F` | raw (16-bit) | unknown: pulse-time based load (airflow meter on this L-type engine) | [ROM:$F86C] | GUESS |
+| `Load` | `$7F` | us (air-temperature-corrected airflow delay) | Load = Calc72(SE056plstime) = 3/4 x + x*ThAcorr/512, x = SE056 delay after the NE edge in us; mass-flow meaning unknown until the SE056 is measured | [ROM:$F550-$F556, $F6FC-$F709] [EMU:tests/test_fuel_chain.py, tests/test_sim.py] | LIKELY (formula and unit); GUESS (airflow per stroke) |
 | `ADC_ThW` | `$57` | degF (after the $FEF0 linearisation) | degC = (raw - 32) / 1.8 | [ROM:$FAD3 ldx #$FEF0 / jsr $38,x; bounded to 241] [cap.asm comments 'water temp in fahrenheit'] | LIKELY |
-| `ADC_12V` | `$55` | raw ADC | volts = raw * 25 / 255 (+B1 divided by 5, 5 V reference) | [cap.asm comment at $FF12 use] | LIKELY |
+| `ADC_12V` | `$55` | raw ADC | volts = raw * 25 / 255 (+B1 divided by 5, 5 V reference) | [ROM:$FC8F-$FCAF] [cap.asm comment '+B1 terminal divided by 5'] | LIKELY |
 
 ## Index
 
@@ -20,7 +20,13 @@ ROM: `TOYOTA Bluetop PCM/cap.bin` (sha256 `62b2a3f29039…`), base `$F000`.
 | [`ign_base`](#ign_base) | `$FF40` | 3d | 6×14 | Base ignition advance (3D) | CONFIRMED (layout and interpolation); LIKELY (rpm axis); GUESS (degrees) |
 | [`thw_linearise`](#thw_linearise) | `$FEF0` | 1d | 17 | Coolant sensor linearisation (raw ADC -> degF) | LIKELY |
 | [`tha_corr`](#tha_corr) | `$FED9` | 1d | 9 | Air temperature correction (ThAcorr) | LIKELY |
-| [`inj_dead_time`](#inj_dead_time) | `$FF12` | 1d | 9 | Injector dead time vs battery voltage | LIKELY |
+| [`inj_dead_time`](#inj_dead_time) | `$FEE9` | 1d | 9 | Injector dead time vs battery voltage | CONFIRMED (use and scaling); LIKELY (volts axis) |
+| [`dwell_battery`](#dwell_battery) | `$FF12` | 1d | 9 | Coil dwell term vs battery voltage | CONFIRMED (use); LIKELY (dwell meaning) |
+| [`se056_max`](#se056_max) | `$FE9C` | 1d | 12 | Maximum airflow delay (SE056Maxtime) vs engine speed | CONFIRMED (use); LIKELY (rpm axis) |
+| [`accel_enrich`](#accel_enrich) | `$FEA7` | 1d | 8 | Acceleration enrichment vs throttle opening rate | CONFIRMED (structure); LIKELY (meaning) |
+| [`overheat_adv`](#overheat_adv) | `$FF11` | 1d | 3 | Over-temperature ignition retard (ThW_tADV when hot) | CONFIRMED |
+| [`pwr_ign_trim`](#pwr_ign_trim) | `$FF94` | step | 8 | Ignition trim selected by the PWRr input (8-step staircase, no interpolation) | CONFIRMED (structure); GUESS (what PWRr is: likely a calibration or option resistor) |
+| [`pwr_o2_trim`](#pwr_o2_trim) | `$FF9C` | step | 8 | O2-loop value selected by the PWRr input (8-step staircase) | CONFIRMED (structure); GUESS (meaning) |
 | [`decel_cut_rpm`](#decel_cut_rpm) | `$FEE2` | 1d | 7 | Decel fuel-cut rpm vs coolant temperature | LIKELY |
 | [`rpm_reciprocal`](#rpm_reciprocal) | `$FEF9` | 1d | 17 | Reciprocal table used to compute FullRPM from the NE period | LIKELY |
 | [`thw_FEAF`](#thw_FEAF) | `$FEAF` | 1d | 7 | Coolant table $FEAF -> byte_83 | CONFIRMED (layout); purpose unknown |
@@ -80,17 +86,97 @@ ROM: `TOYOTA Bluetop PCM/cap.bin` (sha256 `62b2a3f29039…`), base `$F000`.
 
 ## inj_dead_time
 
-**Injector dead time vs battery voltage** at `$FF12`, read through helper entry `$FF25`.
+**Injector dead time vs battery voltage** at `$FEE9`, read through helper entry `$FF25`.
 
-- Cells: raw (scaled by the caller; feeds InjDeadTime)
+- Cells: raw. InjDeadTime = v*8 + 464 us (the helper's A:B/32 + $1D0); 255 -> 2504 us at 8.1 V or less. Input is at most $AC, so entries 7-8 (which overlap $FEF0) are never reached
 - Ross claims: R-F17
-- Evidence: [ROM:$FCA5 ldaa ADC_12V / jsr $13,x]
-- Confidence: LIKELY
+- Evidence: [ROM:$FC8F-$FC9E suba #$53 / ldx #$FEE9 / DivDby32 / addd #$01D0 / std InjDeadTime] [EMU:tests/test_sim.py 1183 us at 14 V]
+- Confidence: CONFIRMED (use and scaling); LIKELY (volts axis)
+- Axis: `ADC_12V - $53 (0 below 8.1 V)` (raw ADC), raw points every 32
+
+| ADC_12V - $53 (0 below 8.1 V) | 0 | 32 | 64 | 96 | 128 | 160 | 192 | 224 | 256 |
+|---|---|---|---|---|---|---|---|---|---|
+| value | 255 | 194 | 75 | 24 | 0 | 0 | 0 | 255 | 220 |
+
+## dwell_battery
+
+**Coil dwell term vs battery voltage** at `$FF12`, read through helper entry `$FF25`.
+
+- Cells: raw. word_BF is filtered towards v*32 us; Dwell = deltaNE/16 + word_BF. Shares bytes with $FF11
+- Evidence: [ROM:$FCA2-$FCAF ldx #$FF12 / lsrd x3 / addd word_BF / lsrd] [ROM:$F913 Dwell = deltaNE/16 + word_BF]
+- Confidence: CONFIRMED (use); LIKELY (dwell meaning)
 - Axis: `ADC_12V` (raw ADC), raw points every 32
 
 | ADC_12V | 0 | 32 | 64 | 96 | 128 | 160 | 192 | 224 | 256 |
 |---|---|---|---|---|---|---|---|---|---|
 | value | 6 | 6 | 255 | 255 | 216 | 150 | 119 | 94 | 81 |
+
+## se056_max
+
+**Maximum airflow delay (SE056Maxtime) vs engine speed** at `$FE9C`, read through helper entry `$FF2D`.
+
+- Cells: raw. SE056Maxtime = v*8 + $800 us; clamps the measured airflow delay and scales the acceleration enrichment. FullRPM is at most $0A00, so only 12 entries are reached (the next bytes are $FEA7)
+- Evidence: [ROM:$F582-$F58E ldd FullRPM / ldx #$FE9C / jsr $91,x / DivDby32 / adda #$08 / std SE056Maxtime] [ROM:$F1DA clamp]
+- Confidence: CONFIRMED (use); LIKELY (rpm axis)
+- Axis: `FullRPM high byte (about rpm/800)` (FullRPM/256), raw points every 1
+
+| FullRPM high byte (about rpm/800) | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| value | 31 | 31 | 35 | 62 | 62 | 87 | 100 | 100 | 104 | 92 | 79 | 0 |
+
+## accel_enrich
+
+**Acceleration enrichment vs throttle opening rate** at `$FEA7`, read through helper entry `$FF2B`.
+
+- Cells: raw multiplier. halved at 2000 rpm and above, then multiplied by (SE056Maxtime - SE056plstime); only off idle
+- Evidence: [ROM:$FBA0-$FBD1]
+- Confidence: CONFIRMED (structure); LIKELY (meaning)
+- Axis: `TPS rise byte_5D - byte_5A, bounded 4..$1C` (raw ADC counts per pass), raw points every 4
+
+| TPS rise byte_5D - byte_5A, bounded 4..$1C | 0 | 4 | 8 | 12 | 16 | 20 | 24 | 28 |
+|---|---|---|---|---|---|---|---|---|
+| value | 0 | 35 | 87 | 128 | 168 | 194 | 217 | 230 |
+
+## overheat_adv
+
+**Over-temperature ignition retard (ThW_tADV when hot)** at `$FF11`, read through helper entry `$FF2A`.
+
+- Cells: raw advance (replaces ThW_tADV). 28 at 218 F falling to 6 from 226 F: about -7.7 deg. Applied only off idle with Load >= $9C4; otherwise ThW_tADV = 28. Shares bytes with $FF12
+- Ross claims: R-I12
+- Evidence: [ROM:$FC03-$FC1E] [EMU:tests/test_sim.py::test_overheat_retard_only_at_high_load]
+- Confidence: CONFIRMED
+- Axis: `ADC_ThW - 218 F, bounded 0..15` (degF above 218), raw points every 8
+
+| ADC_ThW - 218 F, bounded 0..15 | 0 | 8 | 16 |
+|---|---|---|---|
+| value | 28 | 6 | 6 |
+
+## pwr_ign_trim
+
+**Ignition trim selected by the PWRr input (8-step staircase, no interpolation)** at `$FF94`.
+
+- Cells: raw advance subtracted from the 3D-map value
+- Ross claims: R-F10
+- Evidence: [ROM:$F8A5 ldx #$FF94 / jsr $10,x -> $FFA4: ldab ADC_PWRr / lsrb x5 / abx / suba 0,x] [EMU:tests/test_sim.py::test_pwr_input_selects_a_staircase_trim]
+- Confidence: CONFIRMED (structure); GUESS (what PWRr is: likely a calibration or option resistor)
+- Axis: `ADC_PWRr` (raw ADC), raw points every 32
+
+| ADC_PWRr | 0 | 32 | 64 | 96 | 128 | 160 | 192 | 224 |
+|---|---|---|---|---|---|---|---|---|
+| value | 0 | 0 | 0 | 11 | 5 | 5 | 5 | 0 |
+
+## pwr_o2_trim
+
+**O2-loop value selected by the PWRr input (8-step staircase)** at `$FF9C`.
+
+- Cells: raw. subtracted from $6C or $6F (by Load) and stored in unk_9B
+- Evidence: [ROM:$F7E7-$F7EC ldx #$FF9C / jsr $08,x -> $FFA4]
+- Confidence: CONFIRMED (structure); GUESS (meaning)
+- Axis: `ADC_PWRr` (raw ADC), raw points every 32
+
+| ADC_PWRr | 0 | 32 | 64 | 96 | 128 | 160 | 192 | 224 |
+|---|---|---|---|---|---|---|---|---|
+| value | 7 | 0 | 251 | 0 | 0 | 7 | 251 | 254 |
 
 ## decel_cut_rpm
 

@@ -18,7 +18,9 @@ declare -A SHA=(
   [m6801.cpp]=2fcca3ff628448fe7612ea1b3679a357158baa7a075b4ad3453adb7863a27735
 )
 
-if [[ -x "$OUT/hd6301ref" ]]; then
+# Rebuild when the shim changes (its hash is stored next to the binary).
+STAMP="$(sha256sum "$ROOT/tools/mame_ref/harness.cpp" "$0" | sha256sum | cut -d' ' -f1)"
+if [[ -x "$OUT/hd6301ref" && "$(cat "$OUT/stamp" 2>/dev/null)" == "$STAMP" ]]; then
   echo "hd6301ref: $OUT/hd6301ref"
   exit 0
 fi
@@ -45,4 +47,5 @@ for f in macros.inc ops_decl.inc insn.inc cycles.inc; do
 done
 
 c++ -O2 -std=c++17 -w -I"$OUT" -o "$OUT/hd6301ref" "$ROOT/tools/mame_ref/harness.cpp"
+echo "$STAMP" > "$OUT/stamp"
 echo "hd6301ref: $OUT/hd6301ref"

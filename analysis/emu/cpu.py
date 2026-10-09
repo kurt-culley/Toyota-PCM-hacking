@@ -274,17 +274,28 @@ class HD6301:
         self.push(self._cc)
 
     def interrupt(self, vector: int) -> int:
-        """Enter an interrupt (or TRAP/SWI) through ``vector``; returns cycles used."""
+        """Enter an interrupt (or TRAP/SWI) through ``vector``; returns cycles used.
+
+        After WAI the registers are already stacked (WAI's 9 cycles include the seven
+        stack writes, handbook table 3-3-1), so only the vector fetch remains: 4 cycles,
+        as in MAME.
+        """
+        cycles = 4 if self.waiting else 12
         if not self.waiting:
             self._stack_all()
         self.waiting = self.sleeping = False
         self._set(I, True)
         self.pc = self.rd16(vector)
-        return 12
+        return cycles
 
     def irq(self, vector: int) -> bool:
-        """Request a maskable interrupt; taken if I is clear. Returns True if taken."""
+        """Request a maskable interrupt; taken if I is clear. Returns True if taken.
+
+        A masked request still ends SLP: the CPU leaves sleep mode and carries on with the
+        next instruction (handbook section 2.12). WAI with I set is only ended by NMI.
+        """
         if self._cc & I or self.irq_inhibit:
+            self.sleeping = False
             return False
         self.cycles += self.interrupt(vector)
         return True
@@ -607,7 +618,7 @@ def _daa(c: HD6301) -> None:
         cf |= 0x60
     t = a + cf
     c._nz8(t)
-    c._set(V, False)  # handbook: V undefined; cleared here, as MAME does
+    c._set(V, False)  # the handbook contradicts itself on V (STATUS conflicts log); MAME clears it
     if t & 0x100:
         c._set(C, True)  # handbook note 3: C is not cleared if previously set
     c.a = t & 0xFF

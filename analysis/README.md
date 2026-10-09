@@ -53,4 +53,6 @@ Deliberate differences, all from the handbook:
 - CCR bits 7–6 always read as 1, so only bits 5–0 are compared.
 - `$12`/`$13` trap on the HD6301; MAME runs undocumented 6801 behaviour for them.
 - MAME's TRAP cycle count is a placeholder, so it is not compared.
-- DAA's V flag is "undefined" in the handbook. The core clears it, as MAME does.
+- DAA's V flag: the handbook contradicts itself. Table 3-2-1 (PDF p.190) marks V as affected; the instruction details (PDF p.89) say "not affected". The core clears V, as MAME does. The conflict is logged in `docs/STATUS.md`; the Bluetop never executes DAA.
+- Not modelled: the address trap for fetching from non-memory space (handbook §2.13). It belongs in the memory map behind the `Bus`.
+- Memory *reads* are not compared, only writes (in order). Reads only matter for clear-on-read I/O registers, which the peripheral models will handle.

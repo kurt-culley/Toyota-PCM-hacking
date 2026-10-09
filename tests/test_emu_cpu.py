@@ -13,6 +13,7 @@ Deliberate differences (documented in analysis/README.md):
 - TRAP cycle count: MAME's value is a placeholder, so it is not compared.
 """
 
+import os
 import subprocess
 
 import pytest
@@ -58,6 +59,8 @@ class LazyBus:
 @pytest.fixture(scope="module")
 def ref_cases():
     if not REF.exists():
+        if os.environ.get("REQUIRE_MAME_REF"):  # set in CI: the P0 gate must not be skipped there
+            pytest.fail("MAME reference missing: run tools/setup_mame_ref.sh")
         pytest.skip("run tools/setup_mame_ref.sh first")
     out = subprocess.run([str(REF), str(SEED), str(CASES)], capture_output=True, text=True, check=True).stdout
     cases = []
@@ -99,7 +102,7 @@ def test_every_opcode_matches_mame(ref_cases):
         if got != want:
             names = ["pc", "s", "x", "d", "cc"]
             problems += [f"{n} {g:04X}!={w:04X}" for n, g, w in zip(names, got, want, strict=True) if g != w]
-        if dict(bus.writes) != dict(writes):
+        if bus.writes != writes:  # order matters (16-bit registers are written high byte first)
             problems.append(f"writes {bus.writes} != {writes}")
         if op in OPCODES and cycles != cyc:
             problems.append(f"cycles {cycles} != {cyc}")
@@ -162,3 +165,50 @@ def test_suite6303_instructions_step():
         addr += ins.length
         n += 1
     assert n > 200
+
+
+class _Ram(dict):
+    def read(self, a):
+        return self.get(a, 0)
+
+    def write(self, a, v):
+        self[a] = v
+
+
+def _cpu_with_vectors():
+    ram = _Ram({0xFFF8: 0x12, 0xFFF9: 0x34, 0xFFFC: 0x56, 0xFFFD: 0x78})
+    cpu = HD6301(ram)
+    cpu.pc, cpu.s = 0x1000, 0x00FF
+    return cpu, ram
+
+
+def test_slp_wakes_on_masked_irq():
+    """Handbook 2.12: a masked interrupt cancels sleep and execution continues."""
+    cpu, ram = _cpu_with_vectors()
+    ram[0x1000] = 0x1A  # slp
+    cpu.cc = 0x10  # I set
+    cpu.step()
+    assert cpu.sleeping
+    assert cpu.irq(0xFFF8) is False
+    assert not cpu.sleeping and cpu.pc == 0x1001
+
+
+def test_wai_then_irq_cycles_and_single_stack():
+    cpu, ram = _cpu_with_vectors()
+    ram[0x1000] = 0x3E  # wai
+    cpu.cc = 0x00
+    assert cpu.step() == 9
+    assert cpu.waiting and cpu.s == 0x00FF - 7
+    assert cpu.irq(0xFFF8) is True
+    assert cpu.pc == 0x1234 and cpu.s == 0x00FF - 7  # not stacked a second time
+    assert cpu.cycles == 9 + 4
+
+
+def test_wai_masked_needs_nmi():
+    cpu, ram = _cpu_with_vectors()
+    ram[0x1000] = 0x3E
+    cpu.cc = 0x10
+    cpu.step()
+    assert cpu.irq(0xFFF8) is False and cpu.waiting
+    cpu.nmi()
+    assert cpu.pc == 0x5678 and not cpu.waiting

@@ -29,6 +29,8 @@ jobs:
 
       - name: Tests (P0 gates: round-trip, xref, emulator vs MAME)
         run: uv run pytest
+        env:
+          REQUIRE_MAME_REF: "1"
 
       - name: Round-trip report
         run: uv run python -m pcmre.roundtrip

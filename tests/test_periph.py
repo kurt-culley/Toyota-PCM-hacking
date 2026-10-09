@@ -188,3 +188,31 @@ def test_ocr_low_byte_write_also_clears(p):
     assert not p.t1.tcsr & OCF
     assert p.read(OCR1_H) == 0 and p.read(OCR1_L) == 9
     assert p.read(OCR2_H) == 0xFF and p.read(OCR2_L) == 0xFF  # reset value
+
+
+def test_tof_set_on_wrap_and_cleared_by_tcsr_then_frc_read(p):
+    from emu.periph import TOF
+
+    p.advance(0x10000 + 5)
+    assert p.read(TCSR1) & TOF
+    p.read(FRC_H)
+    assert not p.read(TCSR1) & TOF
+
+
+def test_port3_read_without_csr_read_leaves_is3_set(p):
+    p.is3_falling_edge()
+    p.read(PORT3)
+    assert p.read(P3CSR) & 0x80
+
+
+def test_overrun_sets_orfe(p):
+    from emu.periph import ORFE
+
+    p.write(0x04, 0x40)
+    p.write(PORT3, 0x00)
+    p.write(TRCSR, RE | TE)
+    p.write(TDR, 1)
+    p.advance(p.adc_delay)
+    p.write(TDR, 2)
+    p.advance(p.adc_delay)
+    assert p.read(TRCSR) & ORFE

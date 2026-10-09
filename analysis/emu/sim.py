@@ -30,7 +30,7 @@ class SimulationError(RuntimeError):
 
 @cache
 def symbols(listing: Path = LISTING) -> dict[str, int]:
-    """``name equ $addr`` lines and code labels' addresses are not needed: RAM names only."""
+    """RAM and register names from the ``name equ $addr`` lines of the listing (code labels are not needed)."""
     out = {}
     for line in listing.read_text().splitlines():
         m = re.match(r"^(\w+)\s+equ\s+\$([0-9A-Fa-f]+)", line)

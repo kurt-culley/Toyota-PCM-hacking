@@ -69,7 +69,7 @@ Run `PYTHONPATH=analysis uv run python ...` from the repo root. Speed is about r
 | Timer 2 ($18–$1E) | Same layout as timer 1. IC2 on P1-0, OC2 on P1-1, sharing the ICF and OCF vectors. Inferred from the ROM's use of it [ROM:$F1B1, $F242, $F370] | LIKELY: the whole ROM runs correctly on it |
 | Serial ADC | Channel byte sent while P3-6 is low; reply is the bit-reversed reading 320 µs later. Channels 0–5 = TPS, +B, ThA, ThW, PWRr, O2 [ROM:$FAA7–$FB2E] | LIKELY (protocol); GUESS (real conversion time) |
 | Timing granularity | Peripheral registers update between instructions; external edges are captured to the exact cycle | Accurate to a few µs |
-| NE | Falling edge = 10° BTDC, one per 180° of crank, `deltaNE` = 30e6/rpm | CONFIRMED by T terminal → 10.3° and by the ROM's rpm variables |
+| NE | Falling edge = 10° BTDC, one per 180° of crank, `deltaNE` = 30e6/rpm | LIKELY. The 10° reference is taken from the factory T-terminal spec, so the 10.3° T-terminal result cannot independently confirm it. The 180° spacing is confirmed by the ROM's own rpm variables (`lilRPM`, `RPMish`) and the 7400 rpm limit constant |
 | NE duty (high part of the period) | 50 % | GUESS. It sets the earliest dwell start at low rpm, so the **dwell numbers are not trustworthy** yet |
 | G+ | Low across every 4th NE falling edge | LIKELY function, GUESS phase |
 | Airflow | A delay after each NE falling edge (`SE056plstime`), set directly in µs | Mechanism CONFIRMED from the code; the volts → µs relation is unknown |
@@ -80,9 +80,9 @@ Run `PYTHONPATH=analysis uv run python ...` from the repo root. Speed is about r
 
 ## What the simulation established (Bluetop)
 
-All of these are asserted in `tests/test_sim.py` [EMU:sim].
+Items 1–6 and the cranking behaviour in item 8 are asserted in `tests/test_sim.py` [EMU:sim]. Item 7 is an input polarity the simulation adopts from the ROM code, and the "same fuel per cycle" in item 2 follows from the pulse formulas.
 
-1. **rpm scaling.** At 900, 2400 and 4800 rpm: `deltaNE` = 30e6/rpm, `lilRPM` = rpm/25 and `RPMish` = rpm/25 − 32. The variables in [`maps.md`](../../analysis/bluetop/maps.md) are confirmed.
+1. **rpm scaling.** At 900, 2400 and 4800 rpm: `lilRPM` = rpm/25 and `RPMish` = rpm/25 − 32, given `deltaNE` = 30e6/rpm (the stimulus). The variables in [`maps.md`](../../analysis/bluetop/maps.md) are confirmed.
 2. **Injection.**
    - **Warm (above 80 °F / 27 °C):** grouped. Each group fires once per crank revolution for 2 × `InjLoadPulse` + `InjDeadTime`.
    - **Cold (72 °F / 22 °C or below), and while starting:** simultaneous. Both groups fire on every NE edge (4 times per cycle) for `InjLoadPulse` + `InjDeadTime`.
@@ -95,11 +95,11 @@ All of these are asserted in `tests/test_sim.py` [EMU:sim].
    - With the T terminal shorted, the spark is at **10.3° BTDC** at 900 rpm, against the factory spec of 10°.
 4. **Raw → degrees** (STATUS Q3, R-I06) for the Bluetop:
 
-   `BTDC = (BaseAdvance + ThW_tADV + IDLcompADV) × 90/256 − 10.74° + 256 µs`.
+   `BTDC = sum × 90/256 − 10.74° + 256 µs`, where `sum = BaseAdvance + ThW_tADV + IDLcompADV` clamped to $1F–$B8 [ROM:$F8E6], and the result before the 10° edge is capped at `NEhighWidth` [ROM:$F905–$F90B].
 
    The 256 µs is a fixed time lead added by the ROM (`inca` at $F900), worth 0.15° per 100 rpm. Warm, `ThW_tADV` is 28 ($1C), so a **map cell value v gives about v × 90/256 − 0.9° BTDC, plus the 256 µs lead**: idle $2D → 16.3° at 900 rpm. The cap.asm comment "raw/255 × 90" is right to within about 1°.
-5. **Rev limiter cuts fuel only.** At 7600 rpm both injector groups stop and the sparks continue. Fuel returns at 6000 rpm (R-F26 for the Bluetop).
-6. **Missing IGF cuts fuel.** With no IGF echo, `SatCount_98` saturates and both groups stop (R-I16 for the Bluetop).
+5. **Rev limiter cuts fuel only.** After **6** consecutive NE passes above 7400 rpm both injector groups stop; the sparks continue. There is no hysteresis: fuel returns on the first pass at or below 7400 rpm (simulated: cut at 7500, fuel at 7300) (R-F26 for the Bluetop).
+6. **Missing IGF cuts fuel.** After **4** consecutive NE passes (2 revolutions) with no IGF echo, `SatCount_98` reaches $80 and both groups stop (R-I16 for the Bluetop). The saturating counter helper at $FFE1 increments `SatCount_97` and `SatCount_98` once per pass, including the pass that reloads them, which sets these counts.
 7. **IDL polarity.** At the CPU pin, P4-2 is **high** with the throttle closed, the opposite of the cap.asm comment. Evidence: the idle branches [ROM:$F814, $F1E0, $FA19]; details in `engine.py`. This is logged as a conflict in STATUS.
 8. **Cranking.** While `byte_C6` > 0 (starting), the ROM never drives /IGT low itself, but it still cuts fuel when IGF is missing. So the cranking spark must come from hardware outside the CPU, presumably the SE056 firing from NE. With that modelled, the ROM fuels on every NE edge while cranking (`InjLoadPulse` + dead time; about 8 ms at 0 °C with the stand-in airflow signal).
 
@@ -110,4 +110,4 @@ All of these are asserted in `tests/test_sim.py` [EMU:sim].
 - **The 256 µs lead may be compensating** for a real delay (igniter, or the SE056's NE filtering). Only a bench capture of IGT against the crank can tell whether the true spark is at the computed angle or 256 µs later (P8).
 - **Single-instruction timing:** a register read sees the FRC at the start of its instruction, so ISR timings can be a few µs off.
 
-The verifier review of this model is pending (STATUS). Simulated numbers should not be used as evidence until it is done.
+An independent Verifier reviewed this model on 2026-10-09: PASS WITH ISSUES, all fixed (STATUS). Its notes on minor deviations that do not affect this ROM: IS3 is only cleared by a port 3 read (the handbook also allows a write), the compare-inhibit cycle after an OCR/FRC write is not modelled, and TIE/TDRE interrupts are absent.

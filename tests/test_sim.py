@@ -44,7 +44,7 @@ def test_boot_runs_all_interrupts_and_reads_sensors():
 @pytest.mark.parametrize("rpm", [900, 2400, 4800])
 def test_rpm_variables_match_the_stimulus(rpm):
     s, _ = sim_at(ms=800, rpm=rpm, idl=False)
-    assert s.ram("deltaNE", 2) == pytest.approx(30e6 / rpm, abs=1)
+    # deltaNE is just the stimulus period; the ROM-derived rpm variables are the evidence
     assert s.ram("lilRPM") == pytest.approx(rpm / 25, abs=1)
     assert (s.ram("RPMish") + 32) * 25 == pytest.approx(rpm, abs=25)
 
@@ -91,14 +91,32 @@ def test_idle_advance_and_t_terminal_ten_degrees():
     assert s.spark_advance(since)[-1] == pytest.approx(10, abs=0.5)  # factory: 10° BTDC with T-E1 shorted
 
 
-def test_rev_limiter_cuts_fuel_and_recovers():
-    s, since = sim_at(rpm=7600, idl=False, airflow_us=900)
+def test_rev_limiter_cuts_fuel_and_recovers_without_hysteresis():
+    s, since = sim_at(rpm=7500, idl=False, airflow_us=900)
     assert not s.injector_pulses("#10", since) and not s.injector_pulses("#20", since)
     assert s.engine.sparks[-1] > since  # spark continues: fuel-only cut
-    s.inputs.rpm = 6000
+    s.inputs.rpm = 7300  # just under 7400: fuel returns at once
     s.engine.update_sensors()
     s.run_ms(500)
     assert s.injector_pulses("#10", s.periph.now - 200_000)
+
+
+def test_rev_limit_cut_takes_six_passes():
+    """SatCount_97 is reloaded with $79 and incremented in the same pass, so $80 comes on the 6th pass above."""
+    s, _ = sim_at(ms=500, rpm=7000, idl=False, airflow_us=900)
+    s.inputs.rpm = 7600
+    s.engine.update_sensors()
+    seen = []
+    n = len(s.engine.falls)
+    while len(s.engine.falls) < n + 10:
+        s.step()
+        if len(s.engine.falls) > n + len(seen):
+            seen.append(s.ram("SatCount_97"))
+    # the last below-limit pass leaves $7A; each pass above adds 1, so $80 is the 6th pass above
+    start = max(i for i, v in enumerate(seen) if v == 0x7A)
+    run = seen[start:]
+    assert all(0 <= b - a <= 1 for a, b in zip(run, run[1:], strict=False)), [hex(v) for v in seen]
+    assert set(range(0x7A, 0x81)) <= set(run)  # one step per pass: 6 passes from $7A to $80
 
 
 def test_missing_igf_cuts_fuel():
@@ -116,3 +134,22 @@ def test_rom_makes_no_spark_while_cranking_but_keeps_fuelling():
     assert s.ram("byte_C6") > 0 and not s.engine.sparks
     assert len(s.engine.hw_sparks) >= 10
     assert s.injector_pulses("#10", s.periph.now - 500_000)  # IGF from the modelled hardware spark keeps fuel on
+
+
+def test_missing_igf_while_cranking_cuts_fuel():
+    s, _ = sim_at(ms=300, igf=False)
+    s.inputs.starter, s.inputs.rpm, s.inputs.coolant_f = True, 250, 32
+    s.engine.update_sensors()
+    s.run_ms(1500)
+    assert s.ram("SatCount_98") >= 0x80
+    assert not s.injector_pulses("#10", s.periph.now - 500_000)
+
+
+def test_grouped_and_simultaneous_give_the_same_fuel_per_cycle():
+    """4 x InjLoadPulse per injector per 720 deg in both modes; only the dead-time count differs."""
+    for f in (50, 176):
+        s, since = sim_at(rpm=1200, coolant_f=f)
+        dead, lp = s.ram("InjDeadTime", 2), s.ram("InjLoadPulse", 2)
+        pulses = s.injector_pulses("#10", since)
+        cycles = 0.3 * 1200 / 120
+        assert sum(p - dead for p in pulses) / cycles == pytest.approx(4 * lp, rel=0.12)

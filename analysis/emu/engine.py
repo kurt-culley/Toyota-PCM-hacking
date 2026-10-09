@@ -27,7 +27,8 @@ The ROM fixes most of it; the rest is marked GUESS.
   [ROM:$F420-$F443]. So something outside the CPU must fire the igniter while cranking,
   most likely the SE056 directly from NE (the usual Toyota fixed cranking timing). The
   model fires a "hardware" spark, with its IGF, on each NE falling edge (10° BTDC)
-  after which the CPU has made no spark of its own. These go in ``hw_sparks``.
+  after which the CPU has made no spark of its own, only while cranking (STA high or
+  below 500 rpm), so a missed CPU spark in normal running is not hidden. These go in ``hw_sparks``.
 - **Analogue sensors** are read through the serial ADC: channel 0 TPS, 1 battery (+B ÷ 5),
   2 ThA, 3 ThW, 4 PWRr, 5 O2 [ROM:$FABD ldx #$0054 / abx]. The coolant reading is made
   by inverting the ROM's own linearisation table $FEF0, so the ROM sees the requested
@@ -43,7 +44,7 @@ IDL polarity: the ROM's idle state is ``byte_95`` negative. It counts up while P
 high [ROM:$F9F7-$FA39]. Three uses agree that negative means *throttle closed*: the idle
 advance branch and its idle-stability term [ROM:$F814-$F82C], the airflow fallback of 800 µs
 (against 1600 µs off idle) when the airflow signal fails [ROM:$F1E0], and the
-async "tip-in" injection when the throttle opens from that state above 2500 rpm
+async "tip-in" injection (2000 µs) when the throttle opens from that state below 2500 rpm
 [ROM:$FA19]. So at the CPU pin P4-2 is high with the throttle closed; the ECU's input
 buffer presumably inverts the IDL contact (closed to E2). LIKELY.
 """
@@ -148,7 +149,8 @@ class Engine:
             return
         p, t, T = self.p, self.p.now, self.period()
         self.edge += 1
-        if self.falls and not (self.sparks and self.sparks[-1] > self.falls[-1]):
+        cranking = self.inputs.starter or self.inputs.rpm < 500
+        if cranking and self.falls and not (self.sparks and self.sparks[-1] > self.falls[-1]):
             self.hw_sparks.append(t)
             if self.inputs.igf:
                 p.at(t + 20, p.is3_falling_edge)

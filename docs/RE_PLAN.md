@@ -122,7 +122,6 @@ flowchart LR
 
 ### P0: Foundations
 
-- Archive the upstream comments that are still missing (see the TODO in [`upstream_issues.md`](upstream_issues.md)). Get them either from a session whose source is `sparkiedk/Toyota-PCM-hacking`, or from text the owner pastes in.
 - Set up the Python project (`uv`), CI, `asl` and Ghidra, and write the `cap.asm` → Ghidra label importer.
 - **Gate:**
   - `analysis/bluetop/cap.s`, generated from the Ghidra export, reassembles with `asl` **byte-identical** to `cap.bin`, and a cross-check with `dasm` agrees.
@@ -156,8 +155,14 @@ flowchart LR
    - **40-pin, HD6301-type** (expected): use the **§6a Arduino Zero breadboard reader**.
    - **64-pin SDIP:** it is a **Toshiba 8X**. Use the same Zero approach with T8X bus timing, and Ghidra needs a T8X module.
 2. Write a beginner build guide (`docs/hardware/zero_reader_guide.md`). It covers wiring with Mermaid and photos, the Zero firmware (Arduino-CLI or PlatformIO, in `hardware/zero-reader/`), the Python capture script, and the relevant parts of the upstream bring-up checklist.
-3. Dump at least 3 times and check that the SHA-256 hashes are identical. Store the image as `AW11 MR2 PCM/89661-17140.bin`.
-4. Start a variant matrix, `docs/variants.md`, covering 17030, 17070, JDM and US ECUs, and look for more dumps from the community.
+3. Before dumping, the Zero firmware runs three self-tests, following the lessons from upstream #4:
+   - a walking-ones test on every address and data line;
+   - a known-pattern test program;
+   - an infinite-loop test from external memory.
+
+   **If the bus shows endless or unexpected activity, the MCU is running its own internal code: fix the mode pins first.** Confirm the internal ROM size (4 KB at `$F000` is assumed).
+4. Dump at least 3 times and check that the SHA-256 hashes are identical. Store the image as `AW11 MR2 PCM/89661-17140.bin`.
+5. Start a variant matrix, `docs/variants.md`, covering 17030, 17070, JDM and US ECUs, and look for more dumps from the community.
 
 ### P4: MR2 analysis and Tier-B verification → "Ross verified" gate
 

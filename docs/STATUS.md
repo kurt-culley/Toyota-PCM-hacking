@@ -2,7 +2,7 @@
 
 The Lead agent updates this file at the end of every session. The plan is in [`RE_PLAN.md`](RE_PLAN.md).
 
-**Last updated:** 2026-10-09 — playbook, claim register skeleton, upstream digest and BOM created.
+**Last updated:** 2026-10-09 — playbook, claim register skeleton, upstream digest (now complete) and BOM created.
 
 ## Phase checklist
 
@@ -19,7 +19,7 @@ The Lead agent updates this file at the end of every session. The plan is in [`R
 | P8 | Bench rig + validation (Arduino Zero) | ☐ | — |
 
 ### P0 tasks
-- [ ] Archive the missing upstream comments (#4: 10 collapsed comments; the end of #1). See [`upstream_issues.md`](upstream_issues.md).
+- [x] Archive the missing upstream comments (#4 and #1, all read through the API on 2026-10-09). See [`upstream_issues.md`](upstream_issues.md).
 - [ ] Set up the Python project (`uv`, `pytest`, `ruff`) and GitHub Actions CI.
 - [ ] Install Ghidra and pyghidra. Decide between an existing 6800/6801 module and a new HD6301 SLEIGH module.
 - [ ] Install `asl` (Macroassembler AS).
@@ -36,6 +36,8 @@ The Lead agent updates this file at the end of every session. The plan is in [`R
 ### P3 pre-purchase checks (from the HD6301 handbook and `bluetopreader.sch`)
 - [ ] Mode-pin strapping for external vector fetch with the internal ROM still readable.
 - [ ] MCU minimum clock frequency: static (single-step) or a slow continuous clock.
+- [ ] Internal ROM size of the 17140's MCU (the reader assumes 4 KB at `$F000`), per upstream #4.
+- [ ] Zero firmware self-test: walking-ones test on every address and data line, then a known-pattern program, then an infinite-loop external-execution test, all before the real dump (upstream #4: a mis-wired bit or wrong mode pins made the chip run its own code).
 - [ ] Owner orders [`../hardware/BOM.md`](../hardware/BOM.md) section A.
 
 ## Open questions

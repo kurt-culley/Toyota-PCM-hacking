@@ -2,7 +2,7 @@
 
 Source: issues on the original repo, [sparkiedk/Toyota-PCM-hacking](https://github.com/sparkiedk/Toyota-PCM-hacking/issues?q=is%3Aissue). That repo has 8 issues, no Discussions, and an empty wiki. Only the technical points are kept here, each linked to its issue. Treat them as **source-of-truth level 5**: useful leads, to be confirmed against the ROM or bench.
 
-> **TODO (phase P0):** 10 collapsed comments in [#4](https://github.com/sparkiedk/Toyota-PCM-hacking/issues/4) (May–Jul 2021) and the end of [#1](https://github.com/sparkiedk/Toyota-PCM-hacking/issues/1) could not be read when this digest was written. Fetch them from a session whose source is `sparkiedk/Toyota-PCM-hacking`, or have the owner paste them in. Then fold the findings in here.
+> **Complete:** all 39 comments on [#4](https://github.com/sparkiedk/Toyota-PCM-hacking/issues/4) and all 24 on [#1](https://github.com/sparkiedk/Toyota-PCM-hacking/issues/1) were read in full through the GitHub API on 2026-10-09. A helper session with the source repo attached fetched them. The points from the comments GitHub's web UI hides are in their own sections below.
 
 ## Hardware and dumping — [#4 "Hacking a USDM 4AGZE"](https://github.com/sparkiedk/Toyota-PCM-hacking/issues/4) (the most useful thread)
 
@@ -33,6 +33,36 @@ Source: issues on the original repo, [sparkiedk/Toyota-PCM-hacking](https://gith
   - Check that the scope and the USB-serial adapter share a common ground. Use full solder fillets on 0.1" headers, and don't trust cheap SDIP-64 sockets.
 - **The part number does not identify the CPU.** The 4AGZE's 64-pin "D151801-5890" is a **Toshiba 8X**, while the Bluetop's D151801-0642 is an HD6301-type. Identify the chip by package and pinout.
 - **Ignition multiplexer.** The author also built a dsPIC30F3010 board that intercepted IGT and NE/G to drive coil-on-plug, and it was used on a Blacktop.
+
+## Dumping lessons from the previously hidden #4 comments (Jul 2021)
+
+These are the comments the web UI collapses ([#4](https://github.com/sparkiedk/Toyota-PCM-hacking/issues/4), comments 16–28). They bear directly on the P3 Arduino Zero reader.
+
+- **The author's dump workflow:**
+  1. Scope the UART line and take the baud rate from the shortest high or low time.
+  2. Hold the board in reset and start a binary capture.
+  3. Release reset and wait until the data stops.
+  4. Repeat **three times** and compare the files (`fc -b`).
+
+  There is no framing or error checking, and he saw roughly **1 bad capture in 10**. The *Zero reader keeps the triple-dump-and-compare rule* (SHA-256), and the bus-snoop design removes the baud-rate guesswork.
+- **ROM size and base address:** a T8X dump should return **16 KB**. If the internal ROM is smaller (12 KB, 8 KB …), change the reader's base address. For the D151801 the reader assumes **4 KB at `$F000`**. Confirm the MR2 chip's ROM size before trusting a dump.
+- **Failure mode: the data stream never stops, or there is far more data than expected** (one user got more than 30 KB). This means the **chip is running its own internal code**, not the reader, and is trying to talk to PCM peripherals that aren't there. The cause is mode pins or external memory not being set up correctly. The fix is to prove external execution first: run an **infinite-loop test** and probe the bus (only about 3 bus cycles to decode).
+- **"If a single bit is wired incorrectly, parts of your program may still work while others crash hard."** Verify every bus line. The Zero reader firmware gets a self-test mode that walks each address and data line.
+- **Prove the link before dumping.** Send a known string ("Hello world!") repeatedly with a ~100 ms pause, and adjust the baud rate until it reads correctly. The **serial clock pin** (pin 13 on the T8X) runs continuously once the SCI is up, so a frequency counter on it gives the baud rate. *Zero equivalent:* the reader firmware runs a known-pattern test program before the real dump.
+- **Disassembly workflow (IDA 4.x, which this project replaces with Ghidra):**
+  - Set the binary's base offset.
+  - Start disassembling from the **interrupt vectors** at the end of the ROM.
+  - Manually mark code that the tool misses, especially **jump tables** (load index → add to table base → fetch a 16-bit pointer → jump). Each table entry must be flagged as code.
+
+  The Ghidra importer and scripts must handle jump tables explicitly. In the Bluetop, see `procJmpTable` and the `ADCcontrol` table at `$FA9B`.
+- The author offered to help disassemble any new dump ("80% in an hour"). This is a possible upstream collaboration once the MR2 ROM is dumped, and agents must not contact him without the owner's approval.
+
+## Later chips: mode pins are not guaranteed — [#1](https://github.com/sparkiedk/Toyota-PCM-hacking/issues/1) (2018–2021)
+
+- **The mode-selection pins may not behave as the datasheet suggests.** On a desoldered 1999 1UZ VVT-i CPU, the author found that external running and code dumps were "a harder task than anticipated". *For P3:* treat the HD6301 mode-strap feasibility check as essential, and confirm external execution (the infinite-loop test) before any dump attempt.
+- That 1999 chip is a **D151807-4070 = Toshiba TMP97PW42AF**: 128 KB OTP ROM, 6 KB RAM, 24 timer outputs, with a PROM-emulation mode needing a Toshiba **BM11140** adapter. Someone depotted one (drive2.ru, linked in the thread). This is a later generation and not relevant to the AW11, but it shows Denso part numbers map onto many different CPUs.
+- A newer ECU with a 120-pin TLCS-900-family part has no public assembler or disassembler. sparkiedk confirms the general rule again: the mask ROM cannot be modified, so the only route is to run external code and read the ROM out.
+- Later Toyota VVT-i ECUs (1.8 VVT-i, 3S, ZZ) have **JTAG/flash** and use commercial tools such as Toyota Lexus Flasher, PCMFlash and Openport 2.0. The IS200 (1G-FE) Toshiba mask-ROM ECUs are reported as **never dumped**. None of this applies to the AW11, which is mask ROM.
 
 ## Table formats and ignition units — [#6](https://github.com/sparkiedk/Toyota-PCM-hacking/issues/6)
 

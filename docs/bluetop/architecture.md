@@ -77,7 +77,7 @@ The analogue sensors are read by an **external ADC on the serial port**, one cha
 | $58 | `ADC_PWRr` | ("power" input, purpose unknown) | small ignition trim at `$FF94` [ROM:$F8A5] |
 | $59 | `ADC_Oxy` | oxygen sensor | → `word_76` (O2 trim; default $8000) [ROM:$F7BE Calc76] |
 
-Digital inputs: IDL (via `byte_95` bit 7), A/C (P4-3), T test terminal (P4-5, active low), SPD (P4-6), G+ (P3-7), IGF (/IS3).
+Digital inputs: IDL on P4-2 (**high = throttle closed** at the CPU pin; `byte_95` counts up while it is high and goes negative after about 125 passes, which is the ROM's idle state) [EMU:sim, see [`simulation.md`](simulation.md)], A/C (P4-3, high = on), STA (P4-4, high while cranking), T test terminal (P4-5, active low), SPD (P4-6), G+ (P3-7), IGF (/IS3).
 
 ## 4. RAM map (by function)
 
@@ -88,7 +88,7 @@ Digital inputs: IDL (via `byte_95` bit 7), A/C (P4-3), T test terminal (P4-5, ac
 | Fuel | `word_72`, `word_70`, `word_76` (O2), `ThAcorr` $8A, `FuelRatioH` $74, `InCp2TrEg` $9F (the pulse), `InjDeadTime` $81, `Inj10OffTime`, `Inj20OffTime`, `DecelCutRPM` |
 | Enrichments (fuel) | `byte_83`, `byte_84`, `byte_86`–`byte_89`, `byte_8B`, `word_8C` (see [`fuel_chain.md`](fuel_chain.md)) |
 | Ignition | `BaseAdvance`, `IDLcompADV`, `ThW_tADV`, `AdvanceinUS`, `Dwell`, `TVIScounter` $99 |
-| Flags | `byte_4C` (bit 7 inhibits injection), `byte_4D`, `byte_4E` (ISR → main-loop events), `byte_95` (bit 7 ≈ IDL), `unk_CD` |
+| Flags | `byte_4C` (bit 7 inhibits injection), `byte_4D`, `byte_4E` (ISR → main-loop events), `byte_95` (negative = throttle closed for a while), `unk_CD` |
 | Saturating counters | `SatCount_*` (updated by the shared helpers at $FFE1/$FFE3) |
 | Diagnostics | `FlagBadStuff` / `flagbadstuf3` set fault bits that the T terminal reads out |
 

@@ -6,13 +6,13 @@ The ROM fixes most of it; the rest is marked GUESS.
 - **NE on IC2 (P1-0).** The ECU's SE056 interface chip turns the distributor's NE pickup
   into one falling edge per 180° of crank. The falling edge is the reference for the
   spark: with the T terminal shorted the ROM fires on it, and the factory spec for that
-  state is 10° BTDC [ROM:$F2B1, $F814] [repair manual]. The period between falling edges
+  state is 10° BTDC [ROM:$F2AC, $F814] [repair manual]. The period between falling edges
   is ``deltaNE = 30e6 / rpm`` µs. That relation fits the ROM's 7400 rpm rev-limit
-  constant ($0FD6) [ROM:$F432], and tests/test_sim.py checks it against the ROM's own
+  constant ($0FD6) [ROM:$F431], and tests/test_sim.py checks it against the ROM's own
   rpm variables. The high part of each period is ``ne_duty`` (default 50 %, GUESS).
 - **G+ on P3-7.** Low around every fourth NE falling edge. The ROM resets its
   cylinder counter ``IC2LowCnt`` there and uses bit 1 of it to pick the injector group
-  [ROM:$F320-$F330, $F239]. G+ phase relative to a real cylinder is GUESS.
+  [ROM:$F2FB-$F359, $F232]. G+ phase relative to a real cylinder is GUESS.
 - **Airflow on IC1 (P2-0).** The ROM measures ``SE056plstime = IC1 rising time - NE
   falling time`` [ROM:$F1C1]. So the airflow meter reaches the CPU as a delay after each
   NE falling edge, made by the SE056. The model sets P2-0 low at each NE rising edge and
@@ -21,8 +21,15 @@ The ROM fixes most of it; the rest is marked GUESS.
 - **IGF on /IS3.** The igniter confirms each spark. The model gives one falling /IS3
   edge per rising edge of /IGT (P2-1), which is the spark [ROM:$F370-$F3AE].
   ``igf=False`` simulates a dead igniter.
+- **Cranking spark (GUESS, LIKELY needed).** While ``byte_C6`` > 0 (starting, below about
+  500 rpm) the ROM holds /IGT high and never makes a spark itself [ROM:$F24A, $F370,
+  $F92D]. Yet it still demands an IGF echo every pass, and cuts fuel without one
+  [ROM:$F420-$F443]. So something outside the CPU must fire the igniter while cranking,
+  most likely the SE056 directly from NE (the usual Toyota fixed cranking timing). The
+  model fires a "hardware" spark, with its IGF, on each NE falling edge (10° BTDC)
+  after which the CPU has made no spark of its own. These go in ``hw_sparks``.
 - **Analogue sensors** are read through the serial ADC: channel 0 TPS, 1 battery (+B ÷ 5),
-  2 ThA, 3 ThW, 4 PWRr, 5 O2 [ROM:$FAB9 ldx #$0054 / abx]. The coolant reading is made
+  2 ThA, 3 ThW, 4 PWRr, 5 O2 [ROM:$FABD ldx #$0054 / abx]. The coolant reading is made
   by inverting the ROM's own linearisation table $FEF0, so the ROM sees the requested
   °F. Air temperature uses the same inverse: the factory curves for the two NTC sensors
   agree within their tolerances (analysis/sensors/), but the ECU's pull-up for ThA is
@@ -30,12 +37,12 @@ The ROM fixes most of it; the rest is marked GUESS.
 - **Digital inputs** (Port 4): P4-2 IDL (**high** = throttle closed at the CPU pin, LIKELY;
   cap.asm says active low, see below), P4-3 A/C (high = on),
   P4-4 STA (high while cranking), P4-5 T terminal (low = shorted), P4-6 SPD. Port 3
-  bit 4 is an SE056 status line that the ROM expects high [ROM:$FC85].
+  bit 4 is an SE056 status line that the ROM expects high [ROM:$FC82].
 
 IDL polarity: the ROM's idle state is ``byte_95`` negative. It counts up while P4-2 is
 high [ROM:$F9F7-$FA39]. Three uses agree that negative means *throttle closed*: the idle
-advance branch and its idle-stability term [ROM:$F834], the airflow fallback of 800 µs
-(against 1600 µs off idle) when the airflow signal fails [ROM:$F1E8], and the
+advance branch and its idle-stability term [ROM:$F814-$F82C], the airflow fallback of 800 µs
+(against 1600 µs off idle) when the airflow signal fails [ROM:$F1E0], and the
 async "tip-in" injection when the throttle opens from that state above 2500 rpm
 [ROM:$FA19]. So at the CPU pin P4-2 is high with the throttle closed; the ECU's input
 buffer presumably inverts the IDL contact (closed to E2). LIKELY.
@@ -104,6 +111,7 @@ class Engine:
         self.edge = 0  # NE falling-edge count
         self.falls: list[int] = []  # NE falling-edge times
         self.sparks: list[int] = []  # /IGT rising edges
+        self.hw_sparks: list[int] = []  # cranking sparks made outside the CPU (see module notes)
         self.dwell_starts: list[int] = []  # /IGT falling edges
         self.inj: dict[str, list[tuple[int, int]]] = {"#10": [], "#20": []}  # (on, off) times
         self._inj_on: dict[str, int | None] = {"#10": None, "#20": None}
@@ -140,6 +148,10 @@ class Engine:
             return
         p, t, T = self.p, self.p.now, self.period()
         self.edge += 1
+        if self.falls and not (self.sparks and self.sparks[-1] > self.falls[-1]):
+            self.hw_sparks.append(t)
+            if self.inputs.igf:
+                p.at(t + 20, p.is3_falling_edge)
         self.falls.append(t)
         p.set_pin(1, 0, 0)  # NE falling edge -> IC2
         if self.edge % 4 == 0:

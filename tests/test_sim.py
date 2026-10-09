@@ -22,7 +22,7 @@ def sim_at(ms=1500, **inputs):
 
 
 def advance_from_rom_formula(base: int, thw_adv: int, idl_adv: int, delta_ne: int) -> float:
-    """Spark angle BTDC from the ROM's own sum and µs conversion [ROM:$F8D0-$F90E].
+    """Spark angle BTDC from the ROM's own sum and µs conversion [ROM:$F8CD-$F90D].
 
     sum clamped to $1F..$B8, minus $1C; AdvanceinUS = (deltaNE*(b+1))>>9 + 256 - deltaNE/16.
     The spark is AdvanceinUS before the NE falling edge, which is 10° BTDC; 180° per deltaNE.
@@ -57,7 +57,7 @@ def test_warm_injection_is_grouped_and_doubled():
         pulses = s.injector_pulses(g, since)
         assert len(pulses) == pytest.approx(0.3 * 1200 / 60, abs=1)  # once per revolution
         assert pulses[-1] == pytest.approx(expect, abs=15)
-    lp = s.ram("SE056plstime", 2) * s.ram("FuelRatioH", 2) >> 8  # [ROM:$F1F8-$F217]
+    lp = s.ram("SE056plstime", 2) * s.ram("FuelRatioH", 2) >> 8  # [ROM:$F1F0-$F217]
     assert s.ram("InjLoadPulse", 2) == pytest.approx(lp, abs=2)
 
 
@@ -75,7 +75,7 @@ def test_cold_injection_is_simultaneous_every_edge():
 def test_off_idle_advance_follows_the_3d_map(rpm, airflow):
     s, since = sim_at(ms=1200, rpm=rpm, airflow_us=airflow, idl=False)
     t = s.rom[0xFF40 - 0xF000 : 0xFF40 - 0xF000 + 6 * 14 + 2]
-    tvis = 8 if s.ram("TVIScounter") < 0x80 else 0  # +8 while T-VIS is off [ROM:$F89D]
+    tvis = 8 if s.ram("TVIScounter") < 0x80 else 0  # +8 while T-VIS is off [ROM:$F8A3]
     assert s.ram("BaseAdvance") == lookup_3d(t, 14, s.ram("RPMish"), s.ram("Load", 2)) + tvis
     want = advance_from_rom_formula(s.ram("BaseAdvance"), s.ram("ThW_tADV"), s.ram("IDLcompADV"), s.ram("deltaNE", 2))
     got = s.spark_advance(since)
@@ -84,7 +84,7 @@ def test_off_idle_advance_follows_the_3d_map(rpm, airflow):
 
 def test_idle_advance_and_t_terminal_ten_degrees():
     s, since = sim_at(rpm=900)
-    assert s.ram("BaseAdvance") == 0x2D  # fixed idle value [ROM:$F84A]
+    assert s.ram("BaseAdvance") == 0x2D  # fixed idle value [ROM:$F849]
     want = advance_from_rom_formula(0x2D, s.ram("ThW_tADV"), s.ram("IDLcompADV"), s.ram("deltaNE", 2))
     assert s.spark_advance(since)[-1] == pytest.approx(want, abs=0.15)
     s, since = sim_at(rpm=900, t_shorted=True)
@@ -105,3 +105,14 @@ def test_missing_igf_cuts_fuel():
     s, since = sim_at(rpm=900, igf=False)
     assert not s.injector_pulses("#10", since) and not s.injector_pulses("#20", since)
     assert s.ram("SatCount_98") >= 0x80
+
+
+def test_rom_makes_no_spark_while_cranking_but_keeps_fuelling():
+    """byte_C6 > 0 while cranking: /IGT stays high, so the cranking spark (and IGF) must come from outside the CPU."""
+    s, _ = sim_at(ms=300)
+    s.inputs.starter, s.inputs.rpm, s.inputs.coolant_f = True, 250, 32
+    s.engine.update_sensors()
+    s.run_ms(1500)
+    assert s.ram("byte_C6") > 0 and not s.engine.sparks
+    assert len(s.engine.hw_sparks) >= 10
+    assert s.injector_pulses("#10", s.periph.now - 500_000)  # IGF from the modelled hardware spark keeps fuel on

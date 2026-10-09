@@ -19,12 +19,12 @@ Sources:
   presets $FFF8; a following low-byte write loads the whole word.
 - **Timer 2 is a GUESS** from how the ROM uses it: TCSR2 has the same bit layout as
   TCSR1, ICF2 shares the ICF vector, OCF2 shares the OCF vector, IC2's input is P1-0 and
-  OC2's output is P1-1 [ROM:$F1B1, $F286, $F370, $F3B6]. Its edge bit, output level and
+  OC2's output is P1-1 [ROM:$F1B1, $F242, $F370, $F3B9]. Its edge bit, output level and
   flags are all used exactly as timer 1's are, and the whole ROM runs on that model
   (tests/test_sim.py).
 - The SCI talks to the external ADC. The model answers a channel byte written to TDR
   while P3-6 is low with the bit-reversed 8-bit reading for that channel, ``adc_delay``
-  cycles later (default 320, the time the ROM itself allows [ROM:$F3F8]). The ADC's
+  cycles later (default 320, the time the ROM itself allows [ROM:$F404]). The ADC's
   real conversion time is unknown (GUESS).
 
 The model is instruction-granular: the FRC advances by each instruction's cycle count

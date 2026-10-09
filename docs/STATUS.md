@@ -2,7 +2,7 @@
 
 The Lead agent updates this file at the end of every session. The plan is in [`RE_PLAN.md`](RE_PLAN.md).
 
-**Last updated:** 2026-10-09 — P0 round-trip gate passed (asl + dasm byte-identical on the Bluetop ROM). Ghidra made optional (owner decision). Next: cross-reference/call-graph generator, then the emulator.
+**Last updated:** 2026-10-09 — The factory wiring diagram (1984 EWD) and the second photo set are recorded: the CSI and idle air are not ECU-driven, `STH` = T-VIS output, PCB is 175731-0460-A2. A continuity-test guide for the owner is ready. P0 next: cross-reference/call-graph generator, then the emulator.
 
 ## Phase checklist
 
@@ -46,12 +46,14 @@ The Lead agent updates this file at the end of every session. The plan is in [`R
 | # | Question | Who / how |
 |---|---|---|
 | Q1 | ~~Is the 17140's CPU a 40-pin HD6301-type (like the Bluetop) or a 64-pin Toshiba 8X?~~ **Answered 2026-10-09:** a 40-pin **D151801-7110** with silkscreen "6356/6801" and a 4.00 MHz crystal. It is the same family as the Bluetop, so P3 follows the HD6301 path. See [`hardware/aw11_ecu.md`](hardware/aw11_ecu.md) | Done (photos) |
-| Q2 | Does the ECU drive the cold start injector or any idle-air device at all? The hypothesis is no: they are driven by the time switch/STA and a wax valve. **Now doubtful:** the board has pins labelled `?TH` (possibly **STJ**, Toyota's cold start injector terminal) and **`VISC`** (possibly an idle-control VSV) | **High priority.** Owner takes a close-up of the labels, then the pins are traced (P3) and checked in the port audit and wiring diagram (P5) |
+| Q2 | ~~Does the ECU drive the cold start injector or any idle-air device at all?~~ **Answered (LIKELY for the 17140):** no. The factory wiring diagram shows the CSI wired starter → CSI → time switch, and the idle-up VSV switched by the electrical loads (the ECU only senses it on I/UP). The board label is `STH` = S/TH, the T-VIS output, not STJ. See [`hardware/ewd_aw11_1984.md`](hardware/ewd_aw11_1984.md) | Becomes CONFIRMED when continuity Test B shows `VISC` is an input ([`hardware/aw11_ecu.md`](hardware/aw11_ecu.md)) |
 | Q3 | What converts raw ignition-table values to degrees BTDC, and does VR offset matter? | IGT tracing + Zero timing meter (P2/P8) |
 | Q4 | Can a 17030 or 17070 dump be found, to check Ross's 17030 numbers directly? | Community search (P3) |
 | Q5 | Do NE/G inputs need a VR-style bipolar waveform from the bench simulator? | ECU input-circuit inspection (P8). IC3 (µPC177C comparator) is the likely conditioner |
-| Q6 | Do the factory jumpers J3/J4 (fitted) or J5–J10 (empty) next to the MCU set Ross's secret-map "logic level"? | Trace the jumpers to IC7 pins (P3), then find port-bit tests in the ROM (P6) |
+| Q6 | Do the factory jumpers next to the MCU (**two links fitted among J3/J4/J8**; the rest empty) set Ross's secret-map "logic level", or the HD6301 mode pins (P20–P22)? | Owner runs continuity **Test A** ([`hardware/aw11_ecu.md`](hardware/aw11_ecu.md)), then the ROM is searched for port-bit tests (P6) |
 | Q7 | What does the 17140 ROM do with the `OX`/`VF` pins on a UK car with no O2 sensor? | ROM analysis (P4) |
+| Q8 | Does the 17140's `OX` pin carry the mixture-screw CO resistor? The 1984 VAF pin is missing from the board (Ross R-M08) | Continuity **Test B**, then the ROM ADC channel map (P4) |
+| Q9 | Is there a **1986–89 mk1b wiring diagram** to confirm the 17140 pinout (VISC, OX, W, ACT, FPU ...)? | Owner (the second PDF may be it) |
 
 ## Conflicts log
 

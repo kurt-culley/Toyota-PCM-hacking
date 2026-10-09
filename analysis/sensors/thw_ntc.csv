@@ -1,0 +1,9 @@
+# Coolant temperature sensor (THW), terminals 1-2. Source: Toyota MR2 AW11 EWD Nov 1984 (Pub. 36711E) p25 "Water thermo sensor".
+# r_min/r_max in kOhm. note: scan ambiguity / correction made during transcription.
+temp_c,r_min_kohm,r_max_kohm,note
+-20,14.8,17.8,6/8 and 0/8 digits ambiguous in scan; Beta model (B=3513 K) predicts 16.3 kOhm
+0,5.9,5.9,
+20,2.2,2.7,
+40,1.1,1.1,
+60,0.58,0.58,scan prints "80 C" but "140 F" = 60 C
+80,0.29,0.35,

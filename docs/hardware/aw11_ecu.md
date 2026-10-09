@@ -1,6 +1,6 @@
 # Test ECU: Toyota 89661-17140 (UK mk1b MR2, 4A-GE)
 
-This record comes from the owner's photos (2026-10-09) in [`photos/89661-17140/`](photos/89661-17140/). Each claim carries a confidence tag, as set out in [`../RE_PLAN.md`](../RE_PLAN.md).
+This record comes from the owner's photos (2026-10-09, two sets) in [`photos/89661-17140/`](photos/89661-17140/), and from the factory wiring diagram summarised in [`ewd_aw11_1984.md`](ewd_aw11_1984.md). Each claim carries a confidence tag, as set out in [`../RE_PLAN.md`](../RE_PLAN.md).
 
 ## Identification
 
@@ -9,7 +9,7 @@ This record comes from the owner's photos (2026-10-09) in [`photos/89661-17140/`
 | Toyota part number | **89661-17140** | CONFIRMED | Case label ([01](photos/89661-17140/01-case-label.jpg)) |
 | Denso part number | **175700-1043**, 12 V, "4A-G" | CONFIRMED | Case label |
 | Connectors | 10P + 18P + 14P | CONFIRMED | Case label |
-| PCB number | 175731-1??0-A2 (middle digits hidden behind IC1) | PARTIAL | [06](photos/89661-17140/06-ic1-ic5-crystal.jpg). A clearer photo is needed |
+| PCB number | **175731-0460**, revision **A2** | CONFIRMED | [21](photos/89661-17140/21-pcb-number-175731-0460.jpg) |
 | Build date stamp | **S63.11.30** = Showa 63 = **30 Nov 1988** | LIKELY | Sticker top right ([02](photos/89661-17140/02-board-overview.jpg)) |
 
 ## Main microcontroller: answers open question Q1
@@ -36,28 +36,36 @@ This record comes from the owner's photos (2026-10-09) in [`photos/89661-17140/`
 | IC4 | Toshiba **TC4069UBP** | Hex inverter | CONFIRMED (marking) |
 | T07 | Toshiba **2SD1678** power transistor, bolted to the case | A single high-current driver. Ross's claim R-F22 says **one transistor drives all four injectors**, with the #10 and #20 pins strapped together. This part is a strong candidate for that driver | GUESS. Trace #10/#20 to confirm |
 
-## Connector-edge pin labels (silkscreen, photos 04/05)
+## Connector-edge pin labels (silkscreen)
 
-These were read from the photos. Some are partly hidden by components.
+These were read from close-ups [09–18](photos/89661-17140/09-connector-labels-a.jpg). The order below follows the board, from the E01/E02 end:
 
-`E02 E01 #20 #10 · IGT STA · E1 ACT · FPU NSW · ?TH VISC · VF OX · E21 G− · NE G1 · IGF T · IDL · VCC THA · VTA PIM · E2 THW · L2 L1 L3 · SPD ECT · A/C FC · EGW CCO · W BATT · +B +B1`
+`E02 E01 · #20 #10 · IGT STA · E1 ACT · FPU NSW · STH VISC · VF OX · E21 G− · NE G1 · IGF · IDL T · VCC THA · VTA PIM · E2 THW · L2 L1 · L3 · SPD ECT · A/C FC · EGW CCO · W BATT · +B +B1`
 
-Most are standard Toyota terminals:
+The table maps each label to the factory wiring diagram ([`ewd_aw11_1984.md`](ewd_aw11_1984.md), the 1984 edition). The 1984 pin numbers are shown for reference only; the 17140's own connector numbering is not confirmed yet.
 
-- **Ignition, injection and crank/cam signals:** IGT and IGF are the ignition trigger and confirmation. #10 and #20 are the injector outputs. NE, G1 and G− are the crank/cam pickups.
-- **Sensors and supplies:** VTA and IDL are the throttle position and idle switch. PIM is the MAP sensor. THA and THW are the air and coolant temperature sensors. VCC is the 5 V sensor supply, E1/E2/E21 are grounds, and BATT/+B/+B1 are the supplies.
-- **Driver and gearbox inputs:** STA is the starter signal. NSW is the neutral start switch. L1–L3, ECT and SPD are automatic-gearbox and vehicle-speed lines.
-- **Outputs and diagnostics:** FC is fuel pump control, W is the check-engine lamp, and T is the diagnostic test terminal.
+| Board label | Meaning | 1984 EWD pin | Confidence (for the 17140) |
+|---|---|---|---|
+| E01, E02, E1, E2, E21 | Power, ECU and sensor grounds | N-5, N-10, N-7, M-10, M-16 | LIKELY |
+| #10, #20 | Injector groups No.1+3 and No.2+4 | N-4, N-9 | LIKELY |
+| IGT, IGF | Igniter trigger (output), spark confirmation (input) | M-8, M-5 | LIKELY |
+| STA | Starter signal (input). The ECU's **only** cranking input | N-3 | LIKELY |
+| **STH** | **S/TH: T-VIS VSV driver (output)**, switched above 4350 rpm on the mk1a. **Not** a cold-start terminal (earlier misread as "?TH/STJ") | M-18 | LIKELY |
+| **VISC** | Probably the successor to **I/UP**: senses the electrical idle-up VSV (input) | (M-9 I/UP) | GUESS |
+| VF | Feedback/CO check output to the service connector | M-17 | LIKELY |
+| **OX** | The O2 input on other markets. The UK car has no O2 sensor, and the 1984 mixture-screw pin **VAF** is missing from this board, so OX **may carry the CO control resistor** on the 17140 (Ross R-M08) | (L-14 VAF) | GUESS |
+| NE, G1, G− | Distributor pickups (G1 ≈ 1984 "G+") | M-15, M-6, M-7 | LIKELY |
+| IDL, VTA, VCC | Throttle idle contact, throttle position, 5 V sensor supply | M-13, M-11, M-12 | LIKELY |
+| T | Diagnostic test terminal (input) | M-4 | LIKELY |
+| THA, THW, PIM | Air and coolant thermistors, vacuum (MAP) sensor | M-3, M-1, M-2 | LIKELY |
+| SPD | Vehicle speed | L-12 | LIKELY |
+| A/C | A/C switch signal from the A/C amplifier (input) | L-11 | LIKELY |
+| FC | Fuel pump control (circuit opening relay) | L-4 | LIKELY |
+| W | Check-engine lamp (the 1984 "DG" pin probably did this) | (L-9 DG) | GUESS |
+| BATT, +B, +B1 | Memory supply; main supply via the EFI main relay | L-2, L-8, L-1 | LIKELY |
+| ACT, FPU, NSW, L1–L3, ECT, EGW, CCO | A/C cut, fuel-pressure-up VSV, neutral start, automatic-gearbox lines, EGR warning, ? Probably unused on the UK manual car | not in 1984 | GUESS |
 
-Three of these labels change the plan:
-
-1. **`?TH` and `VISC` bear directly on goal 1 (IACV and cold start injector removal).**
-   - The first letter of `?TH` is hidden. If it reads **`STJ`**, that is Toyota's terminal for the **cold start injector / start injector time switch**. On some Toyota ECUs this means the ECU itself monitors or drives the CSI.
-   - `VISC` may be a **VSV for idle-speed control** (an idle-up or air valve) driven by the ECU.
-
-   Either would contradict the framing hypothesis in `RE_PLAN.md`, which assumes the ECU neither knows about nor drives the CSI and IACV. **Status: open, high priority.** A clear photo of these labels and then tracing them on the board will settle it (open question Q2).
-2. **`OX` and `VF` exist on a UK car that has no O2 sensor.** The board is shared with O2-equipped markets. The 17140 ROM probably ignores OX or has it disabled by a jumper or calibration flag. Check this against Ross's R-I14 ("no self-learning").
-3. **`FPU`** is the fuel-pressure-up VSV, used for hot restart. It is another temperature-dependent strategy, relevant to warm-up and start-up (P5).
+**What this means for goal 1:** the factory wiring diagram shows the **cold start injector is wired to the start injector time switch, not the ECU**. The **idle-up VSV is switched by the electrical loads**, with the ECU only sensing it. The aux air valve is mechanical. So the framing hypothesis in `RE_PLAN.md` is supported (STATUS Q2). For the 17140 it stays **LIKELY** until Test B below shows `VISC` is an input.
 
 ## Configuration jumpers next to the MCU: candidate for the "secret map" logic level
 
@@ -65,14 +73,15 @@ There is a row of jumper positions **J1–J10** between IC1 and IC7, labelled ne
 
 | Jumper | State |
 |---|---|
-| **J3** | **fitted** (wire link) |
-| **J4** | **fitted** (wire link) |
-| J5, J6, J7, J8, J9, J10 | empty |
+| **Two of J3 / J4 / J8** | **fitted** (wire links) |
+| The other one of J3/J4/J8, and J5, J6, J7, J9, J10 | empty |
 | J1, J2 (by the crystal) | empty |
+
+**Correction (second photo set):** the first record said "J3 and J4 fitted". Each label sits *between* two rows of pads, so which label owns which link depends on how the photo is read. The straight-on photo [20](photos/89661-17140/20-ic7-jumpers-top-side.jpg) suggests **J4 and J8**; the earlier rotated photo was read as J3 and J4. **Test A below settles it.**
 
 There are also test points **RT**, **RD**, **RS** and a resistor array **RA1**.
 
-Ross says the secret fuel and ignition maps are selected by "a logic level inside the ECU" ([claims](../ross/claims.md) R-F12 and R-I15). Jumpers wired to MCU port pins are the obvious way Denso would set that level at the factory. **Hypothesis (GUESS):** one of J3–J10 sets the port bit that the code tests to choose the secret maps.
+Ross says the secret fuel and ignition maps are selected by "a logic level inside the ECU" ([claims](../ross/claims.md) R-F12 and R-I15). Jumpers wired to MCU port pins are the obvious way Denso would set that level at the factory. **Hypothesis (GUESS):** one of J1–J10 sets the port bit that the code tests to choose the secret maps.
 
 To check it:
 1. Trace each jumper pad to its IC7 pin, using a continuity meter with the board unpowered.
@@ -86,8 +95,83 @@ Unpopulated positions **T20–T23** and **R536–R546** suggest more options for
 - On the component side the board looks coated (glossy). Test a small area with IPA or acetone before probing, as the upstream notes advise.
 - The solder side ([03](photos/89661-17140/03-board-solder-side.jpg)) is clean single-sided through-hole work, which makes tracing easy.
 
-## Photos still wanted
+## Continuity test guide (owner: multimeter only, ECU unpowered)
 
-1. **Straight-on close-up of the connector-edge labels**, especially `?TH` and `VISC`. If the labels are hidden, a photo of the case connector pin numbering also helps.
-2. **Close-up of the PCB part number** next to the DENSO logo (175731-1??0).
-3. **The solder side directly under IC7 and J1–J10**, lit at an angle, for tracing the jumpers to MCU pins.
+This resolves STATUS **Q6** (what the jumpers connect to) and finishes **Q2/Q8** (whether `VISC` and `OX` are inputs, and where they go). No purchases are needed. The solder-side reference photo is [19](photos/89661-17140/19-solder-side-under-ic7-jumpers.jpg).
+
+### Safety
+- The ECU must be **unplugged from the car with no power applied**. Never use continuity or resistance mode on a powered circuit.
+- Use ESD care: touch the metal case before handling the board, and don't touch IC7's pins with your fingers.
+- Use the meter's **continuity (beep)** mode, and press the probes on solder joints from the **solder side**. Don't scratch the conformal coating off on the component side.
+
+### IC7 pin numbering
+
+IC7 is the D151801-7110, assumed to have the standard **HD6301V1 DIP-40 pinout**. Source: `TOYOTA Bluetop PCM/HD6301v1 datasheet.pdf`, page 3 (scanned), "Pin arrangement, HD6301V1P, top view".
+
+Pin 1 is next to the notch or dot. From the **component side**, pins 1–20 run down one side and 21–40 come back up the other. **From the solder side the picture is mirrored**, so find pin 1 first: it is the joint at the notch end that beeps to ground (Vss, pin 1). Pin 21 (Vcc, +5 V) is diagonally opposite.
+
+```
+            ┌──── notch ────┐
+  Vss   1 ──┤               ├── 40  E (bus clock, 1 MHz)
+  XTAL  2 ──┤               ├── 39  SC1 (AS)
+  EXTAL 3 ──┤               ├── 38  SC2 (R/W)
+  /NMI  4 ──┤               ├── 37  P30  ┐
+  /IRQ1 5 ──┤               ├── 36  P31  │
+  /RES  6 ──┤               ├── 35  P32  │ Port 3
+  /STBY 7 ──┤   HD6301V1    ├── 34  P33  │ (data bus AD0-7
+  P20   8 ──┤  (component   ├── 33  P34  │  in expanded mode)
+  P21   9 ──┤   side, top   ├── 32  P35  │
+  P22  10 ──┤    view)      ├── 31  P36  │
+  P23  11 ──┤               ├── 30  P37  ┘
+  P24  12 ──┤               ├── 29  P40  ┐
+  P10  13 ──┤               ├── 28  P41  │
+  P11  14 ──┤               ├── 27  P42  │ Port 4
+  P12  15 ──┤               ├── 26  P43  │ (address A8-15
+  P13  16 ──┤               ├── 25  P44  │  in expanded mode)
+  P14  17 ──┤               ├── 24  P45  │
+  P15  18 ──┤               ├── 23  P46  │
+  P16  19 ──┤               ├── 22  P47  ┘
+  P17  20 ──┤               ├── 21  Vcc (+5 V)
+            └───────────────┘
+```
+
+- **P20–P22 (pins 8–10) are the HD6301 mode-select pins**, latched at reset. A jumper that lands on one of these sets the chip's operating mode, which matters for the P3 reader. A jumper on any **other** port pin is a candidate for a calibration or "secret map" select.
+- The repo README notes the D151801 uses P10/P11 for its extra input-capture/output-compare timer.
+- The D151801 is a Denso custom part. The pinout above is the standard HD6301V1, assumed because the board's silkscreen names the "6356/6801" footprint. Test A also checks this: Vss and Vcc must land where expected.
+
+### Test A: where do the jumpers go?
+1. Find IC7 **pin 1 (Vss)**: it beeps to the case or ground. Then find **pin 21 (Vcc)**.
+2. For **each pad** of J1–J10 (two pads per jumper, 20 pads in total):
+   - beep it against **every IC7 pin** (1–40), and note any pin that beeps;
+   - beep it against **GND (pin 1)** and **+5 V (pin 21)**.
+3. For the **two fitted links**, note which label each link sits under, and which IC7 pin(s) and rail it joins.
+
+| Jumper | Fitted? | Pad A → IC7 pin / GND / +5 V | Pad B → IC7 pin / GND / +5 V |
+|---|---|---|---|
+| J1 | | | |
+| J2 | | | |
+| J3 | | | |
+| J4 | | | |
+| J5 | | | |
+| J6 | | | |
+| J7 | | | |
+| J8 | | | |
+| J9 | | | |
+| J10 | | | |
+
+### Test B: are `STH`, `VISC` and `OX` inputs or outputs?
+For each of the connector pins `STH`, `VISC` and `OX` (plus `STA` as a known-good reference input):
+1. Beep from the connector pin to the **first component** its track reaches. Note the reference (Rxxx, Cxxx, Txx, Dxxx or a hybrid ICx pin).
+2. Follow it one step further, if you can, to an **IC7 pin**, an **IC3 (µPC177C) pin** or an **IC6 (MF176) pin**.
+3. How to read the result:
+   - **Output:** the pin reaches the **collector or drain of a transistor** (Txx), or a hybrid output.
+   - **Input:** the pin goes through a **series resistor or RC filter** to IC3, IC6 or IC7. IC6 means an analogue input, which is what to expect for `OX` if it carries the mixture screw.
+
+| Connector pin | First component | Next IC / pin | Input or output? |
+|---|---|---|---|
+| STA (reference) | | | |
+| STH | | | |
+| VISC | | | |
+| OX | | | |
+
+Send the filled-in tables, or photos of your notes, and they will be recorded here and in `STATUS.md`.

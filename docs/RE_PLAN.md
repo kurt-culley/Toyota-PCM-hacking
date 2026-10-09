@@ -35,9 +35,14 @@ The project owner has a UK mk1b MR2 (ECU **89661-17140**). They know aftermarket
   - **The part-number prefix does not identify the CPU.**
   - How to convert spark-table values into degrees is disputed.
 
-### Framing hypothesis for goal 1 (to verify, not to assume)
+### Framing hypothesis for goal 1 (supported by the factory wiring diagram)
 
-On the AW11/4A-GE, the cold start injector is driven by the **start injector time switch and STA**, not by the ECU. The IACV is a coolant-heated **wax auxiliary air valve**, not an ECU-driven ISC valve. Ross's claim R-I08 supports this. If it holds, the ECU never "knows" these parts are gone. **Caution (2026-10-09):** the 17140 board has pins labelled `VISC` and `?TH` (possibly **STJ**, Toyota's cold start injector terminal), so this hypothesis is now in doubt. See [`hardware/aw11_ecu.md`](hardware/aw11_ecu.md) and STATUS Q2. The real question is how its own strategies react to less idle air and less cranking fuel: idle-stability spark advance, THW enrichment and advance, after-start enrichment and cranking fuel.
+On the AW11/4A-GE, the cold start injector is driven by the **start injector time switch and STA**, not by the ECU. The IACV is a coolant-heated **wax auxiliary air valve**, not an ECU-driven ISC valve. Ross's claim R-I08 supports this, and so does the **1984 factory wiring diagram** ([`hardware/ewd_aw11_1984.md`](hardware/ewd_aw11_1984.md)):
+- The CSI is wired starter → CSI → time switch, with no ECU connection.
+- The electrical idle-up VSV is switched by the electrical loads, and the ECU only senses it on I/UP.
+- The `STH` board pin is S/TH, the T-VIS output, not a cold-start terminal.
+
+If it holds, the ECU never "knows" these parts are gone. It is **LIKELY** for the 17140 until the continuity test in [`hardware/aw11_ecu.md`](hardware/aw11_ecu.md) confirms that `VISC` is an input (STATUS Q2). The real question is how its own strategies react to less idle air and less cranking fuel: idle-stability spark advance, THW enrichment and advance, after-start enrichment and cranking fuel.
 
 ---
 
@@ -57,9 +62,10 @@ On the AW11/4A-GE, the cold start injector is driven by the **start injector tim
 - **Source-of-truth order:**
   1. the ROM bytes
   2. bench or car measurements
-  3. the Ross PDF (17030/17140)
-  4. existing `cap.asm` annotations
-  5. upstream issues and forums
+  3. factory service documentation (wiring diagram, repair manual); see [`hardware/ewd_aw11_1984.md`](hardware/ewd_aw11_1984.md)
+  4. the Ross PDF (17030/17140)
+  5. existing `cap.asm` annotations
+  6. upstream issues and forums
 
   Log conflicts in `STATUS.md`. Never resolve them silently.
 - **Evidence tags on every claim.** Use one of `[ROM:$F863]`, `[PDF:p12]`, `[EMU:test_id]` or `[BENCH:capture.sr]`, plus a confidence of **CONFIRMED**, **LIKELY** or **GUESS**.
@@ -193,7 +199,8 @@ flowchart LR
   - idle-stability advance (attack, decay, maximum)
   - fast idle
   - decel fuel cut versus temperature
-  - whether the ECU drives **any** cold-start-injector or idle-control output (port audit compared against the wiring diagrams)
+  - the load compensation the ECU applies when the **I/UP (idle-up) input** is active
+  - confirm the wiring diagram's finding that the ECU drives **no** cold-start-injector or idle-air output (port audit compared against [`hardware/ewd_aw11_1984.md`](hardware/ewd_aw11_1984.md)). The ECU-side cold-start levers are STA, THW-based enrichment and advance, after-start enrichment, idle-stability advance and I/UP
 - Run whole-ROM emulator sweeps for starts at −5, 10 and 20 °C, each with normal and reduced idle air.
 - **Deliverable:** `docs/warmup_cold_start.md`. It contains:
   - a Mermaid state diagram of the cold-start sequence

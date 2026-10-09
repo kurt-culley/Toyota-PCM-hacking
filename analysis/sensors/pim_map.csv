@@ -1,0 +1,6 @@
+# Vacuum (MAP) sensor PIM output vs absolute manifold pressure, terminals 1-4. Source: Toyota MR2 AW11 EWD Nov 1984 (Pub. 36711E) p25 "Vacuum sensor".
+pressure_mmhg_abs,pressure_kpa_abs,volts,note
+150,20.0,1.2,
+450,60.0,2.4,scan reads "80.0 kPa" but 450 mmHg = 60.0 kPa (17.72 inHg also printed)
+750,100.0,3.8,as scanned (6/8 ambiguous); a linear fit of the other three points gives 3.6 V - confirm on the bench (P8)
+840,112.0,4.0,

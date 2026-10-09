@@ -2,13 +2,19 @@
 
 The Lead agent updates this file at the end of every session. The plan is in [`RE_PLAN.md`](RE_PLAN.md).
 
-**Last updated:** 2026-10-09 — P0 cross-reference generator done ([`../analysis/bluetop/xref.md`](../analysis/bluetop/xref.md)), awaiting Verifier review; next P0 task is the Python HD6301 emulator. Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.md`](hardware/repair_manual_aw11_1988.md); the PDF is not committed). Its US ECU drives the idle-up VSV from `V-ISC` (cranking + 10 s), so Q2 is partly reopened for the 17140; continuity Test B now also covers `FPU`. Earlier today: the 1984 EWD, the second photo set and the continuity-test guide. P0 next: cross-reference/call-graph generator, then the emulator.
+**Last updated:** 2026-10-09 — All P0 tasks are done:
+- the cross-reference generator (Verifier: PASS WITH ISSUES, fixed);
+- the Python HD6301 core, which matches MAME on every opcode (awaiting Verifier).
+
+Next: P0 gate sign-off, then P1 (Ross figures) and the P2 peripheral models.
+
+Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.md`](hardware/repair_manual_aw11_1988.md); the PDF is not committed). Its US ECU drives the idle-up VSV from `V-ISC` (cranking + 10 s), so Q2 is partly reopened for the 17140; continuity Test B now also covers `FPU`. Earlier today: the 1984 EWD, the second photo set and the continuity-test guide. P0 next: cross-reference/call-graph generator, then the emulator.
 
 ## Phase checklist
 
 | Phase | Description | State | Gate signed off by Verifier |
 |---|---|---|---|
-| P0 | Foundations: tooling, asl round-trip, xref, emulator | ◐ round-trip gate passed; xref + emulator outstanding | ☐ |
+| P0 | Foundations: tooling, asl round-trip, xref, emulator | ◐ all P0 tasks done; Verifier review of the emulator pending | ☐ |
 | P1 | Ross claim register (skeleton done; figures and Mermaid diagrams outstanding) | ◐ started | — |
 | P2 | Bluetop analysis + Tier-A verification | ☐ | ☐ |
 | P3 | Dump the MR2 89661-17140 ROM (Arduino Zero reader) | ☐ | — |
@@ -27,7 +33,13 @@ The Lead agent updates this file at the end of every session. The plan is in [`R
 - [x] **Gate: [`analysis/bluetop/cap.s`](../analysis/bluetop/cap.s) reassembles byte-identical to `cap.bin` with `asl`, and the `dasm` cross-check agrees** (`uv run pytest`, 2026-10-09). The ROM's SHA-256 (`62b2a3f2…7f2`) is pinned in the tests.
 - [x] Cross-reference and call-graph generator ([`../analysis/pcmre/xref.py`](../analysis/pcmre/xref.py) → [`../analysis/bluetop/xref.md`](../analysis/bluetop/xref.md)). It covers 68 routines and 1,989 instructions, with readers/writers of every RAM variable and Mermaid call graphs per vector. It follows Denso's indexed calls, jump tables and inline-parameter returns, and agrees with all 514 of IDA's XREF comments (`tests/test_xref.py`). It also found one IDA error: `$F4C9` is inline data, not code. **Verifier (independent agent, 2026-10-09): PASS WITH ISSUES.** It hand-traced 10 X-resolved calls, swept 28 variables by name and checked the stack model, and all of these were correct. Its two should-fix items are now fixed: 16-bit accesses are credited to both bytes, and loop sites are counted and disclosed. Five latent nits were fixed as well.
 - [~] ~~Ghidra + pyghidra~~ **Made optional (owner decision, 2026-10-09).** There is no HD6301 module, and a decompiler adds little on hand-written 8-bit code. It is not a dependency or a gate. A later optional task may write a setup guide so the owner can browse the ROMs in Ghidra on their own PC.
-- [ ] Python HD6301 emulator passing the `suite6303` instruction tests (next P0 task).
+- [x] Python HD6301 CPU core ([`../analysis/emu/cpu.py`](../analysis/emu/cpu.py)), written from the Hitachi handbook tables.
+  - It matches MAME's hd6301 handlers on 16,384 random single-instruction cases (64 per opcode): registers, flags, memory writes and cycles.
+  - Every `suite6303` instruction steps with the right length.
+  - The Bluetop ROM runs from reset into `Main_Loop`.
+  - The reference is built by [`../tools/setup_mame_ref.sh`](../tools/setup_mame_ref.sh), with MAME pinned at `mame0275` and SHA-256-checked; no MAME code is committed.
+  - **Awaiting Verifier review.**
+- [ ] P0 gate sign-off by the Verifier (xref already reviewed; emulator pending).
 ### P1 tasks
 - [x] Claim register skeleton: [`ross/claims.md`](ross/claims.md).
 - [ ] Extract the 16 figures (`pdfimages`) and confirm the page mapping.

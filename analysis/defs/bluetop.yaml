@@ -43,6 +43,7 @@ variables:
 
 maps:
   - id: ign_base
+    category: Ignition
     name: Base ignition advance (3D)
     addr: 0xFF40
     kind: 3d
@@ -59,12 +60,15 @@ maps:
       unit: rpm
     cell:
       unit: raw advance
-      note: "cap.asm comments put advance at about raw*90/255 deg, referenced to the NE edge at 10 deg BTDC; not yet verified (STATUS Q3, R-I06)"
+      equation: "X*90/256-0.9"
+      eq_unit: deg BTDC (warm, plus a 256 us lead; LIKELY, Bluetop only)
+      note: "Warm (ThW_tADV = 28) the spark is about v*90/256 - 0.9 deg BTDC plus a fixed 256 us lead [EMU:sim, docs/bluetop/simulation.md]. The PWRr staircase ($FF94) is subtracted, and 8 is added while T-VIS is shut"
     evidence: "[ROM:$F86C-$F89F] [EMU:tests/test_tables.py::test_3d_ignition_lookup_matches_emulator]"
-    confidence: CONFIRMED (layout and interpolation); LIKELY (rpm axis); GUESS (degrees)
+    confidence: CONFIRMED (layout and interpolation); LIKELY (rpm axis, degrees)
     claims: [R-I02, R-I05]
 
   - id: thw_linearise
+    category: Sensors
     name: Coolant sensor linearisation (raw ADC -> degF)
     addr: 0xFEF0
     kind: 1d
@@ -76,6 +80,7 @@ maps:
     confidence: LIKELY
 
   - id: tha_corr
+    category: Fuel
     name: Air temperature correction (ThAcorr)
     addr: 0xFED9
     kind: 1d
@@ -88,6 +93,7 @@ maps:
     claims: [R-F11]
 
   - id: inj_dead_time
+    category: Fuel
     name: Injector dead time vs battery voltage
     addr: 0xFEE9
     kind: 1d
@@ -96,12 +102,15 @@ maps:
     axis: {var: "ADC_12V - $53 (0 below 8.1 V)", shift: 5, unit: raw ADC}
     cell:
       unit: raw
+      equation: "X*8+464"
+      eq_unit: us dead time
       note: "InjDeadTime = v*8 + 464 us (the helper's A:B/32 + $1D0); 255 -> 2504 us at 8.1 V or less. Input is at most $AC, so entries 7-8 (which overlap $FEF0) are never reached"
     evidence: "[ROM:$FC8F-$FC9E suba #$53 / ldx #$FEE9 / DivDby32 / addd #$01D0 / std InjDeadTime] [EMU:tests/test_sim.py 1183 us at 14 V]"
     confidence: CONFIRMED (use and scaling); LIKELY (volts axis)
     claims: [R-F17]
 
   - id: dwell_battery
+    category: Ignition
     name: Coil dwell term vs battery voltage
     addr: 0xFF12
     kind: 1d
@@ -110,11 +119,14 @@ maps:
     axis: {var: ADC_12V, shift: 5, unit: raw ADC}
     cell:
       unit: raw
+      equation: "X*32"
+      eq_unit: us (dwell term)
       note: "word_BF is filtered towards v*32 us; Dwell = deltaNE/16 + word_BF. Shares bytes with $FF11"
     evidence: "[ROM:$FCA2-$FCAF ldx #$FF12 / lsrd x3 / addd word_BF / lsrd] [ROM:$F913 Dwell = deltaNE/16 + word_BF]"
     confidence: CONFIRMED (use); LIKELY (dwell meaning)
 
   - id: se056_max
+    category: Fuel
     name: Maximum airflow delay (SE056Maxtime) vs engine speed
     addr: 0xFE9C
     kind: 1d
@@ -123,11 +135,14 @@ maps:
     axis: {var: "FullRPM high byte (about rpm/800)", shift: 0, unit: "FullRPM/256", raw: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]}
     cell:
       unit: raw
+      equation: "X*8+2048"
+      eq_unit: us maximum airflow delay
       note: "SE056Maxtime = v*8 + $800 us; clamps the measured airflow delay and scales the acceleration enrichment. FullRPM is at most $0A00, so only 12 entries are reached (the next bytes are $FEA7)"
     evidence: "[ROM:$F582-$F58E ldd FullRPM / ldx #$FE9C / jsr $91,x / DivDby32 / adda #$08 / std SE056Maxtime] [ROM:$F1DA clamp]"
     confidence: CONFIRMED (use); LIKELY (rpm axis)
 
   - id: accel_enrich
+    category: Fuel
     name: Acceleration enrichment vs throttle opening rate
     addr: 0xFEA7
     kind: 1d
@@ -141,6 +156,7 @@ maps:
     confidence: CONFIRMED (structure); LIKELY (meaning)
 
   - id: overheat_adv
+    category: Ignition
     name: Over-temperature ignition retard (ThW_tADV when hot)
     addr: 0xFF11
     kind: 1d
@@ -155,6 +171,7 @@ maps:
     claims: [R-I12]
 
   - id: pwr_ign_trim
+    category: Ignition
     name: Ignition trim selected by the PWRr input (8-step staircase, no interpolation)
     addr: 0xFF94
     kind: step
@@ -166,6 +183,7 @@ maps:
     claims: [R-F10]
 
   - id: pwr_o2_trim
+    category: Fuel
     name: O2-loop value selected by the PWRr input (8-step staircase)
     addr: 0xFF9C
     kind: step
@@ -176,6 +194,7 @@ maps:
     confidence: CONFIRMED (structure); GUESS (meaning)
 
   - id: decel_cut_rpm
+    category: Fuel
     name: Decel fuel-cut rpm vs coolant temperature
     addr: 0xFEE2
     kind: 1d
@@ -188,6 +207,7 @@ maps:
     claims: [R-F25]
 
   - id: rpm_reciprocal
+    category: Sensors
     name: Reciprocal table used to compute FullRPM from the NE period
     addr: 0xFEF9
     kind: 1d
@@ -198,17 +218,17 @@ maps:
     evidence: "[ROM:$F457 in CalcRPMTable]"
     confidence: LIKELY
 
-  - {id: thw_FEAF, name: "Coolant table $FEAF -> byte_83", addr: 0xFEAF, kind: 1d, entry: 0xFF1B, length: 7,
+  - {category: Coolant, id: thw_FEAF, name: "Coolant table $FEAF -> byte_83", addr: 0xFEAF, kind: 1d, entry: 0xFF1B, length: 7,
      axis: {var: ADC_ThW, shift: 5, unit: degF}, cell: {unit: raw}, evidence: "[ROM:$FD44]", confidence: CONFIRMED (layout); purpose unknown}
-  - {id: thw_FEB6, name: "Coolant table $FEB6 -> byte_84", addr: 0xFEB6, kind: 1d, entry: 0xFF1B, length: 7,
+  - {category: Coolant, id: thw_FEB6, name: "Coolant table $FEB6 -> byte_84", addr: 0xFEB6, kind: 1d, entry: 0xFF1B, length: 7,
      axis: {var: ADC_ThW, shift: 5, unit: degF}, cell: {unit: raw}, evidence: "[ROM:$F566]", confidence: CONFIRMED (layout); purpose unknown}
-  - {id: thw_FEBD, name: "Coolant table $FEBD -> byte_8B", addr: 0xFEBD, kind: 1d, entry: 0xFF1B, length: 7,
+  - {category: Coolant, id: thw_FEBD, name: "Coolant table $FEBD -> byte_8B", addr: 0xFEBD, kind: 1d, entry: 0xFF1B, length: 7,
      axis: {var: ADC_ThW, shift: 5, unit: degF}, cell: {unit: raw}, evidence: "[ROM:$FD4B]", confidence: CONFIRMED (layout); purpose unknown}
-  - {id: thw_FEC4, name: "Coolant table $FEC4 -> word_8C", addr: 0xFEC4, kind: 1d, entry: 0xFF1B, length: 7,
+  - {category: Coolant, id: thw_FEC4, name: "Coolant table $FEC4 -> word_8C", addr: 0xFEC4, kind: 1d, entry: 0xFF1B, length: 7,
      axis: {var: ADC_ThW, shift: 5, unit: degF}, cell: {unit: raw}, evidence: "[ROM:$F56D]", confidence: CONFIRMED (layout); purpose unknown}
-  - {id: thw_FECB, name: "Coolant table $FECB", addr: 0xFECB, kind: 1d, entry: 0xFF1B, length: 7,
+  - {category: Coolant, id: thw_FECB, name: "Coolant table $FECB", addr: 0xFECB, kind: 1d, entry: 0xFF1B, length: 7,
      axis: {var: ADC_ThW, shift: 5, unit: degF}, cell: {unit: raw}, evidence: "[ROM:$F57C]", confidence: CONFIRMED (layout); purpose unknown}
-  - {id: thw_FED2, name: "Coolant table $FED2 (multiplies word_72)", addr: 0xFED2, kind: 1d, entry: 0xFF1B, length: 7,
+  - {category: Coolant, id: thw_FED2, name: "Coolant table $FED2 (multiplies word_72)", addr: 0xFED2, kind: 1d, entry: 0xFF1B, length: 7,
      axis: {var: ADC_ThW, shift: 5, unit: degF}, cell: {unit: raw multiplier}, evidence: "[ROM:$F59B]", confidence: CONFIRMED (layout); LIKELY warm-up fuel}
-  - {id: thw_FF0A, name: "Coolant table $FF0A", addr: 0xFF0A, kind: 1d, entry: 0xFF1B, length: 7,
+  - {category: Coolant, id: thw_FF0A, name: "Coolant table $FF0A", addr: 0xFF0A, kind: 1d, entry: 0xFF1B, length: 7,
      axis: {var: ADC_ThW, shift: 5, unit: degF}, cell: {unit: raw}, evidence: "[ROM:$FBFD]", confidence: CONFIRMED (layout); purpose unknown}

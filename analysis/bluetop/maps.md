@@ -17,7 +17,7 @@ ROM: `TOYOTA Bluetop PCM/cap.bin` (sha256 `62b2a3f29039…`), base `$F000`.
 
 | Id | Address | Kind | Size | Name | Confidence |
 |---|---|---|---|---|---|
-| [`ign_base`](#ign_base) | `$FF40` | 3d | 6×14 | Base ignition advance (3D) | CONFIRMED (layout and interpolation); LIKELY (rpm axis); GUESS (degrees) |
+| [`ign_base`](#ign_base) | `$FF40` | 3d | 6×14 | Base ignition advance (3D) | CONFIRMED (layout and interpolation); LIKELY (rpm axis, degrees) |
 | [`thw_linearise`](#thw_linearise) | `$FEF0` | 1d | 17 | Coolant sensor linearisation (raw ADC -> degF) | LIKELY |
 | [`tha_corr`](#tha_corr) | `$FED9` | 1d | 9 | Air temperature correction (ThAcorr) | LIKELY |
 | [`inj_dead_time`](#inj_dead_time) | `$FEE9` | 1d | 9 | Injector dead time vs battery voltage | CONFIRMED (use and scaling); LIKELY (volts axis) |
@@ -41,10 +41,10 @@ ROM: `TOYOTA Bluetop PCM/cap.bin` (sha256 `62b2a3f29039…`), base `$F000`.
 
 **Base ignition advance (3D)** at `$FF40`.
 
-- Cells: raw advance. cap.asm comments put advance at about raw*90/255 deg, referenced to the NE edge at 10 deg BTDC; not yet verified (STATUS Q3, R-I06)
+- Cells: raw advance. Warm (ThW_tADV = 28) the spark is about v*90/256 - 0.9 deg BTDC plus a fixed 256 us lead [EMU:sim, docs/bluetop/simulation.md]. The PWRr staircase ($FF94) is subtracted, and 8 is added while T-VIS is shut
 - Ross claims: R-I02, R-I05
 - Evidence: [ROM:$F86C-$F89F] [EMU:tests/test_tables.py::test_3d_ignition_lookup_matches_emulator]
-- Confidence: CONFIRMED (layout and interpolation); LIKELY (rpm axis); GUESS (degrees)
+- Confidence: CONFIRMED (layout and interpolation); LIKELY (rpm axis, degrees)
 - Rows: `Load` raw $0200, $0400, $0600, $0800, $0A00, $0C00. row r at Load = $200 + r*$200; Load is clamped to $0BFF, so row 5 is reached only as an interpolation target
 - Columns: `RPMish` raw 0, 16, 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208 = 800, 1200, 1600, 2000, 2400, 2800, 3200, 3600, 4000, 4400, 4800, 5600, 6400, 7200 rpm
 

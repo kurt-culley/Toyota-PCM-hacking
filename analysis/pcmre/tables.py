@@ -70,6 +70,33 @@ def entries_needed(entry: int) -> int | None:
     return None
 
 
+def interpolate(lo: int, hi: int, f: int) -> int:
+    """The helper's two-point interpolation (``sub_FF35``): fraction f/256 from lo towards hi."""
+    return lookup_1d(bytes([lo, hi]), 0, f, entry=0xFF2D)
+
+
+def load_axis(load: int) -> tuple[int, int]:
+    """Bluetop 3D map load axis: ``Load`` -> (row, fraction), as at ``lookup3dTable`` ($F86C)."""
+    if load >> 8 > 0x0B:
+        load = 0x0BFF
+    hi = (load >> 8) - 2
+    d = 0 if hi < 0 else ((hi << 8) | (load & 0xFF))
+    d >>= 1
+    return d >> 8, d & 0xFF
+
+
+def lookup_3d(table: bytes, row_len: int, rpmish: int, load: int) -> int:
+    """Bluetop base ignition map at $FF40: rows of ``row_len`` bytes by load, columns by ``RPMish``.
+
+    Each of the two neighbouring load rows is looked up along rpm with the $FF28 entry
+    (16 RPMish counts per column), then the two results are interpolated by the load fraction.
+    """
+    row, f = load_axis(load)
+    v0 = lookup_1d(table[row * row_len :], rpmish, entry=0xFF28)
+    v1 = lookup_1d(table[(row + 1) * row_len :], rpmish, entry=0xFF28)
+    return interpolate(v0, v1, f)
+
+
 @dataclass(frozen=True)
 class TableUse:
     site: int  # address of the jsr N,x

@@ -27,7 +27,7 @@ jobs:
       - name: Lint
         run: uv run ruff check && uv run ruff format --check
 
-      - name: Tests (P0 gates: round-trip, xref, emulator vs MAME)
+      - name: "Tests (P0 gates: round-trip, xref, emulator vs MAME)"
         run: uv run pytest
         env:
           REQUIRE_MAME_REF: "1"

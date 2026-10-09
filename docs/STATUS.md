@@ -18,7 +18,7 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
 |---|---|---|---|
 | P0 | Foundations: tooling, asl round-trip, xref, emulator | ✅ done | ☑ 2026-10-09 (independent Verifier agents: xref and emulator, both after fixes) |
 | P1 | Ross claim register, figures, digitised data, diagrams | ✅ done | — |
-| P2 | Bluetop analysis + Tier-A verification | ☐ | ☐ |
+| P2 | Bluetop analysis + Tier-A verification | ◐ table lookups, ignition map, defs | ☐ |
 | P3 | Dump the MR2 89661-17140 ROM (Arduino Zero reader) | ☐ | — |
 | P4 | MR2 analysis + Tier-B verification → **Ross verified** | ☐ | ☐ |
 | P5 | Warm-up / cold start (goal 1), blocked until the P4 gate | ☐ blocked | ☐ |
@@ -42,6 +42,20 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
   - The reference is built by [`../tools/setup_mame_ref.sh`](../tools/setup_mame_ref.sh), with MAME pinned at `mame0275` and SHA-256-checked; no MAME code is committed.
   - **Verifier (independent agent): PASS WITH ISSUES.** It found 0 mismatches over 256,000 random and 1.08 million targeted cases. All 4 should-fix items are fixed, with regression tests: write order is now compared, SLP wakes on a masked IRQ, waking from WAI costs 4 cycles not 12, and the DAA V-flag conflict is logged. The Verifier re-checked the fixes: **signed off**.
 - [x] P0 gate signed off by the Verifier (2026-10-09). The emulator re-check passed after the fixes.
+### P2 tasks (Bluetop analysis)
+- [x] Emulator routine-call harness ([`../analysis/emu/harness.py`](../analysis/emu/harness.py)).
+- [x] Table lookups modelled and proven equal to the emulator:
+  - the 1D helper (six entry points);
+  - the 3D ignition map at `$FF40`: 6 load rows × 14 rpm columns at 800–4800 every 400, then 5600, 6400, 7200 rpm.
+  - [EMU:tests/test_tables.py]
+- [x] `analysis/defs/bluetop.yaml` with its generator:
+  - 13 maps, including coolant linearisation, THA correction, injector dead time and decel-cut rpm;
+  - output in [`../analysis/bluetop/maps.md`](../analysis/bluetop/maps.md).
+- [ ] Architecture write-up (scheduler, interrupts, ADC sequence, RAM map).
+- [ ] Tier-A claim statuses.
+- [ ] Characterise the remaining tables (`$FE9C`, `$FEA7`, `$FEE9`, `$FF11`) and the scaling of `Load` and the advance degrees.
+- [ ] XDF / TunerStudio output from the YAML.
+
 ### P1 tasks
 - [x] Claim register skeleton: [`ross/claims.md`](ross/claims.md).
 - [x] Extract the 16 figures (`pdfimages`, flipped upright) and confirm the page mapping ([`ross/figures/`](ross/figures/README.md)).

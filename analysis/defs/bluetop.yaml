@@ -1,0 +1,138 @@
+# Map definitions for the AE86 Bluetop ROM (cap.bin, D151801-0642).
+#
+# This is the single source of truth for Bluetop tables. analysis/pcmre/defs.py
+# generates analysis/bluetop/maps.md and the CSVs in analysis/bluetop/maps/ from it.
+# Never edit the generated files by hand.
+#
+# Axis kinds:
+#   shift:  1D table read by the $FF1B-$FF2D helper. Raw axis point i = i << shift on the
+#           8-bit input (pcmre/tables.py documents the entry points).
+#   points: explicit raw axis values.
+# Every entry carries evidence tags and a confidence (CONFIRMED / LIKELY / GUESS), per CLAUDE.md.
+
+rom: bluetop
+file: TOYOTA Bluetop PCM/cap.bin
+base: 0xF000
+sha256: 62b2a3f29039ddddc90eff2ce847e0b1c3af15dea4999408f74a48eed7c087f2
+
+variables:
+  RPMish:
+    addr: 0x64
+    unit: rpm index
+    to_physical: "rpm ~= (RPMish + 32) * 25 below RPMish 160 (4800 rpm); rpm ~= (RPMish - 64) * 50 above"
+    evidence: "[ROM:$F4B8 staa RPMish] [EMU:sweep of CalcRPM $F446 with deltaNE = 30e6/rpm]"
+    confidence: LIKELY (assumes rpm = 30,000,000 / deltaNE, from the ROM's 7400 rpm rev-limit constant $0FD6)
+  Load:
+    addr: 0x7F
+    unit: raw (16-bit)
+    to_physical: "unknown: pulse-time based load (airflow meter on this L-type engine)"
+    evidence: "[ROM:$F86C]"
+    confidence: GUESS
+  ADC_ThW:
+    addr: 0x57
+    unit: degF (after the $FEF0 linearisation)
+    to_physical: "degC = (raw - 32) / 1.8"
+    evidence: "[ROM:$FAD3 ldx #$FEF0 / jsr $38,x; bounded to 241] [cap.asm comments 'water temp in fahrenheit']"
+    confidence: LIKELY
+  ADC_12V:
+    addr: 0x55
+    unit: raw ADC
+    to_physical: "volts = raw * 25 / 255 (+B1 divided by 5, 5 V reference)"
+    evidence: "[cap.asm comment at $FF12 use]"
+    confidence: LIKELY
+
+maps:
+  - id: ign_base
+    name: Base ignition advance (3D)
+    addr: 0xFF40
+    kind: 3d
+    rows: 6
+    cols: 14
+    row_axis:
+      var: Load
+      raw: [0x0200, 0x0400, 0x0600, 0x0800, 0x0A00, 0x0C00]
+      note: "row r at Load = $200 + r*$200; Load is clamped to $0BFF, so row 5 is reached only as an interpolation target"
+    col_axis:
+      var: RPMish
+      raw: [0, 16, 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208]
+      physical: [800, 1200, 1600, 2000, 2400, 2800, 3200, 3600, 4000, 4400, 4800, 5600, 6400, 7200]
+      unit: rpm
+    cell:
+      unit: raw advance
+      note: "cap.asm comments put advance at about raw*90/255 deg, referenced to the NE edge at 10 deg BTDC; not yet verified (STATUS Q3, R-I06)"
+    evidence: "[ROM:$F86C-$F89F] [EMU:tests/test_tables.py::test_3d_ignition_lookup_matches_emulator]"
+    confidence: CONFIRMED (layout and interpolation); LIKELY (rpm axis); GUESS (degrees)
+    claims: [R-I02, R-I05]
+
+  - id: thw_linearise
+    name: Coolant sensor linearisation (raw ADC -> degF)
+    addr: 0xFEF0
+    kind: 1d
+    entry: 0xFF28
+    length: 17
+    axis: {var: raw coolant ADC, shift: 4, unit: raw ADC}
+    cell: {unit: degF (bounded 241 by the caller)}
+    evidence: "[ROM:$FAD3] [EMU:tests/test_tables.py::test_model_matches_emulator_for_every_rom_table]"
+    confidence: LIKELY
+
+  - id: tha_corr
+    name: Air temperature correction (ThAcorr)
+    addr: 0xFED9
+    kind: 1d
+    entry: 0xFF25
+    length: 9
+    axis: {var: ADC_ThA, shift: 5, unit: raw ADC}
+    cell: {unit: raw multiplier}
+    evidence: "[ROM:$FBF6 ldaa ADC_ThA / jsr $4C,x / staa ThAcorr]"
+    confidence: LIKELY
+    claims: [R-F11]
+
+  - id: inj_dead_time
+    name: Injector dead time vs battery voltage
+    addr: 0xFF12
+    kind: 1d
+    entry: 0xFF25
+    length: 9
+    axis: {var: ADC_12V, shift: 5, unit: raw ADC}
+    cell: {unit: raw (scaled by the caller; feeds InjDeadTime)}
+    evidence: "[ROM:$FCA5 ldaa ADC_12V / jsr $13,x]"
+    confidence: LIKELY
+    claims: [R-F17]
+
+  - id: decel_cut_rpm
+    name: Decel fuel-cut rpm vs coolant temperature
+    addr: 0xFEE2
+    kind: 1d
+    entry: 0xFF1B
+    length: 7
+    axis: {var: ADC_ThW, shift: 5, unit: degF}
+    cell: {unit: lilRPM (24 = 600 rpm, 255 = 6375 rpm)}
+    evidence: "[ROM:$FBDA] [cap.asm comment 'table thw, decel fuel cut rpm lookup']"
+    confidence: LIKELY
+    claims: [R-F25]
+
+  - id: rpm_reciprocal
+    name: Reciprocal table used to compute FullRPM from the NE period
+    addr: 0xFEF9
+    kind: 1d
+    entry: 0xFF2D
+    length: 17
+    axis: {var: normalised deltaNE (A = segment, B = fraction), shift: 0, unit: raw}
+    cell: {unit: raw}
+    evidence: "[ROM:$F457 in CalcRPMTable]"
+    confidence: LIKELY
+
+  - {id: thw_FEAF, name: "Coolant table $FEAF -> byte_83", addr: 0xFEAF, kind: 1d, entry: 0xFF1B, length: 7,
+     axis: {var: ADC_ThW, shift: 5, unit: degF}, cell: {unit: raw}, evidence: "[ROM:$FD44]", confidence: CONFIRMED (layout); purpose unknown}
+  - {id: thw_FEB6, name: "Coolant table $FEB6 -> byte_84", addr: 0xFEB6, kind: 1d, entry: 0xFF1B, length: 7,
+     axis: {var: ADC_ThW, shift: 5, unit: degF}, cell: {unit: raw}, evidence: "[ROM:$F566]", confidence: CONFIRMED (layout); purpose unknown}
+  - {id: thw_FEBD, name: "Coolant table $FEBD -> byte_8B", addr: 0xFEBD, kind: 1d, entry: 0xFF1B, length: 7,
+     axis: {var: ADC_ThW, shift: 5, unit: degF}, cell: {unit: raw}, evidence: "[ROM:$FD4B]", confidence: CONFIRMED (layout); purpose unknown}
+  - {id: thw_FEC4, name: "Coolant table $FEC4 -> word_8C", addr: 0xFEC4, kind: 1d, entry: 0xFF1B, length: 7,
+     axis: {var: ADC_ThW, shift: 5, unit: degF}, cell: {unit: raw}, evidence: "[ROM:$F56D]", confidence: CONFIRMED (layout); purpose unknown}
+  - {id: thw_FECB, name: "Coolant table $FECB", addr: 0xFECB, kind: 1d, entry: 0xFF1B, length: 7,
+     axis: {var: ADC_ThW, shift: 5, unit: degF}, cell: {unit: raw}, evidence: "[ROM:$F57C]", confidence: CONFIRMED (layout); purpose unknown}
+  - {id: thw_FED2, name: "Coolant table $FED2 (multiplies word_72)", addr: 0xFED2, kind: 1d, entry: 0xFF1B, length: 7,
+     axis: {var: ADC_ThW, shift: 5, unit: degF}, cell: {unit: raw multiplier}, evidence: "[ROM:$F59B]", confidence: CONFIRMED (layout); LIKELY warm-up fuel}
+  - {id: thw_FF0A, name: "Coolant table $FF0A", addr: 0xFF0A, kind: 1d, entry: 0xFF1B, length: 7,
+     axis: {var: ADC_ThW, shift: 5, unit: degF}, cell: {unit: raw}, evidence: "[ROM:$FBFD]", confidence: CONFIRMED (layout); purpose unknown}

@@ -151,16 +151,22 @@ Pin 1 is next to the notch or dot. From the **component side**, pins 1–20 run 
   This matches the standard HD6301V1 pinout, where XTAL and EXTAL are pins 2 and 3. CONFIRMED.
 - **Fitted links:** J4 and J8 (top-side photo 20, wire stubs visible on the solder side). J3 is empty. This corrects the earlier "two links among J3/J4/J8". The solder-side pad map is [`guide/step2-jumper-pads.jpg`](photos/89661-17140/guide/step2-jumper-pads.jpg). CONFIRMED.
 
-- **Where J4 and J8 go** [BENCH: owner, 2026-10-09]. Results were taken one probe position at a time, and pin numbers come from [`guide/step2c-ic7-pin-numbers.jpg`](photos/89661-17140/guide/step2c-ic7-pin-numbers.jpg). CONFIRMED.
+- **The jumper map** [BENCH: owner, 2026-10-09]. Results were taken one probe position at a time, and pin numbers come from [`guide/step2c-ic7-pin-numbers.jpg`](photos/89661-17140/guide/step2c-ic7-pin-numbers.jpg). **The jumpers come in pairs:** each option pin has one position to **ground** and one to a shared node **N**, and the factory fits one of each pair. CONFIRMED.
 
-  | Link | Connects | Meaning |
-  |---|---|---|
-  | **J4** (fitted) | IC7 **pin 35 = P32** ↔ **ground** (direct, beeps) | P32 reads a hard **logic 0** |
-  | **J8** (fitted) | IC7 **pin 33 = P34** ↔ a node with **~750 Ω to ground**. Not to +5 V or ground directly; the same reading both probe directions, so a resistor, not a diode | P34 is pulled to **logic 0** through about 750 Ω |
+  | Jumper | Fitted | Inner pad (right) | Outer pad (left) | Role |
+  |---|---|---|---|---|
+  | **J4** | ✅ | ground | **P32** (IC7 pin 35) | P32 → ground = **0** |
+  | J9 | — | node N | **P32** (pin 35) | alternative: P32 → N |
+  | **J8** | ✅ | node N | **P34** (pin 33) | P34 → N |
+  | J3 | — | ground | **P34** (pin 33) | alternative: P34 → ground = 0 |
+  | J10 | — | node N | not on any IC7 pin | goes elsewhere on the board |
+  | J5 | — | not N, not ground, not on IC7 | P32 or ground (the meter can't tell them apart while J4 is fitted) | unclear |
+  | J6, J7, J1, J2 | — | not tested | not tested | — |
 
-  - J4 and J8 are not connected to each other.
-  - J4 does not reach pins 4, 5, 7, 26, 33 or 40. The earlier beeps on those pins were miscounts or capacitor-charging chirps.
-  - The links sit on **Port 3**. That is only a general-purpose port in **single-chip mode**, so these are option bits the program reads. They are the prime candidates for Ross's secret-map "logic level" (R-F12, R-I15, STATUS Q6). The ROM search for reads of P32/P34 settles it (P4/P6).
+  - **Node N** reads about **750 Ω to ground**, the same in both probe directions, so it is a resistive path, not a diode. N is **not** connected to the main +5 V (pin 21). It may be a logic-high source such as a standby or battery-backed 5 V rail, which would read as a load to ground when unpowered. GUESS; settled by a powered check (STATUS Q10).
+  - **Factory setting:** **P32 = 0**, and **P34 = N** (LIKELY 1).
+  - **Correction:** many of the "0.757" readings on the beep setting were this 750 Ω path, not chip protection diodes. These conclusions still stand: J4 and J8 are separate nets, and pins 4, 5, 7 and 40 are not grounded (earlier beeps there were miscounts or capacitor-charging chirps).
+  - **Meaning:** P32 and P34 sit on **Port 3**, which is only a general-purpose port in **single-chip mode**. So these are **factory option bits** the program reads. They are the prime candidates for Ross's secret-map "logic level" (R-F12, R-I15, STATUS Q6). LIKELY. The ROM search for reads of Port 3 bits 2 and 4 settles which bit selects what (P4/P6).
 - **Mode pins P20–P22 (pins 8–10)** [BENCH], unpowered, 200k range:
 
   | Pin | To ground | To +5 V |
@@ -182,16 +188,16 @@ Pin 1 is next to the notch or dot. From the **component side**, pins 1–20 run 
 
 | Jumper | Fitted? | Pad A → IC7 pin / GND / +5 V | Pad B → IC7 pin / GND / +5 V |
 |---|---|---|---|
-| J1 | | | |
-| J2 | | | |
-| J3 | | | |
-| J4 | | | |
-| J5 | | | |
-| J6 | | | |
-| J7 | | | |
-| J8 | | | |
-| J9 | | | |
-| J10 | | | |
+| J1 | no | not tested | not tested |
+| J2 | no | not tested | not tested |
+| J3 | no | ground | P34 (pin 33) |
+| J4 | **yes** | ground | P32 (pin 35) |
+| J5 | no | not N / GND / IC7 | P32 or GND (ambiguous while J4 fitted) |
+| J6 | no | not tested | not tested |
+| J7 | no | not tested | not tested |
+| J8 | **yes** | node N | P34 (pin 33) |
+| J9 | no | node N | P32 (pin 35) |
+| J10 | no | node N | not on IC7 |
 
 ### Test B: are `STH`, `VISC`, `FPU` and `OX` inputs or outputs?
 For each of the connector pins `STH`, `VISC`, `FPU` and `OX` (plus `STA` as a known-good reference input):

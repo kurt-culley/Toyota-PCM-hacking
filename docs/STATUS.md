@@ -2,12 +2,11 @@
 
 The Lead agent updates this file at the end of every session. The plan is in [`RE_PLAN.md`](RE_PLAN.md).
 
-**Last updated:** 2026-10-09 — **The P0 gate is signed off.** The independent Verifiers passed the cross-reference generator and the HD6301 core after fixes; the core matches MAME on more than 1.3 million cases. P1 has started:
-- all 16 Ross figures are extracted and mapped;
-- 8 graphs are digitised to CSV;
-- the 17×8 ignition table is transcribed and matches Ross's own chart to within 1 count.
-
-Next: the P1 Mermaid diagrams of Ross's fuel and ignition chains, then the P2 Bluetop analysis with the emulator's peripheral models.
+**Last updated:** 2026-10-09:
+- **Continuity Test A (jumpers) is done.** The links come in pairs, setting two **Port 3 option bits**: **P32 = 0** (J4) and **P34 = node N** (J8). These are the likely secret-map select bits.
+- The case floats. IC7 pin 1 is confirmed. Mode 7 is LIKELY.
+- P0 is signed off. P1's figures and data are done.
+- Next: the P1 Mermaid diagrams, Test B (VISC/FPU/OX/STH), and Q10 (a powered check, needing owner approval).
 
 Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.md`](hardware/repair_manual_aw11_1988.md); the PDF is not committed). Its US ECU drives the idle-up VSV from `V-ISC` (cranking + 10 s), so Q2 is partly reopened for the 17140; continuity Test B now also covers `FPU`. Earlier today: the 1984 EWD, the second photo set and the continuity-test guide. P0 next: cross-reference/call-graph generator, then the emulator.
 
@@ -63,10 +62,11 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
 | Q3 | What converts raw ignition-table values to degrees BTDC, and does VR offset matter? | IGT tracing + Zero timing meter (P2/P8) |
 | Q4 | Can a 17030 or 17070 dump be found, to check Ross's 17030 numbers directly? | Community search (P3) |
 | Q5 | Do NE/G inputs need a VR-style bipolar waveform from the bench simulator? | ECU input-circuit inspection (P8). IC3 (µPC177C comparator) is the likely conditioner |
-| Q6 | ~~Do the factory jumpers set a logic level or the mode pins?~~ **Partly answered 2026-10-09 [BENCH]:** **J4 ties P32 (IC7 pin 35) to ground**, and **J8 pulls P34 (pin 33) low through ~750 Ω**. Both are Port 3 option bits, not mode pins. The mode pins P20–P22 have resistors to ground unpowered; mode 7 is LIKELY (Bluetop `CPUModeTst`). See [`hardware/aw11_ecu.md`](hardware/aw11_ecu.md) | Map the empty jumpers (J3, J5–J7, J9, J10, J1, J2). Then search the 17140 ROM for reads of P32/P34 (P4/P6). A powered reset-level check of P20–P22 needs owner confirmation |
+| Q6 | ~~Do the factory jumpers set a logic level or the mode pins?~~ **Answered 2026-10-09 [BENCH] for P32/P34:**<br>• **The jumpers come in pairs** per option pin: one to ground, one to node N.<br>• **P32 (pin 35):** J4 to ground (fitted), J9 to N.<br>• **P34 (pin 33):** J8 to N (fitted), J3 to ground.<br>• **Factory setting:** P32 = 0, P34 = N (LIKELY 1).<br>• These are Port 3 option bits, the prime candidates for the secret-map select (R-F12, R-I15). They are not the mode pins.<br>See [`hardware/aw11_ecu.md`](hardware/aw11_ecu.md) | Search the 17140 ROM for reads of Port 3 bits 2 and 4 (P4/P6). J6, J7, J1 and J2 are not tested yet |
 | Q7 | What does the 17140 ROM do with the `OX`/`VF` pins on a UK car with no O2 sensor? | ROM analysis (P4) |
 | Q8 | Does the 17140's `OX` pin carry the mixture-screw CO resistor? The 1984 VAF pin is missing from the board (Ross R-M08) | Continuity **Test B**, then the ROM ADC channel map (P4) |
 | Q9 | Is there a **1986–89 UK mk1b wiring diagram** to confirm the 17140 pinout (VISC, OX, W, ACT, FPU ...)? The 1988 repair manual is mk1b-era but **US spec** (air flow meter, O2 sensor), so it defines `V-ISC`, `FPU` and `W` but cannot say what the UK car uses | Owner: a UK/European 1986–89 EWD or repair manual supplement |
+| Q10 | What is jumper **node N**? About 750 Ω to ground, the same both ways, not connected to the main +5 V. Is it a logic-high source, such as a standby 5 V rail? This decides what P34 reads (0 or 1) with the factory J8 fitted | **Powered** bench measurement of N and P20–P22 at reset. Needs the owner's confirmation (CLAUDE.md hardware safety) |
 
 ## Conflicts log
 

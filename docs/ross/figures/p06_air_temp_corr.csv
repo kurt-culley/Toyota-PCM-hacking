@@ -1,0 +1,7 @@
+# 17030 air temperature correction map. Ross PDF p6, image img04.png. Claims: R-F11.
+# Digitised by analysis/ross/digitise.py; resolution about +/-0.11 corr_pct per pixel. Evidence level [PDF]; not ROM data.
+tha_degC,corr_pct
+-15,9.2
+15,2.9
+45,-2.4
+75,-9.4

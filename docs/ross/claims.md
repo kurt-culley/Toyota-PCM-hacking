@@ -100,4 +100,4 @@ These are the 16 embedded images, extracted with `pdfimages -list`. Digitised da
 | p17 | MX2 vs rpm | R-M02 |
 | p18 | Mixture-screw zero position photo | R-M07 |
 
-The page and figure mapping is approximate. Confirm it when extracting.
+The mapping is **confirmed** (2026-10-09), and the data is in [`figures/`](figures/README.md). One correction: p9 (img08) is a Toyota manual excerpt, not Ross's own figure.

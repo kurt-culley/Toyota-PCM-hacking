@@ -19,7 +19,7 @@ declare -A SHA=(
 )
 
 # Rebuild when the shim changes (its hash is stored next to the binary).
-STAMP="$(sha256sum "$ROOT/tools/mame_ref/harness.cpp" "$0" | sha256sum | cut -d' ' -f1)"
+STAMP="$(cat "$ROOT/tools/mame_ref/harness.cpp" "$0" | sha256sum | cut -d' ' -f1)"
 if [[ -x "$OUT/hd6301ref" && "$(cat "$OUT/stamp" 2>/dev/null)" == "$STAMP" ]]; then
   echo "hd6301ref: $OUT/hd6301ref"
   exit 0

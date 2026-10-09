@@ -2,11 +2,12 @@
 
 The Lead agent updates this file at the end of every session. The plan is in [`RE_PLAN.md`](RE_PLAN.md).
 
-**Last updated:** 2026-10-09 — All P0 tasks are done:
-- the cross-reference generator (Verifier: PASS WITH ISSUES, fixed);
-- the Python HD6301 core, which matches MAME on every opcode (awaiting Verifier).
+**Last updated:** 2026-10-09 — **The P0 gate is signed off.** The independent Verifiers passed the cross-reference generator and the HD6301 core after fixes; the core matches MAME on more than 1.3 million cases. P1 has started:
+- all 16 Ross figures are extracted and mapped;
+- 8 graphs are digitised to CSV;
+- the 17×8 ignition table is transcribed and matches Ross's own chart to within 1 count.
 
-Next: P0 gate sign-off, then P1 (Ross figures) and the P2 peripheral models.
+Next: the P1 Mermaid diagrams of Ross's fuel and ignition chains, then the P2 Bluetop analysis with the emulator's peripheral models.
 
 Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.md`](hardware/repair_manual_aw11_1988.md); the PDF is not committed). Its US ECU drives the idle-up VSV from `V-ISC` (cranking + 10 s), so Q2 is partly reopened for the 17140; continuity Test B now also covers `FPU`. Earlier today: the 1984 EWD, the second photo set and the continuity-test guide. P0 next: cross-reference/call-graph generator, then the emulator.
 
@@ -14,8 +15,8 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
 
 | Phase | Description | State | Gate signed off by Verifier |
 |---|---|---|---|
-| P0 | Foundations: tooling, asl round-trip, xref, emulator | ◐ all P0 tasks done; Verifier review of the emulator pending | ☐ |
-| P1 | Ross claim register (skeleton done; figures and Mermaid diagrams outstanding) | ◐ started | — |
+| P0 | Foundations: tooling, asl round-trip, xref, emulator | ✅ done | ☑ 2026-10-09 (independent Verifier agents: xref and emulator, both after fixes) |
+| P1 | Ross claim register (skeleton, figures and data done; Mermaid diagrams outstanding) | ◐ | — |
 | P2 | Bluetop analysis + Tier-A verification | ☐ | ☐ |
 | P3 | Dump the MR2 89661-17140 ROM (Arduino Zero reader) | ☐ | — |
 | P4 | MR2 analysis + Tier-B verification → **Ross verified** | ☐ | ☐ |
@@ -38,12 +39,12 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
   - Every `suite6303` instruction steps with the right length.
   - The Bluetop ROM runs from reset into `Main_Loop`.
   - The reference is built by [`../tools/setup_mame_ref.sh`](../tools/setup_mame_ref.sh), with MAME pinned at `mame0275` and SHA-256-checked; no MAME code is committed.
-  - **Verifier (independent agent): PASS WITH ISSUES.** It found 0 mismatches over 256,000 random and 1.08 million targeted cases. All 4 should-fix items are fixed, with regression tests: write order is now compared, SLP wakes on a masked IRQ, waking from WAI costs 4 cycles not 12, and the DAA V-flag conflict is logged. Awaiting the Verifier's re-check of the fixes.
-- [ ] P0 gate sign-off by the Verifier (xref already reviewed; emulator pending).
+  - **Verifier (independent agent): PASS WITH ISSUES.** It found 0 mismatches over 256,000 random and 1.08 million targeted cases. All 4 should-fix items are fixed, with regression tests: write order is now compared, SLP wakes on a masked IRQ, waking from WAI costs 4 cycles not 12, and the DAA V-flag conflict is logged. The Verifier re-checked the fixes: **signed off**.
+- [x] P0 gate signed off by the Verifier (2026-10-09). The emulator re-check passed after the fixes.
 ### P1 tasks
 - [x] Claim register skeleton: [`ross/claims.md`](ross/claims.md).
-- [ ] Extract the 16 figures (`pdfimages`) and confirm the page mapping.
-- [ ] Digitise the graphs to CSV, and transcribe the 17×8 ignition table.
+- [x] Extract the 16 figures (`pdfimages`, flipped upright) and confirm the page mapping ([`ross/figures/`](ross/figures/README.md)).
+- [x] Digitise the graphs to CSV ([`../analysis/ross/digitise.py`](../analysis/ross/digitise.py)) and transcribe the 17×8 ignition table. The transcription matches Ross's own p13 chart to within 1 count.
 - [ ] Mermaid diagrams of Ross's fuel chain, ignition chain and injection-mode state machine (`ross/diagrams.md`).
 
 ### P3 pre-purchase checks (from the HD6301 handbook and `bluetopreader.sch`)

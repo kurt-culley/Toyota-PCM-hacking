@@ -27,7 +27,7 @@ This repo is used to reverse-engineer Denso/Toyota ECUs. The active project is t
 - **Source-of-truth order:**
   1. ROM bytes
   2. Bench or car measurement
-  3. Factory service documentation ([`docs/hardware/ewd_aw11_1984.md`](docs/hardware/ewd_aw11_1984.md); the original PDFs are Toyota copyright and are not committed)
+  3. Factory service documentation ([`docs/hardware/ewd_aw11_1984.md`](docs/hardware/ewd_aw11_1984.md), [`docs/hardware/repair_manual_aw11_1988.md`](docs/hardware/repair_manual_aw11_1988.md); the original PDFs are Toyota copyright and are not committed)
   4. Ross PDF (17030/17140)
   5. Existing `cap.asm` annotations
   6. Upstream issues ([`docs/upstream_issues.md`](docs/upstream_issues.md)) and forums

@@ -51,7 +51,7 @@ The table maps each label to the factory wiring diagram ([`ewd_aw11_1984.md`](ew
 | IGT, IGF | Igniter trigger (output), spark confirmation (input) | M-8, M-5 | LIKELY |
 | STA | Starter signal (input). The ECU's **only** cranking input | N-3 | LIKELY |
 | **STH** | **S/TH: T-VIS VSV driver (output)**, switched above 4350 rpm on the mk1a. **Not** a cold-start terminal (earlier misread as "?TH/STJ") | M-18 | LIKELY |
-| **VISC** | Probably the successor to **I/UP**: senses the electrical idle-up VSV (input) | (M-9 I/UP) | GUESS |
+| **VISC** | **V-ISC**: the ECU's idle-up VSV output, on during cranking and for 10 s after start, on the 1988 US car ([repair manual FI-119](repair_manual_aw11_1988.md)). The older reading, an I/UP-style sense input, is less likely | 1988 `V-ISC` (1984 M-9 I/UP?) | LIKELY (design); UK use open |
 | VF | Feedback/CO check output to the service connector | M-17 | LIKELY |
 | **OX** | The O2 input on other markets. The UK car has no O2 sensor, and the 1984 mixture-screw pin **VAF** is missing from this board, so OX **may carry the CO control resistor** on the 17140 (Ross R-M08) | (L-14 VAF) | GUESS |
 | NE, G1, G− | Distributor pickups (G1 ≈ 1984 "G+") | M-15, M-6, M-7 | LIKELY |
@@ -61,11 +61,12 @@ The table maps each label to the factory wiring diagram ([`ewd_aw11_1984.md`](ew
 | SPD | Vehicle speed | L-12 | LIKELY |
 | A/C | A/C switch signal from the A/C amplifier (input) | L-11 | LIKELY |
 | FC | Fuel pump control (circuit opening relay) | L-4 | LIKELY |
-| W | Check-engine lamp (the 1984 "DG" pin probably did this) | (L-9 DG) | GUESS |
+| W | Check-engine (warning) lamp; 1988 RM spec 9–14 V with no fault, engine running | 1988 `W` (1984 L-9 DG) | LIKELY |
 | BATT, +B, +B1 | Memory supply; main supply via the EFI main relay | L-2, L-8, L-1 | LIKELY |
-| ACT, FPU, NSW, L1–L3, ECT, EGW, CCO | A/C cut, fuel-pressure-up VSV, neutral start, automatic-gearbox lines, EGR warning, ? Probably unused on the UK manual car | not in 1984 | GUESS |
+| FPU | Low-side output for the fuel-pressure-up VSV (1988 hot-restart system, from STA/THW/THA) | 1988 `FPU` | LIKELY (design); probably unused on UK cars |
+| ACT, NSW, L1–L3, ECT, EGW, CCO | A/C cut, neutral start, automatic-gearbox lines, EGR warning, ? Probably unused on the UK manual car | not in 1984 | GUESS |
 
-**What this means for goal 1:** the factory wiring diagram shows the **cold start injector is wired to the start injector time switch, not the ECU**. The **idle-up VSV is switched by the electrical loads**, with the ECU only sensing it. The aux air valve is mechanical. So the framing hypothesis in `RE_PLAN.md` is supported (STATUS Q2). For the 17140 it stays **LIKELY** until Test B below shows `VISC` is an input.
+**What this means for goal 1:** the factory wiring diagram shows the **cold start injector is wired to the start injector time switch, not the ECU**. The **idle-up VSV is switched by the electrical loads**, with the ECU only sensing it. The aux air valve is mechanical. So the framing hypothesis in `RE_PLAN.md` is supported for the 1984 car (STATUS Q2). **But** the [1988 repair manual](repair_manual_aw11_1988.md) shows a US-spec ECU that drives the idle-up VSV from `V-ISC` during cranking and for 10 s after start. Test B below decides which the 17140 does: an output transistor behind `VISC` means the ECU can command start-up idle air.
 
 ## Configuration jumpers next to the MCU: candidate for the "secret map" logic level
 
@@ -159,19 +160,21 @@ Pin 1 is next to the notch or dot. From the **component side**, pins 1–20 run 
 | J9 | | | |
 | J10 | | | |
 
-### Test B: are `STH`, `VISC` and `OX` inputs or outputs?
-For each of the connector pins `STH`, `VISC` and `OX` (plus `STA` as a known-good reference input):
+### Test B: are `STH`, `VISC`, `FPU` and `OX` inputs or outputs?
+For each of the connector pins `STH`, `VISC`, `FPU` and `OX` (plus `STA` as a known-good reference input):
 1. Beep from the connector pin to the **first component** its track reaches. Note the reference (Rxxx, Cxxx, Txx, Dxxx or a hybrid ICx pin).
 2. Follow it one step further, if you can, to an **IC7 pin**, an **IC3 (µPC177C) pin** or an **IC6 (MF176) pin**.
 3. How to read the result:
    - **Output:** the pin reaches the **collector or drain of a transistor** (Txx), or a hybrid output.
    - **Input:** the pin goes through a **series resistor or RC filter** to IC3, IC6 or IC7. IC6 means an analogue input, which is what to expect for `OX` if it carries the mixture screw.
+   - **`VISC` hint:** on the 1988 US car the idle-up VSV sits between `V-ISC` and ground, so the ECU *sources* battery voltage. Expect a **high-side (PNP) transistor** whose emitter goes to +B, rather than the low-side NPN drivers used for the injectors and `FPU`. An empty transistor footprint behind `VISC` would mean the board supports it but the UK build does not fit it.
 
 | Connector pin | First component | Next IC / pin | Input or output? |
 |---|---|---|---|
 | STA (reference) | | | |
 | STH | | | |
 | VISC | | | |
+| FPU | | | |
 | OX | | | |
 
 Send the filled-in tables, or photos of your notes, and they will be recorded here and in `STATUS.md`.

@@ -35,14 +35,16 @@ The project owner has a UK mk1b MR2 (ECU **89661-17140**). They know aftermarket
   - **The part-number prefix does not identify the CPU.**
   - How to convert spark-table values into degrees is disputed.
 
-### Framing hypothesis for goal 1 (supported by the factory wiring diagram)
+### Framing hypothesis for goal 1 (supported by the 1984 wiring diagram; one caveat from the 1988 manual)
 
 On the AW11/4A-GE, the cold start injector is driven by the **start injector time switch and STA**, not by the ECU. The IACV is a coolant-heated **wax auxiliary air valve**, not an ECU-driven ISC valve. Ross's claim R-I08 supports this, and so does the **1984 factory wiring diagram** ([`hardware/ewd_aw11_1984.md`](hardware/ewd_aw11_1984.md)):
 - The CSI is wired starter → CSI → time switch, with no ECU connection.
 - The electrical idle-up VSV is switched by the electrical loads, and the ECU only senses it on I/UP.
 - The `STH` board pin is S/TH, the T-VIS output, not a cold-start terminal.
 
-If it holds, the ECU never "knows" these parts are gone. It is **LIKELY** for the 17140 until the continuity test in [`hardware/aw11_ecu.md`](hardware/aw11_ecu.md) confirms that `VISC` is an input (STATUS Q2). The real question is how its own strategies react to less idle air and less cranking fuel: idle-stability spark advance, THW enrichment and advance, after-start enrichment and cranking fuel.
+**Caveat (1988 repair manual, [`hardware/repair_manual_aw11_1988.md`](hardware/repair_manual_aw11_1988.md)):** the 1988 US 4A-GE ECU *does* drive the idle-up VSV, from a `V-ISC` output, during cranking and for 10 s after start. The 17140 board has a `VISC` pad. If the UK 17140 drives it, the ECU adds its own start-up air through the idle-up VSV, separately from the IACV. The CSI is not ECU-driven in either manual.
+
+If the hypothesis holds, the ECU never "knows" the IACV and CSI are gone. It is **LIKELY** for the 17140 until continuity Test B in [`hardware/aw11_ecu.md`](hardware/aw11_ecu.md) and the P4 port audit show whether `VISC` is driven (STATUS Q2). The real question is how its own strategies react to less idle air and less cranking fuel: idle-stability spark advance, THW enrichment and advance, after-start enrichment and cranking fuel.
 
 ---
 
@@ -62,7 +64,7 @@ If it holds, the ECU never "knows" these parts are gone. It is **LIKELY** for th
 - **Source-of-truth order:**
   1. the ROM bytes
   2. bench or car measurements
-  3. factory service documentation (wiring diagram, repair manual); see [`hardware/ewd_aw11_1984.md`](hardware/ewd_aw11_1984.md)
+  3. factory service documentation (wiring diagram, repair manual); see [`hardware/ewd_aw11_1984.md`](hardware/ewd_aw11_1984.md) and [`hardware/repair_manual_aw11_1988.md`](hardware/repair_manual_aw11_1988.md)
   4. the Ross PDF (17030/17140)
   5. existing `cap.asm` annotations
   6. upstream issues and forums
@@ -185,6 +187,7 @@ flowchart LR
   - the mixture screw: **3600 rpm** cut-off, **MX1 × MX2 / 32000**, and the end-stop fallback
   - injection doubling above 6000 rpm
   - the IGF fuel cut
+- **VISC/FPU port audit:** find every write to the port bits behind `VISC` and `FPU` (located by continuity Test B). Record the conditions, for example STA plus a 10 s timer as in the 1988 manual. Compare the decel fuel-cut and return rpm with the 1988 manual (1600/1200 rpm, A/C off).
 - Check Ross's 17030-only numbers against the 17140 and mark them `DIFFERS-BY-ECU` where they differ. A 17030 dump would close this gap.
 - Tier-C claims are settled by P8 measurements.
 - **Deliverable:** `docs/ross/verification_report.md`. It gives a status and evidence for every claim, plus Mermaid diagrams of the **verified** chains, with every difference from Ross highlighted.
@@ -199,8 +202,9 @@ flowchart LR
   - idle-stability advance (attack, decay, maximum)
   - fast idle
   - decel fuel cut versus temperature
-  - the load compensation the ECU applies when the **I/UP (idle-up) input** is active
-  - confirm the wiring diagram's finding that the ECU drives **no** cold-start-injector or idle-air output (port audit compared against [`hardware/ewd_aw11_1984.md`](hardware/ewd_aw11_1984.md)). The ECU-side cold-start levers are STA, THW-based enrichment and advance, after-start enrichment, idle-stability advance and I/UP
+  - the load compensation the ECU applies when the **I/UP (idle-up) input** is active, if the 17140 has one
+  - the **`VISC` start-up idle-up output**, if the P4 port audit finds it driven (cranking + 10 s on the 1988 US car)
+  - confirm that the ECU drives **no** cold-start-injector output, and settle whether it drives the idle-up VSV (port audit compared against [`hardware/ewd_aw11_1984.md`](hardware/ewd_aw11_1984.md) and [`hardware/repair_manual_aw11_1988.md`](hardware/repair_manual_aw11_1988.md)). The ECU-side cold-start levers are STA, THW-based enrichment and advance, after-start enrichment, idle-stability advance, and either I/UP or `VISC`
 - Run whole-ROM emulator sweeps for starts at −5, 10 and 20 °C, each with normal and reduced idle air.
 - **Deliverable:** `docs/warmup_cold_start.md`. It contains:
   - a Mermaid state diagram of the cold-start sequence

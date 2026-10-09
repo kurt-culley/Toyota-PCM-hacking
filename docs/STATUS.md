@@ -45,11 +45,13 @@ The Lead agent updates this file at the end of every session. The plan is in [`R
 
 | # | Question | Who / how |
 |---|---|---|
-| Q1 | Is the 17140's CPU a 40-pin HD6301-type (like the Bluetop) or a 64-pin Toshiba 8X? | Owner opens the spare ECU and sends photos (P3) |
-| Q2 | Does the ECU drive the cold start injector or any idle-air device at all? The hypothesis is no: they are driven by the time switch/STA and a wax valve | Port audit + wiring diagram (P5) |
+| Q1 | ~~Is the 17140's CPU a 40-pin HD6301-type (like the Bluetop) or a 64-pin Toshiba 8X?~~ **Answered 2026-10-09:** a 40-pin **D151801-7110** with silkscreen "6356/6801" and a 4.00 MHz crystal. It is the same family as the Bluetop, so P3 follows the HD6301 path. See [`hardware/aw11_ecu.md`](hardware/aw11_ecu.md) | Done (photos) |
+| Q2 | Does the ECU drive the cold start injector or any idle-air device at all? The hypothesis is no: they are driven by the time switch/STA and a wax valve. **Now doubtful:** the board has pins labelled `?TH` (possibly **STJ**, Toyota's cold start injector terminal) and **`VISC`** (possibly an idle-control VSV) | **High priority.** Owner takes a close-up of the labels, then the pins are traced (P3) and checked in the port audit and wiring diagram (P5) |
 | Q3 | What converts raw ignition-table values to degrees BTDC, and does VR offset matter? | IGT tracing + Zero timing meter (P2/P8) |
 | Q4 | Can a 17030 or 17070 dump be found, to check Ross's 17030 numbers directly? | Community search (P3) |
-| Q5 | Do NE/G inputs need a VR-style bipolar waveform from the bench simulator? | ECU input-circuit inspection (P8) |
+| Q5 | Do NE/G inputs need a VR-style bipolar waveform from the bench simulator? | ECU input-circuit inspection (P8). IC3 (µPC177C comparator) is the likely conditioner |
+| Q6 | Do the factory jumpers J3/J4 (fitted) or J5–J10 (empty) next to the MCU set Ross's secret-map "logic level"? | Trace the jumpers to IC7 pins (P3), then find port-bit tests in the ROM (P6) |
+| Q7 | What does the 17140 ROM do with the `OX`/`VF` pins on a UK car with no O2 sensor? | ROM analysis (P4) |
 
 ## Conflicts log
 

@@ -37,7 +37,7 @@ The project owner has a UK mk1b MR2 (ECU **89661-17140**). They know aftermarket
 
 ### Framing hypothesis for goal 1 (to verify, not to assume)
 
-On the AW11/4A-GE, the cold start injector is driven by the **start injector time switch and STA**, not by the ECU. The IACV is a coolant-heated **wax auxiliary air valve**, not an ECU-driven ISC valve. Ross's claim R-I08 supports this. If it holds, the ECU never "knows" these parts are gone. The real question is how its own strategies react to less idle air and less cranking fuel: idle-stability spark advance, THW enrichment and advance, after-start enrichment and cranking fuel.
+On the AW11/4A-GE, the cold start injector is driven by the **start injector time switch and STA**, not by the ECU. The IACV is a coolant-heated **wax auxiliary air valve**, not an ECU-driven ISC valve. Ross's claim R-I08 supports this. If it holds, the ECU never "knows" these parts are gone. **Caution (2026-10-09):** the 17140 board has pins labelled `VISC` and `?TH` (possibly **STJ**, Toyota's cold start injector terminal), so this hypothesis is now in doubt. See [`hardware/aw11_ecu.md`](hardware/aw11_ecu.md) and STATUS Q2. The real question is how its own strategies react to less idle air and less cranking fuel: idle-stability spark advance, THW enrichment and advance, after-start enrichment and cranking fuel.
 
 ---
 

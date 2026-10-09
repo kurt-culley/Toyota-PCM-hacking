@@ -1,0 +1,33 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Cache assemblers
+        uses: actions/cache@v4
+        with:
+          path: .tools
+          key: tools-${{ runner.os }}-${{ hashFiles('tools/setup_assemblers.sh', 'TOYOTA Bluetop PCM/dasm/src/**') }}
+
+      - name: Build asl and dasm
+        run: tools/setup_assemblers.sh
+
+      - name: Lint
+        run: uv run ruff check && uv run ruff format --check
+
+      - name: Tests (P0 round-trip gate)
+        run: uv run pytest
+
+      - name: Round-trip report
+        run: uv run python -m pcmre.roundtrip
+        env:
+          PYTHONPATH: analysis

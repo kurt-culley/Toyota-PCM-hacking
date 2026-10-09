@@ -31,8 +31,8 @@ stateDiagram-v2
   Off --> On: STA high (cranking)
   On --> Hold: STA low (engine started)
   Hold --> Off: 10 s elapsed
-  note right of On: V-ISC = battery voltage\nidle-up VSV open (extra air)
-  note right of Hold: still battery voltage\nfor 10 s after start
+  note right of On: V-ISC = battery voltage<br/>idle-up VSV open (extra air)
+  note right of Hold: still battery voltage<br/>for 10 s after start
 ```
 
 ### High-temperature line-pressure-up (FPU) [FI-118 (PDF 313)]

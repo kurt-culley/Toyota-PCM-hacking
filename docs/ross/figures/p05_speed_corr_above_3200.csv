@@ -1,0 +1,14 @@
+# 17030 rpm speed map >3200 rpm. Ross PDF p5, image img01.png. Claims: R-F07.
+# Digitised by analysis/ross/digitise.py; resolution about +/-0.072 corr_pct per pixel. Evidence level [PDF]; not ROM data.
+rpm,corr_pct
+3200,-9.6
+3600,-7.4
+4000,-2.1
+4400,-3.9
+4800,-1.6
+5200,0.2
+5600,1.8
+6000,6.2
+6400,7.0
+6800,7.2
+7200,1.6

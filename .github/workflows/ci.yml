@@ -16,16 +16,21 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .tools
-          key: tools-${{ runner.os }}-${{ hashFiles('tools/setup_assemblers.sh', 'TOYOTA Bluetop PCM/dasm/src/**') }}
+          key: tools-${{ runner.os }}-${{ hashFiles('tools/setup_assemblers.sh', 'tools/setup_mame_ref.sh', 'tools/mame_ref/**', 'TOYOTA Bluetop PCM/dasm/src/**') }}
 
       - name: Build asl and dasm
         run: tools/setup_assemblers.sh
 
+      - name: Build the MAME HD6301 reference (emulator tests)
+        run: tools/setup_mame_ref.sh
+
       - name: Lint
         run: uv run ruff check && uv run ruff format --check
 
-      - name: Tests (P0 round-trip gate)
+      - name: "Tests (P0 gates: round-trip, xref, emulator vs MAME)"
         run: uv run pytest
+        env:
+          REQUIRE_MAME_REF: "1"
 
       - name: Round-trip report
         run: uv run python -m pcmre.roundtrip

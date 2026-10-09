@@ -28,7 +28,7 @@ Every factual claim in the PDF is listed here so it can be checked against ROM c
 | R-F09 | A hard-driving rpm correction applies only at high load and rpm well above idle. Its sites are 1800/2600/3000/6200/6450/6650/>6650 rpm | p6 | 17030 | B | MR2 ROM | PENDING | |
 | R-F10 | The hard-driving map **does not interpolate** (it is a staircase). It adds about +2 % at 2000 rpm and about −7.5 % above 6650 rpm | p6 | 17030 | A/B | Bluetop, MR2 ROM | PENDING | The lack of interpolation is checkable as table-lookup code (Tier A). The values need the MR2 ROM. |
 | R-F11 | An air-temperature (THA) correction follows, and it is a straight line | p6 | 17030 | B | MR2 ROM | PENDING | Ross doubted his own THA sensor calibration. Cross-check with Zero sensor characterisation. |
-| R-F12 | A **secret** rpm fuel correction map exists. Stock code always jumps over it. A "logic level inside the ECU" enables it, and the same level selects an alternative 3D ignition map | p6 | 17030 | A/B | Bluetop, MR2 ROM | PENDING | Goal 2. See also R-I15. Candidate hardware: the J1–J10 jumpers by IC7 (J3/J4 fitted), see [`aw11_ecu.md`](../hardware/aw11_ecu.md). Jumper correction: **two links among J3/J4/J8**; which label owns which is settled by the continuity test (Test A). |
+| R-F12 | A **secret** rpm fuel correction map exists. Stock code always jumps over it. A "logic level inside the ECU" enables it, and the same level selects an alternative 3D ignition map | p6 | 17030 | A/B | Bluetop, MR2 ROM | PENDING | Goal 2. See also R-I15. Candidate hardware: the J1–J10 jumpers by IC7 (J3/J4 fitted), see [`aw11_ecu.md`](../hardware/aw11_ecu.md). Jumper correction: **two links among J3/J4/J8**; which label owns which is settled by the continuity test (Test A). **BENCH 2026-10-09:** the 17140 has factory jumper pairs on **P32** (J4 to ground, fitted; J9 to node N) and **P34** (J8 to node N, fitted; J3 to ground). These Port 3 option bits are the prime candidates for the 'logic level'. Next: find the ROM's reads of Port 3 bits 2 and 4. |
 | R-F13 | Next a **global correction factor** from RAM is applied. It is computed elsewhere and combines coolant (warm-up), transient throttle and a high-rpm/high-load/high-throttle enrichment | p7 | 17030 | A | Bluetop, MR2 ROM | PENDING | |
 | R-F14 | The high-rpm part of the global correction cuts in at **6300 rpm** and adds a fixed richening offset | p7 | 17030 | B | MR2 ROM | PENDING | |
 | R-F15 | The global correction drops once throttle falls below about two-thirds | p8 | 17030 | B | MR2 ROM | PENDING | |
@@ -63,7 +63,7 @@ Every factual claim in the PDF is listed here so it can be checked against ROM c
 | R-I12 | An **over-temperature** correction map switches in when coolant is hotter than normal | p15 | 17030 | A/B | Bluetop, MR2 ROM | PENDING | |
 | R-I13 | Idle stability: with the throttle closed, an rpm dip triggers a step of extra advance that decays away. Attack, decay and maximum are stored as calibration values | p15 | 17030 | A/B | Bluetop, MR2 ROM | PENDING | Bluetop: `IdleADVcomp`, `IdleRPMs`, `IdleRPMfilt`. Goal 1. |
 | R-I14 | There is no self-learning (no O2 sensor). Only fault codes are remembered in RAM | p15 | UK | A | MR2 ROM | PENDING | NOT-APPLICABLE to the Bluetop, which has `ADC_Oxy`. |
-| R-I15 | Secret mode replaces the whole base map with a second **17×8** 3D ignition map | p15 | 17030 | A/B | MR2 ROM | PENDING | Pairs with R-F12. |
+| R-I15 | Secret mode replaces the whole base map with a second **17×8** 3D ignition map | p15 | 17030 | A/B | MR2 ROM | PENDING | Pairs with R-F12. **BENCH 2026-10-09:** the 17140 has factory jumper pairs on **P32** (J4 to ground, fitted; J9 to node N) and **P34** (J8 to node N, fitted; J3 to ground). These Port 3 option bits are the prime candidates for the 'logic level'. Next: find the ROM's reads of Port 3 bits 2 and 4. |
 | R-I16 | After each spark the ECU checks the IGF echo. After **several** failed sparks it cuts the injectors, even though the UK car has no catalytic converter | p15–p16 | UK | A/B | Bluetop, MR2 ROM, Bench | PENDING | |
 | R-I17 | Toyota/Denso "softened" a dyno-optimal map for fuel quality and tolerances | p14 | — | X | — | PENDING | Opinion. |
 
@@ -100,4 +100,4 @@ These are the 16 embedded images, extracted with `pdfimages -list`. Digitised da
 | p17 | MX2 vs rpm | R-M02 |
 | p18 | Mixture-screw zero position photo | R-M07 |
 
-The page and figure mapping is approximate. Confirm it when extracting.
+The mapping is **confirmed** (2026-10-09), and the data is in [`figures/`](figures/README.md). One correction: p9 (img08) is a Toyota manual excerpt, not Ross's own figure.

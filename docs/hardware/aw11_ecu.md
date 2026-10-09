@@ -140,6 +140,45 @@ Pin 1 is next to the notch or dot. From the **component side**, pins 1–20 run 
 - The repo README notes the D151801 uses P10/P11 for its extra input-capture/output-compare timer.
 - The D151801 is a Denso custom part. The pinout above is the standard HD6301V1, assumed because the board's silkscreen names the "6356/6801" footprint. Test A also checks this: Vss and Vcc must land where expected.
 
+### Results so far (owner, 2026-10-09) [BENCH: owner continuity tests]
+
+- **The ECU case is not bonded to board ground.** No IC7 corner beeps to any point on the case. The board is grounded only through the connector's E pins. Use IC7 pin 1 as the ground reference. CONFIRMED.
+- **IC7 orientation, three ways:**
+  - the half-moon notch is at the X-TAL end;
+  - the crystal leads beep to the 2nd and 3rd joints from solder-side corner B;
+  - so **pin 1 is corner B** in [`guide/step1-ic7-corners.jpg`](photos/89661-17140/guide/step1-ic7-corners.jpg).
+
+  This matches the standard HD6301V1 pinout, where XTAL and EXTAL are pins 2 and 3. CONFIRMED.
+- **Fitted links:** J4 and J8 (top-side photo 20, wire stubs visible on the solder side). J3 is empty. This corrects the earlier "two links among J3/J4/J8". The solder-side pad map is [`guide/step2-jumper-pads.jpg`](photos/89661-17140/guide/step2-jumper-pads.jpg). CONFIRMED.
+
+- **The jumper map** [BENCH: owner, 2026-10-09]. Results were taken one probe position at a time, and pin numbers come from [`guide/step2c-ic7-pin-numbers.jpg`](photos/89661-17140/guide/step2c-ic7-pin-numbers.jpg). **The jumpers come in pairs:** each option pin has one position to **ground** and one to a shared node **N**, and the factory fits one of each pair. CONFIRMED.
+
+  | Jumper | Fitted | Inner pad (right) | Outer pad (left) | Role |
+  |---|---|---|---|---|
+  | **J4** | ✅ | ground | **P32** (IC7 pin 35) | P32 → ground = **0** |
+  | J9 | — | node N | **P32** (pin 35) | alternative: P32 → N |
+  | **J8** | ✅ | node N | **P34** (pin 33) | P34 → N |
+  | J3 | — | ground | **P34** (pin 33) | alternative: P34 → ground = 0 |
+  | J10 | — | node N | not on any IC7 pin | goes elsewhere on the board |
+  | J5 | — | not N, not ground, not on IC7 | P32 or ground (the meter can't tell them apart while J4 is fitted) | unclear |
+  | J6, J7, J1, J2 | — | not tested | not tested | — |
+
+  - **Node N** reads about **750 Ω to ground**, the same in both probe directions, so it is a resistive path, not a diode. N is **not** connected to the main +5 V (pin 21). It may be a logic-high source such as a standby or battery-backed 5 V rail, which would read as a load to ground when unpowered. GUESS; settled by a powered check (STATUS Q10).
+  - **Factory setting:** **P32 = 0**, and **P34 = N** (LIKELY 1).
+  - **Correction:** many of the "0.757" readings on the beep setting were this 750 Ω path, not chip protection diodes. These conclusions still stand: J4 and J8 are separate nets, and pins 4, 5, 7 and 40 are not grounded (earlier beeps there were miscounts or capacitor-charging chirps).
+  - **Meaning:** P32 and P34 sit on **Port 3**, which is only a general-purpose port in **single-chip mode**. So these are **factory option bits** the program reads. They are the prime candidates for Ross's secret-map "logic level" (R-F12, R-I15, STATUS Q6). LIKELY. The ROM search for reads of Port 3 bits 2 and 4 settles which bit selects what (P4/P6).
+- **Mode pins P20–P22 (pins 8–10)** [BENCH], unpowered, 200k range:
+
+  | Pin | To ground | To +5 V |
+  |---|---|---|
+  | 8 (P20) | 9.9k | 30.4k |
+  | 9 (P21) | 17.1k | 37.5k |
+  | 10 (P22) | 8.9k | 29.4k |
+
+  The board's +5 V to ground reads 20.5k, and every "to +5 V" figure is the "to ground" figure plus about 20.5k. So each pin has a **resistor to ground or to a driving circuit**, not a pull-up. Unpowered, that reads as mode 0 (multiplexed test). It **does not show the reset level**: P20, P21 and P22 double as the timer input, timer output and serial clock, which other circuits drive when powered.
+  - **Mode 7 (single chip) is LIKELY**, because the Bluetop ROM's `CPUModeTst` feeds the watchdog only when the mode bits read 111 [ROM:Bluetop $FC6E], and J4/J8 ground Port 3 pins.
+  - **Settling it** needs a powered measurement at reset. That is a bench test and needs the owner's confirmation (CLAUDE.md hardware safety). It feeds the P3 ROM-reader design.
+
 ### Test A: where do the jumpers go?
 1. Find IC7 **pin 1 (Vss)**: it beeps to the case or ground. Then find **pin 21 (Vcc)**.
 2. For **each pad** of J1–J10 (two pads per jumper, 20 pads in total):
@@ -149,16 +188,16 @@ Pin 1 is next to the notch or dot. From the **component side**, pins 1–20 run 
 
 | Jumper | Fitted? | Pad A → IC7 pin / GND / +5 V | Pad B → IC7 pin / GND / +5 V |
 |---|---|---|---|
-| J1 | | | |
-| J2 | | | |
-| J3 | | | |
-| J4 | | | |
-| J5 | | | |
-| J6 | | | |
-| J7 | | | |
-| J8 | | | |
-| J9 | | | |
-| J10 | | | |
+| J1 | no | not tested | not tested |
+| J2 | no | not tested | not tested |
+| J3 | no | ground | P34 (pin 33) |
+| J4 | **yes** | ground | P32 (pin 35) |
+| J5 | no | not N / GND / IC7 | P32 or GND (ambiguous while J4 fitted) |
+| J6 | no | not tested | not tested |
+| J7 | no | not tested | not tested |
+| J8 | **yes** | node N | P34 (pin 33) |
+| J9 | no | node N | P32 (pin 35) |
+| J10 | no | node N | not on IC7 |
 
 ### Test B: are `STH`, `VISC`, `FPU` and `OX` inputs or outputs?
 For each of the connector pins `STH`, `VISC`, `FPU` and `OX` (plus `STA` as a known-good reference input):

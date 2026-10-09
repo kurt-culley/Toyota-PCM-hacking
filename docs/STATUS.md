@@ -60,7 +60,7 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
   - T terminal → 10.3° BTDC;
   - rev-limit and missing-IGF fuel cuts.
   - **Verifier (independent agent, 2026-10-09): PASS WITH ISSUES.** It agreed with the handbook semantics, the timer-2 mirror, the IDL polarity and the cranking-spark inference. Fixed: pass counts (6 above the limit, 4 without IGF), no rev-limit hysteresis, the $FA19 tip-in reading, the circular NE-reference confidence, the cranking-spark model limited to cranking, the formula clamps, and the missing tests.
-- [ ] Warm-up experiments (`analysis/emu/scenarios.py`): cold start, after-start decay and steady values vs coolant. Running; write-up to follow in `bluetop/warmup_sim.md`.
+- [x] Warm-up experiments ([`bluetop/warmup_sim.md`](bluetop/warmup_sim.md), CSVs in `analysis/bluetop/sim/`). Steady warm-up fuel is 2.0× warm at −10 °C and 1.7× at 0 °C, gone by 60 °C. The after-start boost (`byte_84`) is +1.1× at 0 °C and bleeds off over about 550 revolutions. Extra cold advance is about +10° at idle. The injection mode switches simultaneous → grouped at 22–27 °C.
 - [~] Tier-A claim statuses: 18 of 24 set with ROM/EMU evidence (plus R-F11 and R-F22). Remaining: R-F10, R-F12, R-F24, R-I08, R-I14, R-I15.
   - CONFIRMED (Bluetop): R-F17, R-F23, R-F25, R-I05.
   - PARTIAL: R-F11, R-I01.

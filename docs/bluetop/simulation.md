@@ -6,7 +6,7 @@ Code:
 - [`analysis/emu/periph.py`](../../analysis/emu/periph.py): the on-chip peripherals.
 - [`analysis/emu/engine.py`](../../analysis/emu/engine.py): engine and sensor stimulus.
 - [`analysis/emu/sim.py`](../../analysis/emu/sim.py): the `Simulation` class and probes.
-- [`analysis/emu/scenarios.py`](../../analysis/emu/scenarios.py): the warm-up experiments, write-up to follow in `warmup_sim.md`.
+- [`analysis/emu/scenarios.py`](../../analysis/emu/scenarios.py): the warm-up experiments, written up in [`warmup_sim.md`](warmup_sim.md).
 
 Tests: [`tests/test_periph.py`](../../tests/test_periph.py) (register behaviour) and [`tests/test_sim.py`](../../tests/test_sim.py) (the whole ROM against its own arithmetic).
 

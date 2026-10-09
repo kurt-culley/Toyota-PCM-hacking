@@ -18,7 +18,7 @@ flowchart TD
   CALC72["Calc72($0800) → word_72<br/>air-temperature compensated base ratio<br/>[ROM:$F585]"] --> W70
   THW1["ADC_ThW (°F) → table $FED2<br/>[EMU]"] --> W70["word_70 = word_72 × 2 × FED2(ThW) / 256<br/>coolant-compensated floor<br/>[ROM:$F589–$F597]"]
   subgraph ENR["Additive enrichments, summed into a multiplier [ROM:$F673–$F6A6]"]
-    E84["byte_84: table $FEB6 (ThW), decays −$14 per pass<br/>over-temperature (≥ 220 °F) path"]
+    E84["byte_84: table $FEB6 (ThW), decays per pass<br/>after-start enrichment [EMU:sim]"]
     E89["byte_89: load rising faster than its filter<br/>→ acceleration enrichment (only when warm)"]
     E8C["word_8C + byte_8B: table $FEC4 / $FEBD (ThW),<br/>decays −$10 per pass → after-start enrichment"]
     E86["byte_86, byte_88: throttle / rpm / load-dependent terms"]
@@ -40,21 +40,14 @@ Notes:
 - **The multiplier loop** [ROM:$F6A8–$F6B1] adds `word_72` to itself `word_D3` times. `word_D3` is 1 plus the summed enrichments, so the enrichments act as a **multiplier on the base ratio**. That matches Ross's "everything after the base is a correction factor" (R-F02).
 - `FuelRatioH` is the larger of the corrected ratio and the coolant floor `word_70` [ROM:$F6D8–$F6DE]. So a cold engine can never run leaner than the warm-up floor.
 
-### Emulator experiment: steady-state ratio against coolant temperature
+### Warm-up numbers
 
-The ROM was booted to `Main_Loop` in the emulator. Then `loc_F534` was called 300 times at each coolant temperature, with a fixed airflow pulse ($0800), `ThAcorr` = 128 and `lilRPM` = 40.
+Realistic warm-up and after-start numbers come from the whole-ROM simulation: [`warmup_sim.md`](warmup_sim.md) [EMU:sim].
+- **Steady warm-up fuel:** 2.0× warm at −10 °C, 1.7× at 0 °C, gone by about 60 °C.
+- **After-start boost:** on top of that, bleeding off over a fixed number of revolutions (about 33 s at 1000 rpm from 0 °C).
+- **Extra cold advance:** about +10° at idle.
 
-| ADC_ThW (°F) | 32 | 60 | 90 | 120 | 150 | 176 | 200 | 230 |
-|---|---|---|---|---|---|---|---|---|
-| °C | 0 | 16 | 32 | 49 | 66 | 80 | 93 | 110 |
-| `FuelRatioH` | $0548 | $035C | $0290 | $0248 | $0220 | $0214 | $0214 | $023C |
-| relative to warm | 2.54 | 1.62 | 1.23 | 1.10 | 1.02 | 1.00 | 1.00 | 1.07 |
-
-**Read this as shape only (GUESS for absolute values).** It runs one routine in isolation:
-- `byte_83` and `byte_8B` are set by `sub_FD41`, which did not run;
-- the start/after-start flags stay at their boot values.
-
-Even so, the shape is right: a warm-up enrichment of about 2.5× at freezing that fades out by about 80 °C, and slight extra fuel when overheating. Realistic numbers need the whole ROM running with simulated NE/G and airflow pulses: the P2 peripheral model (STATUS).
+An earlier routine-level experiment (running `loc_F534` alone) gave 2.5× at 0 °C. It is superseded, because the diagnostic routine that sets `byte_83`/`byte_8B` did not run.
 
 ## 2. Ignition chain
 

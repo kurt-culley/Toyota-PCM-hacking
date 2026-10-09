@@ -151,6 +151,28 @@ Pin 1 is next to the notch or dot. From the **component side**, pins 1–20 run 
   This matches the standard HD6301V1 pinout, where XTAL and EXTAL are pins 2 and 3. CONFIRMED.
 - **Fitted links:** J4 and J8 (top-side photo 20, wire stubs visible on the solder side). J3 is empty. This corrects the earlier "two links among J3/J4/J8". The solder-side pad map is [`guide/step2-jumper-pads.jpg`](photos/89661-17140/guide/step2-jumper-pads.jpg). CONFIRMED.
 
+- **Where J4 and J8 go** [BENCH: owner, 2026-10-09]. Results were taken one probe position at a time, and pin numbers come from [`guide/step2c-ic7-pin-numbers.jpg`](photos/89661-17140/guide/step2c-ic7-pin-numbers.jpg). CONFIRMED.
+
+  | Link | Connects | Meaning |
+  |---|---|---|
+  | **J4** (fitted) | IC7 **pin 35 = P32** ↔ **ground** (direct, beeps) | P32 reads a hard **logic 0** |
+  | **J8** (fitted) | IC7 **pin 33 = P34** ↔ a node with **~750 Ω to ground**. Not to +5 V or ground directly; the same reading both probe directions, so a resistor, not a diode | P34 is pulled to **logic 0** through about 750 Ω |
+
+  - J4 and J8 are not connected to each other.
+  - J4 does not reach pins 4, 5, 7, 26, 33 or 40. The earlier beeps on those pins were miscounts or capacitor-charging chirps.
+  - The links sit on **Port 3**. That is only a general-purpose port in **single-chip mode**, so these are option bits the program reads. They are the prime candidates for Ross's secret-map "logic level" (R-F12, R-I15, STATUS Q6). The ROM search for reads of P32/P34 settles it (P4/P6).
+- **Mode pins P20–P22 (pins 8–10)** [BENCH], unpowered, 200k range:
+
+  | Pin | To ground | To +5 V |
+  |---|---|---|
+  | 8 (P20) | 9.9k | 30.4k |
+  | 9 (P21) | 17.1k | 37.5k |
+  | 10 (P22) | 8.9k | 29.4k |
+
+  The board's +5 V to ground reads 20.5k, and every "to +5 V" figure is the "to ground" figure plus about 20.5k. So each pin has a **resistor to ground or to a driving circuit**, not a pull-up. Unpowered, that reads as mode 0 (multiplexed test). It **does not show the reset level**: P20, P21 and P22 double as the timer input, timer output and serial clock, which other circuits drive when powered.
+  - **Mode 7 (single chip) is LIKELY**, because the Bluetop ROM's `CPUModeTst` feeds the watchdog only when the mode bits read 111 [ROM:Bluetop $FC6E], and J4/J8 ground Port 3 pins.
+  - **Settling it** needs a powered measurement at reset. That is a bench test and needs the owner's confirmation (CLAUDE.md hardware safety). It feeds the P3 ROM-reader design.
+
 ### Test A: where do the jumpers go?
 1. Find IC7 **pin 1 (Vss)**: it beeps to the case or ground. Then find **pin 21 (Vcc)**.
 2. For **each pad** of J1–J10 (two pads per jumper, 20 pads in total):

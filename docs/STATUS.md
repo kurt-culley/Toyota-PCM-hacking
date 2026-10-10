@@ -110,7 +110,7 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
 - [x] 6301 dump program ([`../hardware/rp2350-reader/6301/`](../hardware/rp2350-reader/6301/)): in the emulator against `cap.bin` it sends the mode byte then the ROM exactly, with no stack use, no contention and no TDRE violation [EMU:tests/test_romdump.py].
 - [x] RP2350 reader firmware ([`../hardware/rp2350-reader/firmware/`](../hardware/rp2350-reader/firmware/)): builds warning-free for the BB48R and the Pico 2 W(H) (pico-sdk 2.1.1); CI uploads both UF2s. Its decode rule matches the Python model [EMU:tests/test_reader_decode_c.py]. Not yet run on hardware.
 - [x] Host capture tool `analysis/pcmre/romcapture.py` [EMU:tests/test_romcapture.py].
-- [ ] Reader guide with wiring picture and checklist.
+- [x] Reader guide with wiring pictures, multimeter checklist, bring-up and troubleshooting ([`hardware/rp2350_reader_guide.md`](hardware/rp2350_reader_guide.md)); its tables are generated from `pins.h` and checked by `tests/test_wiring.py`.
 - [ ] Carrier PCB (KiCad, factory-assembled).
 - [ ] Chip removed from the spare ECU, socket fitted.
 - [ ] Dump ×3, verified; Verifier sign-off.

@@ -40,9 +40,14 @@ def symbols(listing: Path = LISTING) -> dict[str, int]:
 
 
 class Simulation:
-    def __init__(self, rom: bytes | None = None, inputs: EngineInputs | None = None):
+    def __init__(
+        self, rom: bytes | None = None, inputs: EngineInputs | None = None, extra: dict[int, bytes] | None = None
+    ):
+        """``extra`` maps addresses to code or data outside the ROM (external memory, as on the P7 board)."""
         self.rom = rom if rom is not None else BLUETOP_ROM.read_bytes()
         self.periph = Peripherals(self.rom)
+        for addr, data in (extra or {}).items():
+            self.periph.mem[addr : addr + len(data)] = data
         self.cpu = HD6301(self.periph)
         self.engine = Engine(self.periph, self.rom, inputs)
         self.inputs = self.engine.inputs

@@ -58,6 +58,8 @@ sim.injector_pulses("#10")[-1]             # µs the injector was open
 sim.spark_advance()[-1]                    # degrees BTDC
 ```
 
+`Simulation(rom, extra={0xE000: code})` adds code or data outside the 4 KB ROM, as external memory on the P7 board. `pcmre.patch.build()` produces both from an asl patch source; see [`rev_limiter.md`](rev_limiter.md).
+
 Run `PYTHONPATH=analysis uv run python ...` from the repo root. Speed is about real time: one simulated second takes about one second of CPU.
 
 ## What is modelled, and how sure we are

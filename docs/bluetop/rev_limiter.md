@@ -58,19 +58,70 @@ These are general port-injection behaviour, not ROM facts (GUESS for this engine
 - **Recovery:** returning fuel first re-wets the port walls, so the first cycles run lean.
 - **Exhaust:** during the cut the exhaust receives air only, so there is no unburnt fuel in it to ignite.
 
-## Spark-cut limiter: potential
+## Spark-cut limiter: prototype
 
-A spark-cut limiter suppresses ignition and keeps injection running. The cut takes effect on the next firing event, and the unburnt mixture passes into the exhaust, where it can ignite. The relevant ROM structure:
+A spark-cut limiter suppresses ignition and keeps injection running. The cut takes effect on the next firing event, and the unburnt mixture passes into the exhaust, where it can ignite.
 
-1. **Dwell control:** the output-compare interrupt `IRQoutcmp` starts each coil charge. It already has an exit that skips charging the coil while `byte_C6` > 0 (start mode) [ROM:`ldab byte_C6 / bgt OutCmpBombout`]. A spark cut would extend that test to "or the limiter is active".
-2. **IGF safety cut:** with no spark there is no IGF echo, so `SatCount_98` reaches `$80` after 4 passes and cuts fuel. A spark-cut patch must reload `SatCount_98` while the deliberate cut is active, and leave the safety cut working outside it.
-3. **Spark source outside the CPU:** in start mode the ROM never drives `/IGT`, yet the engine sparks. So something outside the CPU (presumably the SE056) fires the coil from NE (simulation finding 8 in [`simulation.md`](simulation.md)). If that path also fires during a CPU spark cut, the result is a fixed ~10° BTDC spark instead of no spark. This needs a bench measurement (P8) of `/IGT` and the coil with the CPU withholding dwell.
-4. **Code space:** the 4 KB internal ROM has no free bytes: no run of 6 or more identical bytes. The P7 modified-ROM board runs from external memory, which leaves room for added code.
-5. **Variants:**
-   - **Full spark cut:** the patch above.
-   - **Alternating cut:** spark cut on every other event, or per cylinder. This gives a finer rpm hold.
-   - **Retard instead of cut:** at the limit the advance is set near or after TDC (`AdvanceinUS` minimal). Combustion continues late into the exhaust stroke, and the IGF echo is kept, so item 2 does not apply.
-6. **Consequences:** higher exhaust gas and exhaust valve temperatures, and thermal load on any catalytic converter. Bench outputs must match the stock ECU before engine running (CLAUDE.md).
+**Patch:** [`analysis/patches/bluetop_sparkcut.asm`](../../analysis/patches/bluetop_sparkcut.asm) (asl), applied with `pcmre.patch`.
+
+**Tests:** [`tests/test_sparkcut.py`](../../tests/test_sparkcut.py) [EMU:test_sparkcut].
+
+### Where the ROM starts a coil charge
+
+`/IGT` low (coil charging) is only ever selected in two places. Every other Timer-1 control write sets the output level high or leaves it unchanged [ROM: all TCSR1 writes].
+
+| Site | Address | Stock test | What it does |
+|---|---|---|---|
+| `IRQoutcmp` | `$F387` | `ldab byte_C6 / bgt OutCmpBombout` | After each spark, schedules the next dwell start |
+| NE handler (`InCp2high`) | `$F252` | `ldaa byte_C6 / bgt IGTisON` | At the NE edge, starts a dwell 13 µs later if none is running (catch-up) |
+
+Both already skip the dwell in start mode (`byte_C6` > 0). The patch extends both tests to "or `SatCount_97` bit 7 set".
+
+### The patch
+
+| Hook | Address | Change |
+|---|---|---|
+| A | `$F387` | `jmp` to new code: no dwell while `byte_C6` > 0 **or limiting** |
+| B | `$F252` | Same check for the NE handler's catch-up dwell |
+| C | `$F1F2` | `ldaa SatCount_97` → `clra`: the limiter no longer cuts fuel. `byte_4C` and the IGF counter `SatCount_98` still do |
+| D | `$F42D` | `bcc / staa SatCount_98` → `jsr`: `SatCount_98` is also reloaded while limiting, because a spark cut produces no IGF echo. Outside the limiter the IGF safety cut is unchanged |
+| New code | `$E000`–`$E025` | 38 bytes, outside the 4 KB ROM: external memory on the P7 board |
+
+- The 4 KB ROM changes only at the hook bytes, and its checksum is re-balanced to `$AA55`.
+- The limit (`$F434`) and the engage-delay reload (`$F42C`) keep the meanings in the table above.
+
+### Simulator results [EMU:test_sparkcut]
+
+| Condition | Stock ROM | Patched ROM |
+|---|---|---|
+| 7600 rpm (above the limit) | Sparks continue, **no injection** | **No sparks**, injection continues; `SatCount_98` stays below `$80` |
+| 3000 rpm and 7300 rpm (below the limit) | — | Spark advance identical to stock. Injector pulse widths within 1 % of stock (see note) |
+| 3000 rpm, no IGF (dead igniter) | Fuel cut | Fuel cut (the safety cut is intact) |
+| 7300 → 7600 rpm, stock reload `$79` | — | Spark stops after ≤ 7 passes, then none; fuel on every pass |
+| 7300 → 7600 rpm, reload `$7E` | — | Spark stops after ≤ 2 passes; fuel on every pass |
+| 7600 → 7300 rpm | — | Spark returns within 2 passes; fuel on every pass |
+
+Per-pass timeline (S = spark, F = fuel; first pass after each rpm step):
+
+```
+reload $79   7600: SF SF SF SF SF SF -F -F -F -F -F -F -F
+             7300: -F -F SF SF SF SF SF SF SF
+reload $7E   7600: SF SF -F -F -F -F -F -F -F -F -F -F -F
+             7300: -F -F SF SF SF SF SF SF SF
+```
+
+- **Pass counts:** one more pass than the counter arithmetic gives. The ROM measures each NE period at its end, and a coil charge already in progress still fires.
+- **Pulse-width note:** the hooks lengthen two interrupts by a few cycles. That shifts sampled timer values by a few µs, and the phase of slow loops paced by main-loop passes (after-start decay, feedback). So pulse widths agree to within 1 % rather than exactly.
+
+### Open points
+
+1. **Spark source outside the CPU.** In start mode the ROM never drives `/IGT`, yet the engine sparks. So something outside the CPU (presumably the SE056) fires the coil from NE (simulation finding 8 in [`simulation.md`](simulation.md)). The simulator models that only while cranking. If the real hardware also fires when the CPU withholds dwell at speed, the patch gives a fixed ~10° BTDC spark instead of a cut. This needs a bench measurement (P8) of `/IGT` and the coil with the patched ROM.
+2. **IGF safety cut during the cut.** The missing-igniter protection is suspended while limiting, by design. A failed igniter at the limit is detected once rpm falls below it.
+3. **No engine dynamics.** The simulator imposes the rpm, so the rpm oscillation at the limit (its period and amplitude) is not modelled.
+4. **Variants not yet prototyped:**
+   - **Alternating cut:** cut every other event, or per cylinder, for a finer rpm hold.
+   - **Retard at the limit:** set the advance near or after TDC, which keeps the IGF echo and so needs no hook D.
+5. **Consequences:** higher exhaust gas and exhaust valve temperatures, and thermal load on any catalytic converter. Bench outputs must match the stock ECU before engine running (CLAUDE.md).
 
 ## 17140 cross-check
 

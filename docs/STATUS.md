@@ -94,6 +94,8 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
 - [x] TunerPro RT XDF generated from the YAML ([`../analysis/bluetop/bluetop.xdf`](../analysis/bluetop/bluetop.xdf)) with display equations for advance, dead time, dwell and max airflow. **Not yet opened in TunerPro: owner check.**
   - Checksum helper [`../analysis/pcmre/checksum.py`](../analysis/pcmre/checksum.py): the word sum must be $AA55, balanced at $FFEE [ROM:$FE50].
   - A TunerStudio INI needs a comms protocol, so it moves to P7.
+- [x] Rev limiter mapped ([`bluetop/rev_limiter.md`](bluetop/rev_limiter.md)): a fuel-only cut after 6 passes above 7400 rpm, with no hysteresis. Constants: the limit word `$F434` and the reload byte `$F42C` (`$7E` is the maximum; `$7F` cuts fuel at every rpm) [EMU:test_rev_limiter].
+- [x] Spark-cut limiter prototype ([`../analysis/patches/bluetop_sparkcut.asm`](../analysis/patches/bluetop_sparkcut.asm), `pcmre.patch`): no dwell while limiting, fuel kept, IGF safety cut held off only while limiting, 38 bytes of code at `$E000` [EMU:test_sparkcut]. **Open:** whether hardware outside the CPU fires the coil when dwell is withheld at speed (bench, P8). Not yet reviewed by a Verifier.
 
 ### P1 tasks
 - [x] Claim register skeleton: [`ross/claims.md`](ross/claims.md).

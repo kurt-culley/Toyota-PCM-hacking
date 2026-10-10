@@ -106,3 +106,32 @@ def call(
         cpu.step()
         steps += 1
     return Result(cpu.a, cpu.b, cpu.x, cpu.s, cpu.cc, cpu.cycles, steps, list(bus.writes), bus.mem)
+
+
+def run(
+    rom: bytes,
+    start: int,
+    stop: int,
+    *,
+    a: int = 0,
+    b: int = 0,
+    x: int = 0,
+    cc: int = 0,
+    ram: dict[int, int] | None = None,
+    rom_base: int = 0xF000,
+    max_steps: int = 100_000,
+) -> Result:
+    """Run straight-line ROM code from ``start`` until PC reaches ``stop`` (for code inside a routine)."""
+    bus = _RecordingBus(rom, rom_base)
+    for addr, value in (ram or {}).items():
+        bus.mem[addr] = value & 0xFF
+    cpu = HD6301(bus)
+    cpu.s = STACK_TOP
+    cpu.a, cpu.b, cpu.x, cpu.cc, cpu.pc = a & 0xFF, b & 0xFF, x & 0xFFFF, cc, start
+    steps = 0
+    while cpu.pc != stop:
+        if steps >= max_steps:
+            raise RoutineTimeout(f"${start:04X} did not reach ${stop:04X} within {max_steps} steps (PC ${cpu.pc:04X})")
+        cpu.step()
+        steps += 1
+    return Result(cpu.a, cpu.b, cpu.x, cpu.s, cpu.cc, cpu.cycles, steps, list(bus.writes), bus.mem)

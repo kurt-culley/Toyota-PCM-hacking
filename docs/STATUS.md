@@ -2,7 +2,16 @@
 
 The Lead agent updates this file at the end of every session. The plan is in [`RE_PLAN.md`](RE_PLAN.md).
 
-**Last updated:** 2026-10-09:
+**Last updated:** 2026-10-09 (later):
+- **P2 is complete and signed off** (independent Verifier PASS, 2026-10-10).
+  - Next is **P3, dumping the 17140 ROM**. It needs the owner to order [`../hardware/BOM.md`](../hardware/BOM.md) section A.
+  - Owner checks outstanding: load `analysis/bluetop/bluetop.xdf` in TunerPro, continuity Test B, and Q10 (a powered check).
+  - Whole-ROM simulation and warm-up results (PR #4).
+  - All Tier-A claims have Bluetop evidence; every table is defined.
+  - TunerPro XDF and checksum helper.
+  - **Goal-1 note:** the Bluetop drives an idle-up output (P1-5, like the 1988 RM's V-ISC) for about 10 s after start, and at idle while the learned trim `word_42` is low; no direct coolant warm-up schedule for idle air.
+
+Earlier on 2026-10-09:
 - **Continuity Test A (jumpers) is done.** The links come in pairs, setting two **Port 3 option bits**: **P32 = 0** (J4) and **P34 = node N** (J8). These are the likely secret-map select bits.
 - The case floats. IC7 pin 1 is confirmed. Mode 7 is LIKELY.
 - P0 is signed off. P1's figures and data are done.
@@ -18,7 +27,7 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
 |---|---|---|---|
 | P0 | Foundations: tooling, asl round-trip, xref, emulator | ✅ done | ☑ 2026-10-09 (independent Verifier agents: xref and emulator, both after fixes) |
 | P1 | Ross claim register, figures, digitised data, diagrams | ✅ done | — |
-| P2 | Bluetop analysis + Tier-A verification | ☐ | ☐ |
+| P2 | Bluetop analysis + Tier-A verification | ✅ done | ☑ 2026-10-10 (independent Verifier agents: simulation, then P2 gate; PASS after fixes) |
 | P3 | Dump the MR2 89661-17140 ROM (Arduino Zero reader) | ☐ | — |
 | P4 | MR2 analysis + Tier-B verification → **Ross verified** | ☐ | ☐ |
 | P5 | Warm-up / cold start (goal 1), blocked until the P4 gate | ☐ blocked | ☐ |
@@ -42,6 +51,47 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
   - The reference is built by [`../tools/setup_mame_ref.sh`](../tools/setup_mame_ref.sh), with MAME pinned at `mame0275` and SHA-256-checked; no MAME code is committed.
   - **Verifier (independent agent): PASS WITH ISSUES.** It found 0 mismatches over 256,000 random and 1.08 million targeted cases. All 4 should-fix items are fixed, with regression tests: write order is now compared, SLP wakes on a masked IRQ, waking from WAI costs 4 cycles not 12, and the DAA V-flag conflict is logged. The Verifier re-checked the fixes: **signed off**.
 - [x] P0 gate signed off by the Verifier (2026-10-09). The emulator re-check passed after the fixes.
+### P2 tasks (Bluetop analysis)
+- [x] Emulator routine-call harness ([`../analysis/emu/harness.py`](../analysis/emu/harness.py)).
+- [x] Table lookups modelled and proven equal to the emulator:
+  - the 1D helper (six entry points);
+  - the 3D ignition map at `$FF40`: 6 load rows × 14 rpm columns at 800–4800 every 400, then 5600, 6400, 7200 rpm.
+  - [EMU:tests/test_tables.py]
+- [x] `analysis/defs/bluetop.yaml` with its generator:
+  - 13 maps, including coolant linearisation, THA correction, injector dead time and decel-cut rpm;
+  - output in [`../analysis/bluetop/maps.md`](../analysis/bluetop/maps.md).
+- [x] Architecture write-up ([`bluetop/architecture.md`](bluetop/architecture.md)): reset, the event-driven main loop, ISR roles, ADC sequencer, RAM map.
+- [x] Fuel and ignition chains ([`bluetop/fuel_chain.md`](bluetop/fuel_chain.md)). `Calc72` is proven in the emulator [EMU:tests/test_fuel_chain.py]. The ratio-vs-coolant shape (≈2.5× at 0 °C) comes from a routine-level experiment.
+- [x] **Peripheral model + whole-ROM simulation** ([`bluetop/simulation.md`](bluetop/simulation.md)): timers 1 and 2, the serial ADC, ports and IS3, plus NE/G, airflow, IGF and sensor stimulus. `cap.bin` runs unmodified from reset at about real time. Checked against the ROM's own arithmetic [EMU:tests/test_sim.py]:
+  - rpm variables;
+  - injector pulses in both injection modes (cold simultaneous, warm grouped);
+  - 3D-map advance and the µs conversion, to 0.15°;
+  - T terminal → 10.3° BTDC;
+  - rev-limit and missing-IGF fuel cuts.
+  - **Verifier (independent agent, 2026-10-09): PASS WITH ISSUES.** It agreed with the handbook semantics, the timer-2 mirror, the IDL polarity and the cranking-spark inference. Fixed: pass counts (6 above the limit, 4 without IGF), no rev-limit hysteresis, the $FA19 tip-in reading, the circular NE-reference confidence, the cranking-spark model limited to cranking, the formula clamps, and the missing tests.
+- [x] Warm-up experiments ([`bluetop/warmup_sim.md`](bluetop/warmup_sim.md), CSVs in `analysis/bluetop/sim/`). Steady warm-up fuel is 2.0× warm at −10 °C and 1.7× at 0 °C, gone by 60 °C. The after-start boost (`byte_84`) is +1.1× at 0 °C and bleeds off over about 550 revolutions. Extra cold advance is about +10° at idle. The injection mode switches simultaneous → grouped at 22–27 °C.
+- [x] Tier-A claim statuses: all 24 have Bluetop evidence.
+  - Latest: R-F10 DIFFERS (only PWRr staircases), R-F12/R-I15 no alternative map on the Bluetop (17140 question), R-I08 PARTIAL, R-I12 CONFIRMED, R-I14 DIFFERS.
+  - **R-I08 / P1-5:** the Bluetop drives an idle-up output for about 10 s after start (= 1988 RM V-ISC timing), plus at idle while the learned `word_42` is below $42; no direct coolant schedule.
+  - **R-I14:** the Bluetop keeps learned O2 trims and fault codes in standby RAM $40–$4A.
+  - CONFIRMED (Bluetop): R-F17, R-F23, R-F25, R-I05.
+  - PARTIAL: R-F11, R-I01.
+  - DIFFERS-BY-ECU: R-F21, R-F22 (the Bluetop uses grouped injection), R-I02 (14×6 map).
+  - NOT-APPLICABLE: R-F01 (the Bluetop has no MAP channel).
+  - The rest need the fuel-chain trace.
+- **P2 gate Verifier (independent agent, 2026-10-10): PASS WITH ISSUES.**
+  - Confirmed against the ROM: the table maths, the $FEE9/$FF12 correction, the Port 1/3 audit, the standby RAM and the checksum.
+  - Fixed: the second P1-5 path (idle while learned `word_42` < $42) and the toned-down coolant wording; `se056_max` is 11 entries (FullRPM is capped at $09FF); `thw_FF0A` named as the warm-up advance; `pwr_o2_trim` marked signed; the R-I14 and R-F10 wording; extra overheat and P1-5 tests; overlap warnings in the table titles.
+  - **Re-check (independent agent, 2026-10-10): PASS.** All items are fixed; it confirmed the second P1-5 path, the $F84F/$F9BF/$F461 citations and the XDF/CSV outputs. Its wording nits (Load ≥ $190 plus the T-terminal condition in R-I14, the extra test citation for P1-5) are applied.
+- [x] Every table the code reads is now defined: 19 maps in the YAML.
+  - New: `$FE9C` max airflow delay vs rpm, `$FEA7` acceleration enrichment, `$FF11` over-temperature retard, and the PWRr staircases `$FF94`/`$FF9C`.
+  - **Correction:** the injector dead time is `$FEE9` (8·v + 464 µs); `$FF12` is the dwell term.
+  - `Load` scaling documented (air-temperature-corrected airflow delay, µs).
+  - Advance degrees: see Q3.
+- [x] TunerPro RT XDF generated from the YAML ([`../analysis/bluetop/bluetop.xdf`](../analysis/bluetop/bluetop.xdf)) with display equations for advance, dead time, dwell and max airflow. **Not yet opened in TunerPro: owner check.**
+  - Checksum helper [`../analysis/pcmre/checksum.py`](../analysis/pcmre/checksum.py): the word sum must be $AA55, balanced at $FFEE [ROM:$FE50].
+  - A TunerStudio INI needs a comms protocol, so it moves to P7.
+
 ### P1 tasks
 - [x] Claim register skeleton: [`ross/claims.md`](ross/claims.md).
 - [x] Extract the 16 figures (`pdfimages`, flipped upright) and confirm the page mapping ([`ross/figures/`](ross/figures/README.md)).
@@ -60,8 +110,8 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
 | # | Question | Who / how |
 |---|---|---|
 | Q1 | ~~Is the 17140's CPU a 40-pin HD6301-type (like the Bluetop) or a 64-pin Toshiba 8X?~~ **Answered 2026-10-09:** a 40-pin **D151801-7110** with silkscreen "6356/6801" and a 4.00 MHz crystal. It is the same family as the Bluetop, so P3 follows the HD6301 path. See [`hardware/aw11_ecu.md`](hardware/aw11_ecu.md) | Done (photos) |
-| Q2 | Does the ECU drive the cold start injector or any idle-air device? **CSI: no (LIKELY for the 17140).** Both factory manuals wire it starter → CSI → time switch, and the board label is `STH` = S/TH (T-VIS), not STJ. **Idle air: open.** The IACV is a mechanical wax valve in both manuals. The idle-up VSV is load-switched and only *sensed* (I/UP) in the 1984 EWD, but the 1988 US ECU **drives** it from `V-ISC` during cranking and for 10 s after start, and the 17140 board has a `VISC` pad. See [`hardware/ewd_aw11_1984.md`](hardware/ewd_aw11_1984.md) and [`hardware/repair_manual_aw11_1988.md`](hardware/repair_manual_aw11_1988.md) | Continuity **Test B** (is there a driver transistor behind `VISC`?), then the P4 port audit ([`hardware/aw11_ecu.md`](hardware/aw11_ecu.md)) |
-| Q3 | What converts raw ignition-table values to degrees BTDC, and does VR offset matter? | IGT tracing + Zero timing meter (P2/P8) |
+| Q2 | Does the ECU drive the cold start injector or any idle-air device? **CSI: no (LIKELY for the 17140).** Both factory manuals wire it starter → CSI → time switch, and the board label is `STH` = S/TH (T-VIS), not STJ. **Idle air: open.** The IACV is a mechanical wax valve in both manuals. The idle-up VSV is load-switched and only *sensed* (I/UP) in the 1984 EWD, but the 1988 US ECU **drives** it from `V-ISC` during cranking and for 10 s after start, and the 17140 board has a `VISC` pad. **Bluetop evidence (P2) [EMU:sim]:** the Bluetop ROM drives P1-5 from key-on until about 10 s after start (same at 0 °C and 80 °C in simulation), matching the 1988 RM's V-ISC timing, and also at idle while its learned trim `word_42` is below $42. So this ECU family drives an idle-up output, but not on a coolant warm-up schedule. See [`hardware/ewd_aw11_1984.md`](hardware/ewd_aw11_1984.md) and [`hardware/repair_manual_aw11_1988.md`](hardware/repair_manual_aw11_1988.md) | Continuity **Test B** (is there a driver transistor behind `VISC`?), then the P4 port audit ([`hardware/aw11_ecu.md`](hardware/aw11_ecu.md)) |
+| Q3 | What converts raw ignition-table values to degrees BTDC, and does VR offset matter? **Bluetop answered in simulation [EMU:sim]:** BTDC = (map + ThW_tADV + idle term) × 90/256 − 10.74° plus a fixed 256 µs lead (T terminal → 10.3°, consistent with the factory 10° but not independent of it). For the Bluetop that makes a map cell v ≈ v × 90/256 − 0.9°. Open: whether the 256 µs lead offsets a real delay, and the 17140's conversion | Bench IGT vs crank capture (P8); 17140 ROM (P4) |
 | Q4 | Can a 17030 or 17070 dump be found, to check Ross's 17030 numbers directly? | Community search (P3) |
 | Q5 | Do NE/G inputs need a VR-style bipolar waveform from the bench simulator? | ECU input-circuit inspection (P8). IC3 (µPC177C comparator) is the likely conditioner |
 | Q6 | ~~Do the factory jumpers set a logic level or the mode pins?~~ **Answered 2026-10-09 [BENCH] for P32/P34:**<br>• **The jumpers come in pairs** per option pin: one to ground, one to node N.<br>• **P32 (pin 35):** J4 to ground (fitted), J9 to N.<br>• **P34 (pin 33):** J8 to N (fitted), J3 to ground.<br>• **Factory setting:** P32 = 0, P34 = N (LIKELY 1).<br>• These are Port 3 option bits, the prime candidates for the secret-map select (R-F12, R-I15). They are not the mode pins.<br>See [`hardware/aw11_ecu.md`](hardware/aw11_ecu.md) | Search the 17140 ROM for reads of Port 3 bits 2 and 4 (P4/P6). J6, J7, J1 and J2 are not tested yet |
@@ -77,6 +127,8 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
 | 2026-10-09 | Idle-up VSV control | 1984 EWD (Europe, mk1a era): load-switched, ECU senses on I/UP | 1988 RM (US, mk1b era): ECU drives on `V-ISC`, cranking + 10 s | Era/market difference; the manuals do not contradict each other for their own cars. **Open for the 17140** (Q2): Test B + port audit |
 | 2026-10-09 | Injector harness grouping and impedance | 1984 EWD: #10 = No.1+3, #20 = No.2+4; injectors 1.5–3.0 Ω | 1988 RM: No.10 = No.3+4, No.20 = No.1+2; injectors about 13.8 Ω | Era/market difference. The grouping matters only if the ECU does not join #10/#20 (R-F22). Measure the UK car's injectors before P8 |
 | 2026-10-09 | HD6301 DAA V flag | Handbook table 3-2-1 (PDF p.190): V affected | Handbook instruction details (PDF p.89): V not affected | Open. The core clears V, as MAME does. The Bluetop never executes DAA; check the 17140 ROM for DAA before relying on it |
+| 2026-10-09 | Bluetop IDL input polarity | cap.asm comment: P4-2 IDL "active low" (throttle closed = 0) | ROM behaviour: idle state (`byte_95` negative) builds while P4-2 is **high**, and three idle-only uses agree (idle advance, 800 µs airflow fallback, tip-in pulse below 2500 rpm); a second cap.asm comment at $F7F1 also says P4-2 is high when IDL is closed [ROM:$F9F7–$FA39, $F814, $F1E0, $FA19] | ROM wins (truth order): P4-2 high = throttle closed at the CPU pin, LIKELY (the input buffer presumably inverts). The simulation uses the ROM's polarity |
+| 2026-10-09 | Bluetop cranking spark | Assumption that the CPU makes every spark | ROM: in start mode (`byte_C6` > 0) /IGT is held high, yet missing IGF still cuts fuel [ROM:$F24A, $F370, $F92D, $F420] | The cranking spark must come from outside the CPU (LIKELY the SE056 from NE). Modelled as such; confirm on the bench (P8) and in the 17140 ROM (P4) |
 | 2026-10-09 | Max ignition advance | Ross p16 graph: about 50° BTDC | Upstream #6: implausible, may include a VR offset | Open. Settle with a bench measurement (R-I06) |
 
 ## Exceptions to the Arduino-first rule

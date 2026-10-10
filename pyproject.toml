@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Reverse-engineering tooling for Denso/Toyota PCMs (mk1 MR2 AW11 project)"
 readme = "docs/RE_PLAN.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = ["pyyaml>=6"]
 
 [dependency-groups]
 dev = ["pytest>=8", "ruff>=0.6", "pillow>=10"]

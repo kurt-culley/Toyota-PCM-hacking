@@ -89,8 +89,9 @@ maps:
     unit: raw advance
     equation: X*90/256-0.9
     eq_unit: deg BTDC (warm, PWRr trim 0, off idle, plus a 256 us lead; LIKELY, Bluetop only)
-    note: Warm (ThW_tADV = 28) the spark is about v*90/256 - 0.9 deg BTDC plus a fixed 256 us lead [EMU:sim, docs/bluetop/simulation.md].
-      The PWRr staircase ($FF94) is subtracted, and 8 is added while T-VIS is shut
+    note: 'Warm (ThW_tADV = 28) the spark is about v*90/256 - 0.9 deg BTDC plus a fixed 256 us lead [EMU:sim, docs/bluetop/simulation.md].
+      The PWRr staircase ($FF94) is subtracted, and 8 is added once T-VIS has opened (above 4350 rpm; TVIScounter
+      >= 0) [ROM:$FC47-$FC6D, $F89F]. Readable table in degrees: docs/bluetop/ignition_table.md'
   evidence: '[PORT:pcmre.crossver CONFIRMED, from 0642 $FF40] [ROM:$F86C-$F89F] [EMU:tests/test_tables.py::test_3d_ignition_lookup_matches_emulator]'
   confidence: CONFIRMED (layout and interpolation); LIKELY (rpm axis, degrees)
   claims:

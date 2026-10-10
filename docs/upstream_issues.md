@@ -9,7 +9,7 @@ Source: issues on the original repo, [sparkiedk/Toyota-PCM-hacking](https://gith
 - **Mask ROM.** These Denso MCUs cannot be reflashed. Running custom code means running the MCU in external (expanded) mode from external memory on a daughtercard that replaces the CPU.
 - **Dumping method.** Run the repo's reader code with the MCU in external mode. It sends the internal ROM over the MCU UART to a **5 V USB-UART** (not RS232), captured with a terminal program.
   - The baud rate is odd: measure it on a scope and set the adapter to the nearest rate. For the HD6301, `reader6301v1.asm` sets 244.1 baud.
-  - *Modernised in this project:* the Arduino Zero reader snoops the bus instead, so there is no baud-rate problem ([`RE_PLAN.md` §6a](RE_PLAN.md)).
+  - *Modernised in this project:* the RP2350 reader also snoops the bus, a second channel independent of the baud rate, so there is no baud-rate problem ([`RE_PLAN.md` §6a](RE_PLAN.md)).
 - **Daughtercard design (1UZ, Toshiba 8X).** The parts are external flash plus an **ATF1504ASL CPLD** (CUPL source in [`Toshiba 8x daughtercard/1504 CUPL code/`](../Toshiba%208x%20daughtercard/1504%20CUPL%20code/)). The CPLD:
   - emulates port A and part of port B
   - emulates the port-B input strobe (IS), which the 1UZ uses to sense /IDL
@@ -36,7 +36,7 @@ Source: issues on the original repo, [sparkiedk/Toyota-PCM-hacking](https://gith
 
 ## Dumping lessons from the previously hidden #4 comments (Jul 2021)
 
-These are the comments the web UI collapses ([#4](https://github.com/sparkiedk/Toyota-PCM-hacking/issues/4), comments 16–28). They bear directly on the P3 Arduino Zero reader.
+These are the comments the web UI collapses ([#4](https://github.com/sparkiedk/Toyota-PCM-hacking/issues/4), comments 16–28). They bear directly on the P3 RP2350 reader.
 
 - **The author's dump workflow:**
   1. Scope the UART line and take the baud rate from the shortest high or low time.
@@ -44,11 +44,11 @@ These are the comments the web UI collapses ([#4](https://github.com/sparkiedk/T
   3. Release reset and wait until the data stops.
   4. Repeat **three times** and compare the files (`fc -b`).
 
-  There is no framing or error checking, and he saw roughly **1 bad capture in 10**. The *Zero reader keeps the triple-dump-and-compare rule* (SHA-256), and the bus-snoop design removes the baud-rate guesswork.
+  There is no framing or error checking, and he saw roughly **1 bad capture in 10**. The *RP2350 reader keeps the triple-dump-and-compare rule* (SHA-256), and the bus-snoop design removes the baud-rate guesswork.
 - **ROM size and base address:** a T8X dump should return **16 KB**. If the internal ROM is smaller (12 KB, 8 KB …), change the reader's base address. For the D151801 the reader assumes **4 KB at `$F000`**. Confirm the MR2 chip's ROM size before trusting a dump.
 - **Failure mode: the data stream never stops, or there is far more data than expected** (one user got more than 30 KB). This means the **chip is running its own internal code**, not the reader, and is trying to talk to PCM peripherals that aren't there. The cause is mode pins or external memory not being set up correctly. The fix is to prove external execution first: run an **infinite-loop test** and probe the bus (only about 3 bus cycles to decode).
-- **"If a single bit is wired incorrectly, parts of your program may still work while others crash hard."** Verify every bus line. The Zero reader firmware gets a self-test mode that walks each address and data line.
-- **Prove the link before dumping.** Send a known string ("Hello world!") repeatedly with a ~100 ms pause, and adjust the baud rate until it reads correctly. The **serial clock pin** (pin 13 on the T8X) runs continuously once the SCI is up, so a frequency counter on it gives the baud rate. *Zero equivalent:* the reader firmware runs a known-pattern test program before the real dump.
+- **"If a single bit is wired incorrectly, parts of your program may still work while others crash hard."** Verify every bus line. The RP2350 reader firmware's `rigcheck` mode walks each address and data line, one at a time, before the chip goes in.
+- **Prove the link before dumping.** Send a known string ("Hello world!") repeatedly with a ~100 ms pause, and adjust the baud rate until it reads correctly. The **serial clock pin** (pin 13 on the T8X) runs continuously once the SCI is up, so a frequency counter on it gives the baud rate. *RP2350 equivalent:* the `clock` mode measures E (and so the baud rate) directly, and the `probe` mode proves the bus before the real dump; the dump's first byte is a known value (the mode byte).
 - **Disassembly workflow (IDA 4.x, which this project replaces with the `pcmre` Python tooling):**
   - Set the binary's base offset.
   - Start disassembling from the **interrupt vectors** at the end of the ROM.
@@ -68,7 +68,7 @@ These are the comments the web UI collapses ([#4](https://github.com/sparkiedk/T
 
 - To convert spark-table values into degrees, trace how **IGT** is generated. On the T8X, IGT is bit 0 of the DOUT port, driven from the timer CPR0 interrupt, which counts at 250 kHz (4 µs per count). The interrupt is scheduled at **TDC − advance − dwell**, converted into time and offset from a measured NE edge.
 - It is disputed whether the **VR-sensor zero-crossing offset** is "baked into" the tables. Ross's roughly **50° BTDC** maximum was questioned. The suggested way to settle it is a bench rig that logs NE against the IGT pin (the author spun an old Blacktop distributor with a cordless drill).
-  - *This project:* the Arduino Zero timing meter (P8) and Ross claim R-I06.
+  - *This project:* the RP2350 timing meter (P8) and Ross claim R-I06.
 - WinOLS can locate tables but does not reveal their format.
 
 ## Other platforms — [#1](https://github.com/sparkiedk/Toyota-PCM-hacking/issues/1)

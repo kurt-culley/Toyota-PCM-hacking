@@ -22,7 +22,7 @@ This record comes from the owner's photos (2026-10-09, two sets) in [`photos/896
 | Family | **HD6301/6801-type, the same D151801 family as the AE86 Bluetop** (D151801-0642). The silkscreen names the 6801/6356 footprint, and the package matches | LIKELY. Becomes CONFIRMED when the reader runs code on it |
 | Crystal | "400IDK8Z": **4.00 MHz**, giving E = 1 MHz. This fits Ross's "1 µs timer = injector µs" (claim R-F23) | LIKELY |
 
-**What this means for the plan:** P3 follows the **HD6301 path**. The [§6a Arduino Zero reader](../RE_PLAN.md#6a-arduino-zero-rom-reader-p3-buy-now-about-1015) and the Bluetop reader method both apply. The Toshiba 8X branch (Redtop/1UZ tooling) is not needed. The ROM size is still to be confirmed: the Bluetop's is 4 KB at `$F000`, and the D151801 variants may differ.
+**What this means for the plan:** P3 follows the **HD6301 path**. The [§6a RP2350 reader](../RE_PLAN.md#6a-rp2350-rom-reader-p3) and the Bluetop reader method both apply. The Toshiba 8X branch (Redtop/1UZ tooling) is not needed. The ROM size is still to be confirmed: the Bluetop's is 4 KB at `$F000`, and the D151801 variants may differ.
 
 ## Other ICs
 

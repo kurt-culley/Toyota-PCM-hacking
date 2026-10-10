@@ -2,7 +2,10 @@
 
 The Lead agent updates this file at the end of every session. The plan is in [`RE_PLAN.md`](RE_PLAN.md).
 
-**Last updated:** 2026-10-09 (later):
+**Last updated:** 2026-10-10:
+- **P3 hardware is now RP2350-based** (RE_PLAN §6): an Olimex RP2350-PICO2-BB48R plus a Raspberry Pi Pico 2 WH, wired straight to the D151801 on a breadboard (no level shifters), with the chip in mode 0. Next: order BOM section A; dump program, firmware and guide in progress.
+
+Earlier:
 - **P2 is complete and signed off** (independent Verifier PASS, 2026-10-10).
   - Next is **P3, dumping the 17140 ROM**. It needs the owner to order [`../hardware/BOM.md`](../hardware/BOM.md) section A.
   - Owner checks outstanding: load `analysis/bluetop/bluetop.xdf` in TunerPro, continuity Test B, and Q10 (a powered check).
@@ -28,12 +31,12 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
 | P0 | Foundations: tooling, asl round-trip, xref, emulator | ✅ done | ☑ 2026-10-09 (independent Verifier agents: xref and emulator, both after fixes) |
 | P1 | Ross claim register, figures, digitised data, diagrams | ✅ done | — |
 | P2 | Bluetop analysis + Tier-A verification | ✅ done | ☑ 2026-10-10 (independent Verifier agents: simulation, then P2 gate; PASS after fixes) |
-| P3 | Dump the MR2 89661-17140 ROM (Arduino Zero reader) | ☐ | — |
+| P3 | Dump the MR2 89661-17140 ROM (RP2350 reader) | ☐ | ☐ |
 | P4 | MR2 analysis + Tier-B verification → **Ross verified** | ☐ | ☐ |
 | P5 | Warm-up / cold start (goal 1), blocked until the P4 gate | ☐ blocked | ☐ |
 | P6 | Secret maps (goal 2) | ☐ | ☐ |
 | P7 | Modified ROM + TunerStudio (goal 3) | ☐ | ☐ |
-| P8 | Bench rig + validation (Arduino Zero) | ☐ | — |
+| P8 | Bench rig + validation (RP2350) | ☐ | — |
 
 ### P0 tasks
 - [x] Archive the missing upstream comments (#4 and #1, all read through the API on 2026-10-09). See [`upstream_issues.md`](upstream_issues.md).
@@ -98,12 +101,18 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
 - [x] Digitise the graphs to CSV ([`../analysis/ross/digitise.py`](../analysis/ross/digitise.py)) and transcribe the 17×8 ignition table. The transcription matches Ross's own p13 chart to within 1 count.
 - [x] Mermaid diagrams of Ross's fuel chain, ignition chain, injection modes, T-VIS, idle stability, mixture screw and cold start ([`ross/diagrams.md`](ross/diagrams.md)). All render with mermaid-cli 11.4.
 
-### P3 pre-purchase checks (from the HD6301 handbook and `bluetopreader.sch`)
-- [ ] Mode-pin strapping for external vector fetch with the internal ROM still readable.
-- [ ] MCU minimum clock frequency: static (single-step) or a slow continuous clock.
-- [ ] Internal ROM size of the 17140's MCU (the reader assumes 4 KB at `$F000`), per upstream #4.
-- [ ] Zero firmware self-test: walking-ones test on every address and data line, then a known-pattern program, then an infinite-loop external-execution test, all before the real dump (upstream #4: a mis-wired bit or wrong mode pins made the chip run its own code).
+### P3 tasks (ROM dump, RP2350 reader)
+- [x] Mode for the dump: **mode 0** (P22/P21/P20 = L/L/L, pins 10/9/8), "Multiplexed Test": internal ROM on, reset vector external for 3–4 cycles after RES rises [handbook Table 2-1-1].
+- [x] Clock: E = 0.1–1.0 MHz, so EXTAL 0.4–4 MHz; not static. The reader runs EXTAL at 1 MHz [handbook p.128, p.188].
+- [x] ROM size: confirmed on the hardware by the reader's `size` run (4 KB at `$F000` expected, as on the D151801 Bluetops).
+- [x] Self-test plan: multimeter checklist, `rigcheck`, `clock`, `listen`, `probe`, then `dump` ([`hardware/rp2350_reader_guide.md`](hardware/rp2350_reader_guide.md)).
 - [ ] Owner orders [`../hardware/BOM.md`](../hardware/BOM.md) section A.
+- [ ] 6301 dump program, tested in the emulator.
+- [ ] RP2350 reader firmware, built in CI.
+- [ ] Reader guide with wiring picture and checklist.
+- [ ] Carrier PCB (KiCad, factory-assembled).
+- [ ] Chip removed from the spare ECU, socket fitted.
+- [ ] Dump ×3, verified; Verifier sign-off.
 
 ## Open questions
 
@@ -112,13 +121,13 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
 | Q1 | ~~Is the 17140's CPU a 40-pin HD6301-type (like the Bluetop) or a 64-pin Toshiba 8X?~~ **Answered 2026-10-09:** a 40-pin **D151801-7110** with silkscreen "6356/6801" and a 4.00 MHz crystal. It is the same family as the Bluetop, so P3 follows the HD6301 path. See [`hardware/aw11_ecu.md`](hardware/aw11_ecu.md) | Done (photos) |
 | Q2 | Does the ECU drive the cold start injector or any idle-air device? **CSI: no (LIKELY for the 17140).** Both factory manuals wire it starter → CSI → time switch, and the board label is `STH` = S/TH (T-VIS), not STJ. **Idle air: open.** The IACV is a mechanical wax valve in both manuals. The idle-up VSV is load-switched and only *sensed* (I/UP) in the 1984 EWD, but the 1988 US ECU **drives** it from `V-ISC` during cranking and for 10 s after start, and the 17140 board has a `VISC` pad. **Bluetop evidence (P2) [EMU:sim]:** the Bluetop ROM drives P1-5 from key-on until about 10 s after start (same at 0 °C and 80 °C in simulation), matching the 1988 RM's V-ISC timing, and also at idle while its learned trim `word_42` is below $42. So this ECU family drives an idle-up output, but not on a coolant warm-up schedule. See [`hardware/ewd_aw11_1984.md`](hardware/ewd_aw11_1984.md) and [`hardware/repair_manual_aw11_1988.md`](hardware/repair_manual_aw11_1988.md) | Continuity **Test B** (is there a driver transistor behind `VISC`?), then the P4 port audit ([`hardware/aw11_ecu.md`](hardware/aw11_ecu.md)) |
 | Q3 | What converts raw ignition-table values to degrees BTDC, and does VR offset matter? **Bluetop answered in simulation [EMU:sim]:** BTDC = (map + ThW_tADV + idle term) × 90/256 − 10.74° plus a fixed 256 µs lead (T terminal → 10.3°, consistent with the factory 10° but not independent of it). For the Bluetop that makes a map cell v ≈ v × 90/256 − 0.9°. Open: whether the 256 µs lead offsets a real delay, and the 17140's conversion | Bench IGT vs crank capture (P8); 17140 ROM (P4) |
-| Q4 | Can a 17030 or 17070 dump be found, to check Ross's 17030 numbers directly? | Community search (P3) |
+| Q4 | Can a 17030 or 17070 dump be found, to check Ross's 17030 numbers directly? No public 17030/17070/17140 dump found (web search 2026-10-10) | Open |
 | Q5 | Do NE/G inputs need a VR-style bipolar waveform from the bench simulator? | ECU input-circuit inspection (P8). IC3 (µPC177C comparator) is the likely conditioner |
 | Q6 | ~~Do the factory jumpers set a logic level or the mode pins?~~ **Answered 2026-10-09 [BENCH] for P32/P34:**<br>• **The jumpers come in pairs** per option pin: one to ground, one to node N.<br>• **P32 (pin 35):** J4 to ground (fitted), J9 to N.<br>• **P34 (pin 33):** J8 to N (fitted), J3 to ground.<br>• **Factory setting:** P32 = 0, P34 = N (LIKELY 1).<br>• These are Port 3 option bits, the prime candidates for the secret-map select (R-F12, R-I15). They are not the mode pins.<br>See [`hardware/aw11_ecu.md`](hardware/aw11_ecu.md) | Search the 17140 ROM for reads of Port 3 bits 2 and 4 (P4/P6). J6, J7, J1 and J2 are not tested yet |
 | Q7 | What does the 17140 ROM do with the `OX`/`VF` pins on a UK car with no O2 sensor? | ROM analysis (P4) |
 | Q8 | Does the 17140's `OX` pin carry the mixture-screw CO resistor? The 1984 VAF pin is missing from the board (Ross R-M08) | Continuity **Test B**, then the ROM ADC channel map (P4) |
 | Q9 | Is there a **1986–89 UK mk1b wiring diagram** to confirm the 17140 pinout (VISC, OX, W, ACT, FPU ...)? The 1988 repair manual is mk1b-era but **US spec** (air flow meter, O2 sensor), so it defines `V-ISC`, `FPU` and `W` but cannot say what the UK car uses | Owner: a UK/European 1986–89 EWD or repair manual supplement |
-| Q10 | What is jumper **node N**? About 750 Ω to ground, the same both ways, not connected to the main +5 V. Is it a logic-high source, such as a standby 5 V rail? This decides what P34 reads (0 or 1) with the factory J8 fitted | **Powered** bench measurement of N and P20–P22 at reset. Needs the owner's confirmation (CLAUDE.md hardware safety) |
+| Q10 | What is jumper **node N**? About 750 Ω to ground, the same both ways, not connected to the main +5 V. Is it a logic-high source, such as a standby 5 V rail? This decides what P34 reads (0 or 1) with the factory J8 fitted | **Powered** measurement of N and P20–P22 in the socketed ECU with the chip out (P3). Needs the owner's confirmation at the time (CLAUDE.md hardware safety) |
 
 ## Conflicts log
 
@@ -131,9 +140,8 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
 | 2026-10-09 | Bluetop cranking spark | Assumption that the CPU makes every spark | ROM: in start mode (`byte_C6` > 0) /IGT is held high, yet missing IGF still cuts fuel [ROM:$F24A, $F370, $F92D, $F420] | The cranking spark must come from outside the CPU (LIKELY the SE056 from NE). Modelled as such; confirm on the bench (P8) and in the 17140 ROM (P4) |
 | 2026-10-09 | Max ignition advance | Ross p16 graph: about 50° BTDC | Upstream #6: implausible, may include a VR offset | Open. Settle with a bench measurement (R-I06) |
 
-## Exceptions to the Arduino-first rule
+## Exceptions to the RP2350-first rule
 
 | Date | Item | Reason | Owner approved? |
 |---|---|---|---|
-| 2026-10-09 | Level shifters (74LVC245, 74AHCT125) | The Zero is not 5 V tolerant | Accepted in the plan |
-| 2026-10-09 | Bus-speed CPLD + SRAM (in-car daughterboard, deferred) | Firmware cannot answer a 1 MHz bus in hundreds of ns | Accepted in the plan; nothing ordered yet |
+| — | — | — | — |

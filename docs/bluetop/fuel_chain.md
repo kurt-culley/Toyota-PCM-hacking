@@ -67,7 +67,7 @@ flowchart TD
   US --> IGT["OC1 → IGT"]
 ```
 
-**Raw → degrees:** the clamp comments and the T-terminal value ($1C = 10° BTDC, matching the factory "10° BTDC with T–E1 shorted") point to **degrees ≈ raw × 90/256** before the −$1C offset. LIKELY; this feeds R-I06 / STATUS Q3. It needs a bench check: Zero timing meter against IGT (P8).
+**Raw → degrees:** the clamp comments and the T-terminal value ($1C = 10° BTDC, matching the factory "10° BTDC with T–E1 shorted") point to **degrees ≈ raw × 90/256** before the −$1C offset. LIKELY; this feeds R-I06 / STATUS Q3. It needs a bench check: RP2350 timing meter against IGT (P8).
 
 ### In tuning terms
 

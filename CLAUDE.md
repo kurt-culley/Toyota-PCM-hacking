@@ -7,13 +7,14 @@ This repo is used to reverse-engineer Denso/Toyota ECUs. The active project is t
 
 ## Fundamental rules
 
-1. **Arduino-first, minimal purchases.** Design every hardware task around the owner's **Arduino Zero** (SAMD21, 3.3 V, native USB). Buy a part only when the Zero physically cannot do the job, and write the reason in [`hardware/BOM.md`](hardware/BOM.md). Two exceptions are already accepted: level shifters, and bus-speed memory/glue for the in-car board. Any new exception needs the owner's approval, logged in `STATUS.md`. **The Zero is not 5 V tolerant, so always level-shift.**
+1. **RP2350-first, minimal purchases.** Design every hardware task around the project's two RP2350 boards: the **Olimex RP2350-PICO2-BB48R** (wired, real-time work) and the **Raspberry Pi Pico 2 WH** (wireless link, spare). Buy a part only when they cannot do the job, and write the reason in [`hardware/BOM.md`](hardware/BOM.md). Any new exception needs the owner's approval, logged in `STATUS.md`. **The RP2350's digital pads take 5 V only while the board is powered:** power the 5 V side last and remove it first; drive 5 V-CMOS inputs (RES, STBY, EXTAL) open-drain with a pull-up; use dividers or clamps for 12 V, flyback, VR and ADC-pin signals; never enable internal pull-downs (erratum E9).
 2. **Modernise.** Use the current toolchain:
    - Python disassembly tooling (`analysis/pcmre`): verified decoder, generated source, cross-references and call graphs
    - the `asl` assembler
    - a Python HD6301 emulator
    - Python with `uv`, `pytest` and `ruff`
    - sigrok/PulseView
+   - pico-sdk with PIO for the RP2350 firmware
    - KiCad
    - TunerStudio, or TunerPro RT for raw ROM files
 
@@ -58,8 +59,8 @@ This repo is used to reverse-engineer Denso/Toyota ECUs. The active project is t
 | `TOYOTA Bluetop PCM/` | AE86 Bluetop, D151801 (HD6301-type). `cap.bin` + `cap.asm` is the main reference ROM. Also the reader and patch notes |
 | `Toyota Redtop 4A-GE/`, `Toyota Blacktop 4a-ge/`, `Toyota 1UZ PCM/` | Toshiba 8X ECUs and dumps |
 | `Toshiba 8x info/`, `Toshiba 8x daughtercard/` | T8X documentation, the CPLD port-emulator daughtercard |
-| `BISON loader-debugger/` | 6301 RAM loader and monitor |
+| `BISON loader-debugger/` | BUFFALO-style RAM loader and monitor for the **Toshiba 8X** (not 6301 code) |
 | `Lifting The Lid on the mk1 MR2 ECU (Jeremy Ross).pdf` | UK MR2 ECU articles. Claims are tracked in `docs/ross/claims.md` |
 | `docs/` | Playbook, status, Ross verification, write-ups |
-| `hardware/` | BOM, Zero firmware, KiCad (as it is created) |
+| `hardware/` | BOM, reader guide, RP2350 firmware, KiCad (as it is created) |
 | `analysis/` | `pcmre` Python tooling, generated source, emulator, map definitions, generated outputs (as they are created) |

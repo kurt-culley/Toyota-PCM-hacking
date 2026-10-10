@@ -4,7 +4,7 @@ This playbook is for any agent, or person, working in this repo. Standing rules 
 
 ## Context
 
-The project owner has a UK mk1b MR2 (ECU **89661-17140**). They know aftermarket tuning well but are new to reverse engineering, so **agents lead**. They have a spare ECU, an **Arduino Zero**, a logic analyser, a scope and soldering skills. They are also interested in anything that overlaps with JDM and other-market ECUs.
+The project owner has a UK mk1b MR2 (ECU **89661-17140**). They know aftermarket tuning well but are new to reverse engineering, so **agents lead**. They have a spare ECU, a multimeter, a breadboard and jumpers, and soldering skills. There is no scope or logic analyser; the hardware plan does not need one. They are also interested in anything that overlaps with JDM and other-market ECUs.
 
 ### Goals, in order
 
@@ -19,12 +19,12 @@ The project owner has a UK mk1b MR2 (ECU **89661-17140**). They know aftermarket
   - Chip: D151801-0642, a Denso HD6301-family part. The ROM is 4 KB, mapped at `$F000–$FFFF`. It has TVIS and is from the same era as the MR2.
   - [`cap.asm`](../TOYOTA%20Bluetop%20PCM/cap.asm) / `cap.idb` hold a partly annotated disassembly. Names include `ADC_ThW`, `TVIScounter`, `IdleRPMs`, `IdleADVcomp` and `lookup3dTable`. The 3D ignition table is near `$FF40`, and the THW tables are at `$FEAF`, `$FEBD` and `$FED2`.
   - **The Bluetop uses a different strategy from the UK MR2.** The Bluetop is L-type (airflow pulse `SE056`) and has an O2 sensor (`ADC_Oxy`). The UK MR2 is D-type (MAP sensor) with no O2 sensor.
-- [`cap2-151801-2860.bin`](../TOYOTA%20Bluetop%20PCM/cap2-151801-2860.bin) is a second D151801 program. It differs from `cap.bin` in 3611 bytes.
+- [`cap2-151801-2860.bin`](../TOYOTA%20Bluetop%20PCM/cap2-151801-2860.bin) is a revised version of the same D151801 program, with identical maps. `cap4.bin` is a second capture of it. Comparison: [`bluetop/versions.md`](bluetop/versions.md).
 - **Redtop** (`D151802-0442`) and **Blacktop** (`D151804-8081`) run on the **Toshiba 8X**, a later and different CPU. They are conceptual references only, unless the MR2 chip turns out to be a T8X (see P3).
 - [`Lifting The Lid on the mk1 MR2 ECU (Jeremy Ross).pdf`](../Lifting%20The%20Lid%20on%20the%20mk1%20MR2%20ECU%20%28Jeremy%20Ross%29.pdf) has 18 pages and 16 embedded figures, including the 17×8 ignition table. It covers the UK **17030** in depth and the **17140** for the mixture screw.
 - Existing tooling and know-how:
   - D151801 reader (`reader6301v1.asm`, `bluetopreader.sch`)
-  - BISON loader/debugger
+  - BISON loader/debugger (Toshiba 8X code, not 6301)
   - `dasm` (6303)
   - `sfrdefs.h`
   - patch notes in [`replacement.txt`](../TOYOTA%20Bluetop%20PCM/replacement.txt): watchdog `$FC75`, ROM checksum `$FE59`, rev limiter `$F434`
@@ -50,14 +50,16 @@ If the hypothesis holds, the ECU never "knows" the IACV and CSI are gone. It is 
 
 ## 1. Ground rules
 
-- **FUNDAMENTAL: Arduino-first, minimal purchases.** Every hardware task is first designed around the owner's **Arduino Zero**:
-  - SAMD21, 48 MHz, 3.3 V logic, native USB
-  - 12-bit ADC and 10-bit DAC
-  - TCC/TC timers with input capture
+- **FUNDAMENTAL: RP2350-first, minimal purchases.** Every hardware task is designed around two RP2350 boards (§6):
+  - **Olimex RP2350-PICO2-BB48R** (RP2350B): the wired, real-time board. All 48 GPIOs on breadboard-friendly headers; GPIO0–39 are 5 V tolerant and GPIO40–47 are 8 ADC inputs; PIO state machines for exact bus and edge timing; PSRAM and microSD.
+  - **Raspberry Pi Pico 2 WH** (RP2350A + Wi-Fi/BLE): the wireless link (phone dashboard, wireless tuning) and a spare board that can run the ROM reader on its own.
 
-  Anything new is bought only when the Zero physically cannot do the job, and the reason is written down in the relevant doc and in [`../hardware/BOM.md`](../hardware/BOM.md). There are two accepted exceptions so far:
-  1. **Level shifters**, because the Zero is not 5 V tolerant.
-  2. **Bus-speed memory and glue logic** for the in-car board, because firmware cannot answer a 1 MHz bus within a few hundred ns.
+  Anything else is bought only when these cannot do the job, and the reason is written in [`../hardware/BOM.md`](../hardware/BOM.md). Interfacing rules:
+  1. **5 V logic connects directly** to GPIO0–39 (RP2350 5 V-tolerant pads), **but only while the board is powered**: the 5 V side is always powered up last and down first.
+  2. Inputs that need a true 5 V high (the 6301's RES, STBY, EXTAL) are driven **open-drain with a pull-up to 5 V**.
+  3. 12 V, injector-flyback and VR signals need **dividers or clamps**; the ADC pins (GPIO40–47) are not 5 V tolerant and always use dividers.
+  4. Internal pull-downs are never enabled (RP2350 erratum E9).
+  5. The in-car modified-ROM board (P7) is a **factory-assembled** PCB.
 
   Any new exception goes in [`STATUS.md`](STATUS.md) for the owner to approve.
 - **FUNDAMENTAL: Modernise.** Use current software, reverse-engineering techniques and hardware (§2). Legacy tools such as IDA 4.9, TASM, dasm, ExpressPCB, WinCUPL, RS232 and RealTerm are used only to cross-check results or read old files. Legacy files (`.idb`, ExpressPCB, `.xls`) are converted to open formats (text, KiCad, CSV) when touched. The originals are never deleted.
@@ -78,7 +80,7 @@ If the hypothesis holds, the ECU never "knows" the IACV and CSI are gone. It is 
 - **Single source for map definitions.** Each ROM gets one file, `analysis/defs/<rom>.yaml`, listing its maps, scalars and RAM variables with scaling. CSV, Markdown, TunerPro XDF and TunerStudio INI are all generated from it. Nothing is maintained by hand in two places.
 - **Never modify the original dumps.** Derived work goes in `analysis/`, `docs/` and `hardware/`.
 - **Safety:**
-  - Every hardware step needs the owner's confirmation and comes with a safety checklist (power sequencing, ESD, level shifting).
+  - Every hardware step needs the owner's confirmation and comes with a safety checklist (power sequencing, ESD, signal levels).
   - Keep a known-good ECU aside at all times.
   - Never run the engine on untested code.
 - **Community:** agents may draft questions for the upstream repo (`sparkiedk/Toyota-PCM-hacking`, whose maintainer was active in Dec 2025), but they post only with the owner's approval.
@@ -92,10 +94,10 @@ If the hypothesis holds, the ECU never "knows" the IACV and CSI are gone. It is 
 | Emulation | A Python HD6301 core (`analysis/emu/`) with timer, OC/IC, SCI and ADC models, tested against `dasm/test/suite6303` and MAME's hd6301 core as reference. It runs single routines **and** the whole ROM with simulated NE/G and sensor inputs | — (Ross's 8086 port, conceptually) |
 | Scripting & tests | Python 3.12+, `uv`, `pytest`, `ruff`. GitHub Actions runs the round-trip and emulator tests | `.bat` files |
 | Signal capture | **sigrok / PulseView** with custom decoders (NE/G, IGT/IGF, injector, Denso ADC serial). Captures are committed as `.sr` files | — |
-| ROM reader | **The Arduino Zero is the reader** (§6a) | EPROM reader board, RS232, RealTerm |
-| Bench stimulus, timing meter, logger | **Arduino Zero** (§6 role matrix) | signal generator, drill + distributor (kept as a physical cross-check) |
-| PCB / CPLD | **KiCad** (current) with JLCPCB, PCBWay or Aisler. **ATF1508ASL** (still made, 5 V native), using an open flow where possible (prjbureau-style tools), otherwise WinCUPL in a VM. **Programmed by the Zero** as a JTAG/SVF player | ExpressPCB, Win XP + parallel-port JTAG |
-| Tuning | **TunerStudio** for live tuning through the daughterboard's Zero co-processor (P7). **TunerPro RT (XDF)** for editing raw ROM images until then, because TunerStudio cannot open a raw ROM file | — |
+| ROM reader | **RP2350 reader** (§6a): C + pico-sdk + PIO firmware, built in CI to a UF2 | EPROM reader board, RS232, RealTerm |
+| Bench stimulus, timing meter, logger | **RP2350 boards** (§6 role matrix) | signal generator, drill + distributor (kept as a physical cross-check) |
+| PCB / CPLD | **KiCad** (current) with JLCPCB, PCBWay or Aisler. Boards are ordered **factory-assembled (PCBA)**. The P7 board is RP2350-based first; an **ATF1508ASL** CPLD + SRAM design is the fallback | ExpressPCB, Win XP + parallel-port JTAG |
+| Tuning | **TunerStudio** for live tuning through the P7 board's RP2350, over USB or Wi-Fi. **TunerPro RT (XDF)** for editing raw ROM images until then, because TunerStudio cannot open a raw ROM file | — |
 
 ## 3. Agent roles
 
@@ -105,7 +107,7 @@ If the hypothesis holds, the ECU never "knows" the IACV and CSI are gone. It is 
 | **Toolsmith** | `pcmre` disassembly and cross-reference tooling, emulator, generators (`defs/*.yaml` → XDF/INI/CSV/MD), CI |
 | **Code analyst** | Control flow, RAM map, routine naming |
 | **Calibration analyst** | Map discovery, axes and scaling, physical-unit tables and plots |
-| **Hardware guide** | Beginner build guides (Markdown + Mermaid + photos), Zero firmware, bench procedures |
+| **Hardware guide** | Beginner build guides (Markdown + Mermaid + photos), RP2350 firmware, bench procedures |
 | **Verifier** | Independently re-derives claims and can lower their confidence. **Every gate needs Verifier sign-off** |
 
 One session may play several roles, but the Verifier must not sign off its own work in the same session.
@@ -116,7 +118,7 @@ One session may play several roles, but the Verifier must not sign off its own w
 flowchart LR
   P0[P0 Foundations] --> P1[P1 Ross claim register]
   P1 --> P2[P2 Bluetop + Tier-A verification]
-  P0 --> P3[P3 Dump MR2 ROM<br/>Arduino Zero reader]
+  P0 --> P3[P3 Dump MR2 ROM<br/>RP2350 reader]
   P2 --> P4[P4 MR2 analysis + Tier-B verification]
   P3 --> P4
   P4 -->|GATE: Ross verified| P5[P5 Warm-up / cold start]
@@ -156,23 +158,18 @@ flowchart LR
 - Map the vectors, main loop and scheduler (`procJmpTable`), the ADC sequencer (`$FA9B`), the RAM map (`$40–$FF`), the table formats (2D and 3D interpolation helpers around `$FF35`), and the full fuel and ignition chains.
 - Write `analysis/defs/bluetop.yaml`, then generate CSV, Markdown and XDF from it.
 - Give every Tier-A claim a status: CONFIRMED, CONTRADICTED or NOT-APPLICABLE (because the Bluetop is L-type, not D-type). Back each one with ROM and emulator evidence. Diff against `cap2`.
-- Optionally cross-check selected routines on the **real CPU** using the Zero slow-clock harness (§6).
+- Optionally cross-check selected routines on the **real CPU** using the RP2350 real-CPU harness (§6).
 - **Gate:** every Tier-A claim has a status, and the Verifier has spot-checked them in the emulator.
 
 ### P3: Dump the MR2 89661-17140 ROM (hardware; can start right after P0)
 
-1. Open the spare ECU and photograph both sides. Identify the CPU **by package and pinout**, not by part number. Record everything in `docs/hardware/aw11_ecu.md`.
-   - **40-pin, HD6301-type** (expected): use the **§6a Arduino Zero breadboard reader**.
-   - **64-pin SDIP:** it is a **Toshiba 8X**. Use the same Zero approach with T8X bus timing, and `pcmre` needs a T8X decoder (the instruction set is in `Toshiba 8x info/`).
-2. Write a beginner build guide (`docs/hardware/zero_reader_guide.md`). It covers wiring with Mermaid and photos, the Zero firmware (Arduino-CLI or PlatformIO, in `hardware/zero-reader/`), the Python capture script, and the relevant parts of the upstream bring-up checklist.
-3. Before dumping, the Zero firmware runs three self-tests, following the lessons from upstream #4:
-   - a walking-ones test on every address and data line;
-   - a known-pattern test program;
-   - an infinite-loop test from external memory.
-
-   **If the bus shows endless or unexpected activity, the MCU is running its own internal code: fix the mode pins first.** Confirm the internal ROM size (4 KB at `$F000` is assumed).
-4. Dump at least 3 times and check that the SHA-256 hashes are identical. Store the image as `AW11 MR2 PCM/89661-17140.bin`.
-5. Start a variant matrix, `docs/variants.md`, covering 17030, 17070, JDM and US ECUs, and look for more dumps from the community.
+1. **CPU identified** (done): the spare ECU's IC7 is a 40-pin D151801-7110, HD6301V1-compatible, soldered to the board ([`hardware/aw11_ecu.md`](hardware/aw11_ecu.md)). Reading it in-circuit is impossible: J4 grounds AD2, J8 loads AD4, and other board chips drive the bus pins.
+2. **Remove the chip and fit a socket** in the same session: conformal coat off with IPA, desoldering braid and pump (low-melt alloy as the backup), photos of pin 1 and the notch first, then a turned-pin DIP-40 socket. With the socket fitted, Q10 (node N) can be measured powered with the chip out, with the owner's confirmation at the time.
+3. **Build the §6a RP2350 reader on a breadboard.** The guide is [`hardware/rp2350_reader_guide.md`](hardware/rp2350_reader_guide.md); firmware is in `hardware/rp2350-reader/`. A factory-assembled carrier PCB (§6a) is built in parallel.
+4. **Bring-up, in order:** guided multimeter checklist → `rigcheck` (chip out) → insert the chip → `clock` → `listen` (nothing driven) → `probe` → `dump`. **If the bus shows endless or unexpected activity, the MCU is running its own code: fix the mode straps first** (upstream #4). The `size` run confirms the internal ROM size (4 KB at `$F000` is expected).
+5. **Dump at least 3 times** and check that the SHA-256 hashes match, the mode byte reads 0, and the SCI and bus-snoop channels agree. Store the image as `AW11 MR2 PCM/89661-17140.bin`.
+6. **Gate:** an independent Verifier signs off the procedure and the dump's integrity before P4 starts.
+7. Start a variant matrix, `docs/variants.md`, covering 17030, 17070, JDM and US ECUs.
 
 ### P4: MR2 analysis and Tier-B verification → "Ross verified" gate
 
@@ -211,7 +208,7 @@ flowchart LR
   - a Mermaid state diagram of the cold-start sequence
   - the predicted effects of removing the IACV and the CSI, with symptoms and confidence levels
   - mitigations, including what a custom ROM could change
-- Validate against a real cold start logged with the **Zero in-car logger** (P8).
+- Validate against a real cold start logged with the **RP2350 in-car logger** (P8).
 
 ### P6: Secret maps (goal 2)
 
@@ -221,24 +218,27 @@ flowchart LR
 ### P7: Modified ROM and TunerStudio (goal 3)
 
 1. Do a **port-usage audit** of the MR2 ROM: which port bits are read and written, and what each one means.
-2. Design the §6b daughterboard in KiCad: expanded mode, emulation of the lost ports and strobes in the CPLD, SRAM, and power-down behaviour.
-3. Run an infinite-loop test from external memory, and probe the bus to confirm fetches and check for contention.
-4. Run the byte-identical stock image and compare it on the bench against the stock ECU.
-5. Make calibration-only edits, handling the ROM checksum (`$FE59` on the Bluetop; find the MR2 equivalent) and the watchdog.
+2. **Prototype on the BB48R** (§6b): the D151801 runs in an expanded mode with its program served from RP2350 RAM. The board emulates the port registers that become external (`$04`–`$07`, `$0F`, including the IS3/IGF flag) and drives the ECU's lost port 3/4 lines. Outputs that need 5 V CMOS levels get an HCT buffer.
+3. Run an infinite-loop test from external memory, and check the bus for contention with the firmware's own bus monitor.
+4. Run the **stock image plus a documented mode-test patch**: `CPUModeTst` feeds the watchdog only in single-chip mode [ROM:Bluetop `$FC6E`], so a byte-identical image cannot run in expanded mode. Compare it on the bench with the stock reference, the car's own ECU.
+5. Make calibration-only edits, handling the ROM checksum (word sum `$AA55` balanced at `$FFEE` on the Bluetop, `pcmre.checksum`; find the MR2 equivalent) and the watchdog.
 6. Integrate TunerStudio:
-   - The Zero co-processor exposes the calibration area in SRAM and live variables to TunerStudio over native USB. It uses the TunerStudio serial protocol with an INI generated from `defs/mr2_17140.yaml`.
+   - The RP2350 exposes the calibration area and live variables to TunerStudio over USB, or over Wi-Fi through the Pico 2 WH. It uses the TunerStudio serial protocol with an INI generated from `defs/mr2_17140.yaml`.
    - Live variables come from a small UART stream added to the modified ROM.
-   - Map edits are written into SRAM by cycle stealing. A dual-port SRAM is the fallback.
-   - "Burn" saves to the Zero's flash.
-   - If TunerStudio fails, fall back to TunerPro RT (live via an Ostrich-compatible protocol, then offline XDF).
-7. Never run the engine until the bench outputs match the stock ECU.
+   - Map edits go straight into the RP2350's RAM image; "Burn" saves to its flash.
+   - If TunerStudio fails, fall back to TunerPro RT (offline XDF).
+7. Port the prototype to a **factory-assembled** in-car board (RP2350B + wireless module + automotive power). The CPLD + SRAM design is the fallback if the port audit rules out the RP2350 route.
+8. Never run the engine until the bench outputs match the stock ECU.
 
-### P8: Bench rig and validation (in parallel from P3)
+### P8: Bench rig and validation (designed after P4)
 
-- The Zero acts as the **bench stimulus** (NE/G, PIM/VTA, THW/THA) and is scripted from Python to sweep rpm and temperature. Firmware lives in `hardware/bench-sim/`.
-- The Zero acts as a **timing meter**: it measures IGT edges against NE/G edges to calibrate spark degrees (settling upstream issue #6 and claim R-I06) and confirms that the µs value equals the injector pulse (R-F23). The logic analyser is an independent cross-check.
-- The Zero acts as an **in-car cold-start logger** on the stock ECU, recording a baseline for P5.
-- A single Zero is used for one role at a time. That is fine, because the phases are sequential.
+P8 is required before P7 runs on the engine. Its design waits for P4 and STATUS Q5 (whether NE/G need a VR-style waveform).
+- **Prediction** comes from the whole-ROM simulator ([`bluetop/simulation.md`](bluetop/simulation.md)), which will run the 17140 ROM too.
+- The BB48R is the **bench stimulus** (NE/G from PIO; fixed resistors or a potentiometer for THW/THA; PIM/VTA from PWM + RC), scripted from Python. Firmware lives in `hardware/bench-sim/`.
+- The BB48R is the **timing meter**: PIO edge capture of IGT, injectors and NE/G calibrates spark degrees (upstream issue #6, R-I06) and checks the injector pulse (R-F23).
+- The BB48R is the **in-car logger**: up to 8 analogue channels through dividers, logged to microSD; the Pico 2 WH streams live values to a phone.
+- **Protection:** clamps on injector-flyback and NE/G lines, or tap the logic-side signals; a fused 12 V supply on the bench.
+- **P4 check:** the Bluetop has a serial RAM-peek routine (`SerialDebug`, `$F40D`). If the 17140 has one, a 3-wire SCI tap gives the ECU's own live variables with no analogue front-end.
 
 ## 5. Repo layout (built up over time)
 
@@ -248,87 +248,98 @@ docs/{RE_PLAN,STATUS,upstream_issues,variants,glossary}.md
 docs/ross/{claims.md,verification_report.md,diagrams.md,figures/}
 docs/bluetop/  docs/mr2/  docs/hardware/  docs/warmup_cold_start.md  docs/secret_maps.md
 analysis/{pcmre/,emu/,tools/,defs/*.yaml,generated/{xdf,ini,csv}/,captures/*.sr}
-hardware/{BOM.md,zero-reader/,bench-sim/,daughtercard/}
+docs/hardware/rp2350_reader_guide.md
+hardware/{BOM.md,rp2350-reader/{6301,firmware,pcb}/,bench-sim/,incar-board/}
 ```
 
-## 6. Hardware: Arduino-first, minimal purchases
+## 6. Hardware: RP2350-first, minimal purchases
 
-### Arduino Zero role matrix
+### Controller choice
 
-There is one board, with a swappable firmware project for each role under `hardware/zero-*/` (or `hardware/bench-sim/`).
+| Board | 5 V-tolerant pins | Analogue in | Wireless | Role |
+|---|---|---|---|---|
+| **Olimex RP2350-PICO2-BB48R** (RP2350B) | 40 (GPIO0–39) | 8 (GPIO40–47) | — | Wired, real-time work: reader, real-CPU harness, bench, logger, P7 prototype |
+| **Raspberry Pi Pico 2 WH** (RP2350A) | 23 (GP0–22) | 3 | Wi-Fi 4 + BLE 5.2 | Wireless link (dashboard, tuning); spare reader |
 
-| Phase | Zero role | Replaces | Extra parts |
-|---|---|---|---|
-| P3 | **ROM reader**: clock + external memory + bus-snoop dump | EPROM, latch, crystal, EPROM programmer, USB-UART | level shifters |
-| P2/P4 | **Real-CPU test harness**: runs ROM routines on the real MCU at slow clock to cross-check the emulator | — | none |
-| P4/P8 | **Sensor characterisation**: 12-bit ADC plus known resistors. Measures the THW/THA NTC curves and PIM/VTA transfer, giving ADC → °C/kPa scaling | hand-made multimeter tables | divider resistors |
-| P8 | **Bench stimulus**: NE/G from TCC timers, PIM/VTA from DAC/PWM, THW/THA from digital pots | signal generator | 2× MCP41010 |
-| P8 | **Spark/injector timing meter**: TC input capture at 48 MHz. Reports °BTDC and µs to Python | logic-analyser post-processing (LA kept as a cross-check) | dividers / 74LVC245 |
-| P5 | **In-car cold-start logger**: passively records injector pulse width, IGT advance, TVIS and THW/PIM/VTA from the stock ECU, as CSV over USB | laptop + LA in the car | dividers, protection resistors, TVS |
-| P2/P7 | **Slow-clock hardware-in-the-loop** (if the MCU tolerates a slow or stepped clock): the Zero serves memory, including a **modified** image, and generates NE/G in step with the clock, so the real CPU runs code against simulated engine conditions before any daughterboard exists | early daughterboard prototypes | none |
-| P7 | **CPLD programmer** (JTAG/SVF player) | ATDH1150USB (~£80+) | none |
-| P7 | **Daughterboard co-processor**: image loader, TunerStudio link, burn to flash, live data | Moates Ostrich, separate datalogger | — |
+Why the RP2350: its digital pads take 5 V while powered, so the ECU's 5 V logic needs no level shifters; its **PIO** state machines give hardware-exact bus timing (a published RP2350 design serves a 6301 bus at E ≈ 1 MHz, the ECU's own speed); both boards share one SDK and code base. Two boards are used because no available board combines wireless with the 35–40 usable 5 V-tolerant pins the P7 prototype needs, and keeping Wi-Fi off the bus-serving chip keeps its timing clean.
 
-**Always level-shift.** The Zero's I/O is **3.3 V and not 5 V tolerant**. Use 74LVC245 (5 → 3.3 V inputs, and bidirectional) and 74AHCT125 (3.3 → 5 V outputs). Before designing the NE/G stimulus, check against the ECU input circuit whether NE/G need a VR-like bipolar waveform (op-amp stage) or accept a 0–5 V square wave.
+Alternatives considered: ESP32 family (3.3 V only, no PIO), STM32 (no PIO, no wireless, no published 6301 design), 5 V Arduinos (software bus timing too slow), Teensy and FPGA boards (3.3 V only), single RP2350B + wireless boards (Pimoroni Pico LiPo 2 XL W, Waveshare RP2350B-Plus-W, SparkFun IoT RedBoard: too few usable pins for the P7 prototype).
 
-### 6a. Arduino Zero ROM reader (P3): buy now, about £10–15
+### Role matrix
 
-The Zero **is** the MCU's external memory and clock.
+| Phase | Board and role | Extra parts |
+|---|---|---|
+| P3 | **ROM reader** (BB48R, or the Pico 2 WH): clock, external memory, SCI capture and bus snoop | 5 resistors, 2 capacitors |
+| P4 | **Real-CPU harness**: runs ROM routines on the real D151801 in mode 0 to cross-check the emulator | none |
+| P4/P8 | **Sensor characterisation**: ADC plus known resistors gives the THW/THA NTC and PIM/VTA transfer | divider resistors |
+| P8 | **Bench stimulus**: NE/G from PIO, THW/THA from fixed resistors or a potentiometer, PIM/VTA from PWM + RC | resistors |
+| P8 | **Spark/injector timing meter**: PIO edge capture at 150 MHz | dividers / clamps |
+| P5/P8 | **In-car logger**: analogue + edge timing to microSD; live view on a phone via the Pico 2 WH | dividers, clamps, 12 V → 5 V supply |
+| P7 | **Prototype in-car board**: serves the modified image, emulates the lost ports, links to TunerStudio | HCT buffer if needed |
+
+### 6a. RP2350 ROM reader (P3)
+
+The RP2350 **is** the MCU's external memory and clock. The D151801 runs in **mode 0** (P22/P21/P20 strapped low), where the internal ROM stays enabled but the reset vector is fetched externally for 3–4 cycles after RES rises.
 
 ```mermaid
 flowchart LR
-  ZERO[Arduino Zero<br/>3.3 V, native USB] -->|EXTAL clock, /RES<br/>via 74AHCT125| MCU[D151801 / HD6301<br/>removed from spare ECU<br/>on breadboard, 5 V from Zero's 5V pin]
-  MCU <-->|AD0-7 multiplexed bus<br/>via 74LVC245, DIR from R/W| ZERO
-  MCU -->|A8-15, AS, E, R/W<br/>via 74LVC245| ZERO
-  ZERO <-->|USB| PC[Python capture script<br/>3 dumps, SHA-256 compare]
+  RP[RP2350 board<br/>USB to PC] -->|EXTAL 1 MHz open-drain, RES open-drain<br/>pull-ups to the 6301 5 V rail| MCU[D151801 / HD6301<br/>on breadboard, mode 0]
+  MCU <-->|AD0-7 multiplexed bus<br/>direct, 5 V-tolerant pads| RP
+  MCU -->|A8-15, AS, E, R/W, SCI TX| RP
+  RP <-->|USB serial| PC[romcapture.py<br/>3 dumps compared, SHA-256]
 ```
 
 ```mermaid
 sequenceDiagram
-  participant Z as Arduino Zero
-  participant M as D151801 MCU
-  participant P as PC (Python)
-  Z->>M: hold /RES low, start EXTAL clock
-  Z->>M: release /RES (power already stable)
-  M->>Z: fetch reset vector / reader code (external bus)
-  Z-->>M: serve reader bytes (LDAA 0,X / STAA $9000 / INX / BNE)
+  participant R as RP2350
+  participant M as D151801 (mode 0)
+  R->>M: hold RES low, run EXTAL, wait for steady E
+  R->>M: release RES
+  M->>R: dummy $FFFF, then $FFFE/$FFFF (external in this window)
+  R-->>M: serve vector $C0C0
+  M->>R: fetch dump program from $C0xx
   loop 4096 bytes
-    M->>Z: write ROM byte to external $9000
-    Z->>P: forward byte over USB
+    M->>M: LDAB 0,X from internal ROM (data also appears on the bus)
+    M->>R: SCI TX byte at 15,625 baud
   end
-  P->>P: repeat x3, compare SHA-256
+  M->>M: SLP
 ```
 
-- The Zero latches the low address from AD0–7 on AS itself, so no '373 latch is needed. It serves a tiny reader program and records each internal-ROM byte when the MCU writes it to an external address (**bus-snoop dump**). There is no UART and no odd baud rate. [`reader6301v1.asm`](../TOYOTA%20Bluetop%20PCM/reader6301v1.asm) is the reference, and its UART method is the fallback.
-- **Two feasibility checks happen before anything is bought.** Use the [HD6301 handbook](../HD6301_HD6303_Series_Handbook_1989.pdf) and `bluetopreader.sch`.
-  1. Find the mode-pin strapping that gives external reset/vector fetch while the internal ROM at `$F000` stays readable. The existing reader proves such a configuration exists.
-  2. Find the MCU's minimum clock frequency.
-     - If the MCU is static, the Zero single-steps the clock.
-     - If not, the Zero runs a slow continuous clock (for example EXTAL 1 MHz, giving 4 µs bus cycles, about 190 Zero CPU cycles each) and serves it with a tight loop on the SAMD21 single-cycle IOBUS port.
-- About 22 GPIOs are needed. If pins run short, drop high address lines the reader does not need.
-- If the CPU is a Toshiba 8X, the same approach applies with T8X bus timing ([`Toshiba 8x info/bus_timing.jpg`](../Toshiba%208x%20info/bus_timing.jpg)). The only extra part is an SDIP-64 socket.
-- The same breadboard also runs bench experiments on the real CPU (BISON-style RAM peeking, routine tests against the emulator) without buying anything else.
+- **Drive only where nothing else can:** the RP2350 drives the bus only for reads of `$C0xx` and for the in-window vector. It never drives during reset, `$0000`–`$00FF`, `$F000`–`$FFFF` outside the window, or write cycles. The handbook forbids overlapping internal and external space, because internal reads are driven onto the bus in mode 0.
+- **Two dump channels:** the program sends the ROM over the 6301's own SCI, and the RP2350 also samples the bus during the internal reads.
+- **Safety:** the mode straps go to GND through 10 kΩ (never bare wires); the 6301's 5 V rail is connected last and removed first; power-good waits for a steady E clock before releasing RES; the AD lines use the lowest drive strength to limit any contention.
+- **Pin map:** one PIO program serves both boards; the bus block keeps the same layout relative to its base pin. On the BB48R the reader avoids the board's own GPIOs: GP0–7 (UEXT, Qwiic with 2.2 kΩ pull-ups), GP8 (PSRAM chip-select), GP9–11/24 (microSD), GP25 (LED) and the non-5 V-tolerant GP40–47.
+
+  | 6301 signal (pin) | BB48R | Pico 2 WH |
+  |---|---|---|
+  | AD0–AD7 (37…30) | GP16–23 | GP0–7 |
+  | A8–A15 (29…22) | GP26–33 | GP10–17 |
+  | AS (39) | GP34 | GP18 |
+  | E (40) | GP35 | GP19 |
+  | R/W (38) | GP36 | GP20 |
+  | RES (6), open-drain, 10 kΩ pull-up | GP37 | GP8 |
+  | EXTAL (3), open-drain, 470 Ω pull-up | GP38 | GP9 |
+  | P24/TX (12), 10 kΩ pull-up | GP39 | GP21 |
+
+  Firmware: [`../hardware/rp2350-reader/firmware/`](../hardware/rp2350-reader/firmware/) (C, pico-sdk ≥ 2.1, PIO; CI builds a UF2 per board). The drive/listen rule in `decode.h` is tested against the Python model in `analysis/pcmre/readerdecode.py`, and the dump program runs on the emulator against `cap.bin` [EMU:tests/test_romdump.py].
+- **Carrier PCB:** a DIP-40 ZIF socket, headers for the BB48R, the resistors and capacitors, and a load switch that sequences the 6301's 5 V rail automatically. Ordered factory-assembled (JLCPCB PCBA). It later serves as the P4 real-CPU harness.
 
 The parts list is in [`../hardware/BOM.md`](../hardware/BOM.md).
 
-### 6b. In-car modified-ROM daughterboard (P7): deferred, buy nothing yet
-
-At real engine speed the MCU expects memory to answer within a few hundred ns. No Arduino can do that from firmware, so the car board needs real bus-speed memory and glue logic. The Zero still does everything else.
+### 6b. In-car modified-ROM board (P7): prototype first, buy nothing yet
 
 ```mermaid
 flowchart LR
-  ECU[ECU DIP-40 socket] <-->|machined-pin plug| MCU[D151801]
-  MCU <-->|bus| GLUE[ATF1508ASL CPLD<br/>latch + decode + lost-port emulation<br/>+ cycle-steal writes]
-  GLUE <--> SRAM[AS6C62256 32 KB SRAM<br/>ROM image]
-  ZERO[Arduino Zero<br/>loader + TunerStudio + burn to flash] <-->|SPI via 74LVC/74AHCT| GLUE
-  ZERO -->|holds /RES until loaded| MCU
-  PC[Laptop: TunerStudio] <-->|USB| ZERO
+  ECU[ECU DIP-40 socket] <-->|ports 1/2, power, crystal pass through| MCU[D151801<br/>expanded mode]
+  MCU <-->|bus at E = 1 MHz| RP[RP2350B<br/>program image in RAM<br/>emulated port registers]
+  RP <-->|lost port 3/4 + IGF lines| ECU
+  RP <-->|USB / UART| LINK[Laptop TunerStudio<br/>or Pico 2 WH Wi-Fi]
 ```
 
-- At power-up the Zero holds /RES, loads the image into SRAM through the CPLD, then releases reset. No EPROM and no programmer are needed.
-- For **live tuning**, the HD6301 uses the bus only while E is high. In the other half of each cycle the CPLD lets the Zero write map bytes. A dual-port SRAM is the fallback.
-- **The Zero programs the CPLD** (JTAG/SVF). The ATDH1150USB is an exception that needs owner approval.
-- **Nothing in 6b is ordered** until three things are done: the CPU is identified (P3), the port audit is complete (P7), and a design review has frozen the pin budget and memory map. After that, `BOM.md` gets live UK stock and prices.
+- The RP2350 serves the modified image from RAM at the ECU's own bus speed, emulates the port registers that become external in expanded mode, and recreates the lost port 3/4 and IGF lines on the ECU side.
+- Live tuning edits the RAM image directly; there is no cycle stealing and no dual-port SRAM.
+- Prototype on the BB48R first; the final board is factory-assembled. The CPLD + SRAM design stays the fallback.
+- **Nothing in 6b is ordered** until the P4 port audit is done and a design review has frozen the pin budget.
 
 ## 7. Glossary seed
 
@@ -336,4 +347,4 @@ The full glossary lives in `docs/glossary.md`, written in tuner terms. Seed term
 
 - **Signals and sensors:** NE/G, IGT/IGF, THW/THA, PIM, VTA/IDL, STA, TVIS.
 - **ECU concepts:** D-type/L-type EFI, mask ROM, expanded mode, interrupt vector, RAM map, 2D/3D table, interpolation, checksum.
-- **Hardware and tooling:** disassembler, cross-reference, CPLD, level shifting (3.3 V ↔ 5 V), dual-port SRAM, cycle stealing.
+- **Hardware and tooling:** disassembler, cross-reference, CPLD, 5 V-tolerant pads, open-drain + pull-up, PIO.

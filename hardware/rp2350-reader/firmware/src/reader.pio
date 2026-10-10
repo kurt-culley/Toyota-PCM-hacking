@@ -1,0 +1,86 @@
+; PIO programs for the HD6301 ROM reader.
+
+; ---------------------------------------------------------------------------------------
+; bus6301: one pass per 6301 bus cycle (multiplexed bus, E = 250 kHz).
+;   in_base  = BUS_BASE (pins.h layout: AD +0..7, A8-15 +10..17, AS +18, E +19, R/W +20)
+;   out_base = AD0, 8 pins;  jmp_pin = E
+;   Y        = snoop delay after E rises (2 PIO clocks per pass), loaded once at start.
+;
+; Words to the CPU, tagged by bit 31:
+;   address sample, bit 31 = 0: the 21 bus pins at AS falling;
+;   snoop sample,   bit 31 = 1: 0xFFFFFF00 | AD0-7 read while E is high (bit 8 set);
+;   early-release marker: 0xFFFFFE00 (E fell before the snoop delay ended).
+; Words from the CPU: bits 0-7 data, bits 8-15 pin directions (0xFF = drive). The CPU
+; sends a word only for a cycle it wants driven.
+;
+; Fail-safe rules:
+;   - The answer must already be waiting when E rises; if not, the cycle is listen-only
+;     (`pull noblock` with X = 0). The CPU never sends an answer once it is late.
+;   - Any answer still queued when the next cycle starts (AS high) is thrown away, so an
+;     answer can never be used in a later cycle.
+;   - The bus is released when E falls, even if that happens during the snoop delay
+;     (the snoop sample is then skipped).
+; ---------------------------------------------------------------------------------------
+.program bus6301
+    pull block
+    mov y, osr
+cycle:
+.wrap_target
+    wait 1 pin 18           ; AS high: a new cycle begins
+    pull noblock            ; discard any stale answer
+    wait 0 pin 18           ; AS falls: AD0-7 hold the low address byte
+    in pins, 21
+    push noblock
+    mov x, null             ; default answer: listen
+    wait 1 pin 19           ; E rises: data phase
+    pull noblock            ; the CPU's answer if it is already here, else 0
+    out pins, 8             ; data value
+    out pindirs, 8          ; 0xFF drives, 0x00 keeps listening
+    mov x, y
+delay:
+    jmp pin hold            ; E still high?
+    jmp early               ; E fell early: release now
+hold:
+    jmp x-- delay
+    mov isr, ~null
+    in pins, 8              ; snoop sample: 0xFFFFFF00 | AD0-7 (bit 8 set)
+    push noblock
+    wait 0 pin 19           ; E falls: the 6301 latches read data here
+    out pindirs, 8          ; release (OSR bits 16-23 are zero)
+.wrap
+early:
+    out pindirs, 8          ; release first
+    mov isr, ~null
+    in null, 9              ; marker 0xFFFFFE00 (bit 31 set, bit 8 clear): no snoop
+    push noblock            ; so the CPU's "is anything newer queued?" check still works
+    jmp cycle
+
+; ---------------------------------------------------------------------------------------
+; extal_od: open-drain square wave for the 6301 EXTAL input (pin 3, 470R pull-up to 5 V).
+; The pin's output value stays 0; only its direction toggles, so the RP2350 never drives
+; it high. Two instructions per period: run at 2x the wanted frequency.
+; ---------------------------------------------------------------------------------------
+.program extal_od
+.wrap_target
+    set pindirs, 1          ; pull low
+    set pindirs, 0          ; release: the pull-up takes it to 5 V
+.wrap
+
+; ---------------------------------------------------------------------------------------
+; sci_rx: 8N1 receiver for the 6301 P24/TX line, 8 PIO clocks per bit.
+;   in_base = jmp_pin = the SCI pin. Bytes arrive in bits 31-24 of each RX FIFO word.
+;   A character with a bad stop bit is dropped (the dump length check then fails).
+; ---------------------------------------------------------------------------------------
+.program sci_rx
+start:
+    wait 0 pin 0            ; start bit
+    set x, 7 [10]           ; to the middle of data bit 0 (12 clocks from the edge)
+bitloop:
+    in pins, 1
+    jmp x-- bitloop [6]     ; 8 clocks per bit
+    jmp pin stop_ok
+    wait 1 pin 0            ; framing error: wait for idle, drop the byte
+    mov isr, null
+    jmp start
+stop_ok:
+    push block

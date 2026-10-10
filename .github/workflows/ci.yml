@@ -36,3 +36,31 @@ jobs:
         run: uv run python -m pcmre.roundtrip
         env:
           PYTHONPATH: analysis
+
+  firmware:
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        board: [olimex_rp2350_pico2_bb48, pico2_w]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the ARM toolchain
+        run: sudo apt-get update && sudo apt-get install -y gcc-arm-none-eabi libnewlib-arm-none-eabi libstdc++-arm-none-eabi-newlib ninja-build
+
+      - name: Fetch pico-sdk 2.1.1
+        run: |
+          git clone --depth 1 -b 2.1.1 https://github.com/raspberrypi/pico-sdk "$RUNNER_TEMP/pico-sdk"
+          git -C "$RUNNER_TEMP/pico-sdk" submodule update --init --depth 1 lib/tinyusb
+
+      - name: Build the reader UF2 (warnings are errors)
+        env:
+          PICO_SDK_PATH: ${{ runner.temp }}/pico-sdk
+        run: |
+          cmake -S hardware/rp2350-reader/firmware -B build -G Ninja -DPICO_BOARD=${{ matrix.board }}
+          cmake --build build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rp2350_reader_${{ matrix.board }}
+          path: build/rp2350_reader_${{ matrix.board }}.uf2

@@ -76,6 +76,12 @@ def report(start: int, rom: bytes) -> str:
     return "\n".join(out)
 
 
+def check_dump_image(start: int, rom: bytes) -> None:
+    """Only a `dump` result ($F000-$FFFF) is saved as the ROM; a `size` run is not."""
+    if (start, len(rom)) != (0xF000, 0x1000):
+        raise SystemExit(f"image is ${start:04X}, {len(rom)} bytes, not a $F000-$FFFF dump (a `size` run?): not saved")
+
+
 def save(rom: bytes, path: Path) -> None:
     if path.exists() and path.read_bytes() != rom:
         raise SystemExit(f"{path} already exists with different bytes: not overwriting. Compare the two dumps.")
@@ -113,6 +119,7 @@ def main() -> int:
     text = a.from_log.read_text() if a.from_log else capture_serial(a.port)
     start, rom = parse_intel_hex(console_section(text))
     print(report(start, rom))
+    check_dump_image(start, rom)
     save(rom, a.out)
     print(f"saved {a.out}")
     return 0

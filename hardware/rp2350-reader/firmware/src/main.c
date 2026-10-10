@@ -59,13 +59,32 @@ static cycle_log_t cycle_log[LOG_N];
 static uint8_t snoop_img[0x10000];
 static uint32_t snoop_seen[0x10000 / 32];
 
+static uint8_t serve_page[256];  // served from RAM: no flash-cache stalls on core 1
+
 static PIO pio = pio0;
 static uint sm_bus, sm_clk, sm_sci;
 
+// Core 1: one address word per cycle, optionally followed by a snoop word (bit 31 set).
+// It sends an answer only for a cycle it drives, and only if it is still in time: E has
+// not risen yet and the PIO has queued nothing newer. Once it is late, it stops driving
+// until the next reset (the dump then fails visibly instead of risking contention).
 static void __not_in_flash_func(core1_bus)(void) {
     save_and_disable_interrupts();
+    bool have_prev = false, prev_listened = false, given_up = false;
+    uint16_t prev_addr = 0;
+    uint32_t prev_log = LOG_N;
     for (;;) {
         uint32_t w = pio_sm_get_blocking(pio, sm_bus);
+        if (w >> 31) {  // snoop sample for the previous cycle
+            if (have_prev && prev_listened) {
+                snoop_img[prev_addr] = (uint8_t)w;
+                snoop_seen[prev_addr >> 5] |= 1u << (prev_addr & 31);
+            }
+            if (prev_log < LOG_N && !(cycle_log[prev_log].flags & LOG_DROVE))
+                cycle_log[prev_log].data = (uint8_t)w;
+            have_prev = false;
+            continue;
+        }
         if (assert_seen != assert_req) {
             assert_seen = assert_req;
             decode_assert_reset(&dec);
@@ -75,31 +94,37 @@ static void __not_in_flash_func(core1_bus)(void) {
             // from the moment RES rises
             decode_release_reset(&dec);
             log_count = 0;
+            given_up = false;
             gpio_set_dir(PIN_RES, GPIO_IN);
             release_seen = release_req;
         }
         uint16_t addr = (uint16_t)((w & 0xFFu) | (((w >> BUS_AHI_OFF) & 0xFFu) << 8));
         bool read = (w >> BUS_RW_OFF) & 1u;
         int d = decode_cycle(&dec, addr, read);
-        if (listen_only)
+        if (listen_only || given_up)
             d = DECODE_LISTEN;
-        pio_sm_put(pio, sm_bus, d < 0 ? 0u : (0xFF00u | (uint32_t)d));
-        uint32_t s = pio_sm_get_blocking(pio, sm_bus);
-        bus_cycles++;
         uint8_t flags = read ? LOG_READ : 0;
-        if (s == 0xFFFFFFFFu) {
-            flags |= LOG_LATE;
-            late_cycles++;
-        } else if (d >= 0) {
-            flags |= LOG_DROVE;
-            drive_cycles++;
-        } else if (read && !dec.in_reset) {
-            snoop_img[addr] = (uint8_t)s;
-            snoop_seen[addr >> 5] |= 1u << (addr & 31);
+        if (d >= 0) {
+            if (gpio_get(PIN_E) || !pio_sm_is_rx_fifo_empty(pio, sm_bus)) {
+                given_up = true;  // too late for this cycle: never drive again this run
+                late_cycles++;
+                flags |= LOG_LATE;
+                d = DECODE_LISTEN;
+            } else {
+                pio_sm_put(pio, sm_bus, 0xFF00u | (uint32_t)d);
+                drive_cycles++;
+                flags |= LOG_DROVE;
+            }
         }
+        bus_cycles++;
+        have_prev = true;
+        prev_addr = addr;
+        prev_listened = d < 0 && read && !dec.in_reset;
         uint32_t n = log_count;
+        prev_log = LOG_N;
         if (n < LOG_N) {
-            cycle_log[n] = (cycle_log_t){addr, d >= 0 ? (uint8_t)d : (uint8_t)s, flags};
+            cycle_log[n] = (cycle_log_t){addr, d >= 0 ? (uint8_t)d : 0u, flags};
+            prev_log = n;
             log_count = n + 1;
         }
     }
@@ -201,7 +226,7 @@ static void pio_init_all(void) {
     pio_sm_set_pins_with_mask64(pio, sm_bus, 0, 0xFFull << PIN_AD0);
     pio_sm_set_pindirs_with_mask64(pio, sm_bus, 0, 0xFFull << PIN_AD0);
     pio_sm_init(pio, sm_bus, off, &c);
-    pio_sm_put(pio, sm_bus, (uint32_t)(SNOOP_DELAY_NS * (sys / 1e9f)));
+    pio_sm_put(pio, sm_bus, (uint32_t)(SNOOP_DELAY_NS * (sys / 1e9f) / 2.0f));  // 2 clocks per pass
 
     pio_sm_set_enabled(pio, sm_sci, true);
     pio_sm_set_enabled(pio, sm_bus, true);
@@ -256,7 +281,9 @@ static bool start_run(const uint8_t *page, bool drive) {
     memset(snoop_seen, 0, sizeof snoop_seen);
     while (!pio_sm_is_rx_fifo_empty(pio, sm_sci))
         (void)pio_sm_get(pio, sm_sci);
-    dec.page = page;
+    if (page)
+        memcpy(serve_page, page, sizeof serve_page);
+    dec.page = page ? serve_page : NULL;
     dec.vector = ROMDUMP_VECTOR;
     late_cycles = drive_cycles = 0;
     listen_only = !drive;
@@ -369,7 +396,27 @@ static void cmd_listen(void) {
     end_run();
     printf("listen: RES released for 5 ms with nothing driven.\n");
     print_log();
-    printf("Expect $FFFF, $FFFE, $FFFF near the start (the reset vector fetch).\n");
+    // With nothing driving, the vector reads float and echo the address low byte
+    // ($FE, $FF). Real data there means the chip drove its vector internally, so the
+    // reader must not serve it: probe and dump would collide with the chip.
+    int fffe = -1, fffe_at = -1;
+    for (uint32_t i = 0; i + 1 < log_count && i < LOG_N - 1; i++)
+        if (cycle_log[i].addr == 0xFFFE && cycle_log[i + 1].addr == 0xFFFF) {
+            fffe = cycle_log[i].data << 8 | cycle_log[i + 1].data;
+            fffe_at = (int)i;
+            break;
+        }
+    if (fffe < 0)
+        printf("listen: no $FFFE/$FFFF fetch seen -> FAIL (check AS, E, R/W, RES and the straps)\n");
+    else if (fffe_at >= (int)VECTOR_WINDOW)
+        printf("listen: vector fetch at cycle %d, after the %u-cycle window -> STOP, send this log to the agent\n",
+               fffe_at, VECTOR_WINDOW);
+    else if (fffe == 0xFEFF)
+        printf("listen: vector fetch at cycle %d reads $FEFF (floating bus, external as expected) -> PASS\n", fffe_at);
+    else
+        printf("listen: vector fetch at cycle %d reads $%04X, not the floating $FEFF -> STOP: do not run probe;\n"
+               "        the chip may be driving its vector internally (wrong mode?). Send this log to the agent.\n",
+               fffe_at, fffe);
 }
 
 static uint8_t probe_page[256];
@@ -437,7 +484,7 @@ static void cmd_dump(void) {
     uint mode = runs[0][0] >> 5;
     bool same = !memcmp(runs[0], runs[1], len + 1) && !memcmp(runs[0], runs[2], len + 1);
     uint32_t seen = 0, agree = 0, sum = 0;
-    for (uint32_t i = 0; i < len; i++) {
+    for (uint32_t i = 0; i < len - 1; i++) {  // $FFFF: dummy cycles overwrite its snoop
         uint32_t a = ROMDUMP_START + i;
         if (snoop_seen[a >> 5] & (1u << (a & 31))) {
             seen++;
@@ -447,8 +494,8 @@ static void cmd_dump(void) {
     for (uint32_t i = 0; i < len; i += 2)
         sum += (uint32_t)(rom[i] << 8 | rom[i + 1]);
     printf("mode %u (want 0), runs identical: %s\n", mode, same ? "yes" : "NO");
-    printf("snoop channel: %lu of %lu bytes seen, %lu agree with the SCI copy\n", (unsigned long)seen,
-           (unsigned long)len, (unsigned long)agree);
+    printf("snoop channel: %lu of %lu bytes seen, %lu agree with the SCI copy ($FFFF not compared)\n",
+           (unsigned long)seen, (unsigned long)(len - 1), (unsigned long)agree);
     printf("word sum $%04lX (the Bluetop convention is $AA55)\n", (unsigned long)(sum & 0xFFFF));
     printf("vectors:");
     for (uint32_t a = 0xFFF0; a < 0x10000; a += 2)

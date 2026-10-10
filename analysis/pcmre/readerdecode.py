@@ -13,7 +13,7 @@ the data bus with more than one device"):
 - Never in $0000-$00FF (on-chip registers and RAM; in modes 0/2 the port registers
   $04-$07 and $0F are external, but the dump program never touches them).
 - Never in $F000-$FFFF, except for the reset vector: $FFFE, then $FFFF straight after
-  it, within the first ``VECTOR_WINDOW`` bus cycles after RES rises. In mode 0 the
+  it, both within the first ``VECTOR_WINDOW`` bus cycles after RES rises. In mode 0 the
   vectors are external only for those few cycles. After that the window locks shut
   until the next reset.
 - Drive only reads of page $C0xx, from the program image.
@@ -23,7 +23,7 @@ Everything else is listened to (the snoop channel).
 
 from __future__ import annotations
 
-VECTOR_WINDOW = 3  # bus cycles after RES rises: $FFFF (dummy), $FFFE, $FFFF
+VECTOR_WINDOW = 3  # bus cycles after RES rises: $FFFF (dummy), $FFFE, $FFFF. Never raise it.
 PROGRAM_PAGE = 0xC0
 
 
@@ -63,7 +63,7 @@ class ReaderDecode:
             if addr == 0xFFFE and n < VECTOR_WINDOW:
                 self.last_drove_fffe = True
                 return self.vector >> 8
-            if addr == 0xFFFF and follows_fffe:
+            if addr == 0xFFFF and follows_fffe and n < VECTOR_WINDOW:
                 self.locked = True
                 return self.vector & 0xFF
             if n >= VECTOR_WINDOW:

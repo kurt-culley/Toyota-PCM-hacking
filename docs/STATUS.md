@@ -110,6 +110,21 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
 - [x] 6301 dump program ([`../hardware/rp2350-reader/6301/`](../hardware/rp2350-reader/6301/)): in the emulator against `cap.bin` it sends the mode byte then the ROM exactly, with no stack use, no contention and no TDRE violation [EMU:tests/test_romdump.py].
 - [x] RP2350 reader firmware ([`../hardware/rp2350-reader/firmware/`](../hardware/rp2350-reader/firmware/)): builds warning-free for the BB48R and the Pico 2 W(H) (pico-sdk 2.1.1); CI uploads both UF2s. Its decode rule matches the Python model [EMU:tests/test_reader_decode_c.py]. Not yet run on hardware.
 - [x] Host capture tool `analysis/pcmre/romcapture.py` [EMU:tests/test_romcapture.py].
+- **Firmware Verifier (independent agent, 2026-10-10): FAIL, all findings fixed; re-review pending.**
+  - **Blocker:** a late core-1 answer could be driven past E falling, or into a later cycle. Fixed in the PIO and core 1:
+    - the answer must be queued before E rises, or the cycle is listen-only;
+    - stale answers are discarded at the start of each cycle;
+    - the bus is released early if E falls during the snoop delay;
+    - FIFO words are tagged, so core 1 cannot lose its place;
+    - core 1 stops driving for the rest of a run once it is late;
+    - the served pages are in RAM.
+  - **Major:** `$FFFF` was served after `$FFFE` without a window bound. Now bounded (tested). `listen` now checks that the vector reads float (external) and says STOP otherwise. The guide no longer invites changing the window.
+  - **Minor:**
+    - `romcapture` refuses non-`$F000` images;
+    - `$FFFF` is excluded from the snoop comparison (6301 dummy cycles);
+    - the guide stresses "chip out" for `rigcheck`, adds a RES-level and rail check, and makes pull-ups for the unused port pins optional;
+    - "43-byte" program.
+  - **Accepted:** the release lags E falling by about 3 PIO clocks (~20 ns at 2 mA drive). Input-sync bypass is not used, because the RP2350 register's mapping under a GPIO base of 16 is not documented. The emulator does not model the 6301's dummy `$FFFF` cycles. No test covers PIO or core-1 timing; the hardware `listen`/`probe` steps cover it.
 - [x] Reader guide with wiring pictures, multimeter checklist, bring-up and troubleshooting ([`hardware/rp2350_reader_guide.md`](hardware/rp2350_reader_guide.md)); its tables are generated from `pins.h` and checked by `tests/test_wiring.py`.
 - [ ] Carrier PCB (KiCad, factory-assembled).
 - [ ] Chip removed from the spare ECU, socket fitted.

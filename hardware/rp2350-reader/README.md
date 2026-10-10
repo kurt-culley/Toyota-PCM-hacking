@@ -4,7 +4,7 @@ Reads the internal ROM of the HD6301V1 / D151801 in mode 0. Build and use: [`../
 
 | Path | Contents |
 |---|---|
-| `6301/romdump.asm`, `romsize.asm` | The 42-byte program the reader serves at `$C0C0` (asl). `python -m pcmre.romdump --write` regenerates `firmware/src/romdump.h` from them |
+| `6301/romdump.asm`, `romsize.asm` | The 43-byte program the reader serves at `$C0C0` (asl). `python -m pcmre.romdump --write` regenerates `firmware/src/romdump.h` from them |
 | `firmware/` | C, pico-sdk ≥ 2.1, PIO. `pins.h` is the single pin map for both boards; `decode.h` is the drive/listen rule |
 | `../../analysis/pcmre/readerdecode.py` | Python model of `decode.h` |
 | `../../analysis/pcmre/romcapture.py` | Host side: runs `dump`, saves and checks the ROM |

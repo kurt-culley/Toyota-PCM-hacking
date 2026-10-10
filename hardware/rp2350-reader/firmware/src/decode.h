@@ -5,7 +5,9 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define VECTOR_WINDOW 3u  // bus cycles after RES rises: $FFFF (dummy), $FFFE, $FFFF
+// Bus cycles after RES rises: $FFFF (dummy), $FFFE, $FFFF. The handbook allows "3 or 4";
+// 3 is the safe reading. Never raise it: outside the window the vector is internal.
+#define VECTOR_WINDOW 3u
 #define PROGRAM_PAGE 0xC0u
 #define DECODE_LISTEN (-1)
 
@@ -54,7 +56,7 @@ static inline int decode_cycle(decode_t *d, uint16_t addr, bool read) {
             d->last_drove_fffe = true;
             return d->vector >> 8;
         }
-        if (addr == 0xFFFF && follows_fffe) {
+        if (addr == 0xFFFF && follows_fffe && n < VECTOR_WINDOW) {
             d->locked = true;
             return d->vector & 0xFF;
         }

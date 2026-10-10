@@ -233,3 +233,12 @@ def test_header_is_current():
 
 def test_programs_listed():
     assert set(PROGRAMS) == {"romdump", "romsize"}
+
+
+def test_ffff_after_late_fffe_not_driven():
+    """$FFFE at the last window cycle: the $FFFF after it would be outside the window."""
+    r = fresh()
+    r.cycle(0x0000, True)
+    r.cycle(0x0000, True)
+    assert r.cycle(0xFFFE, True) == 0xC0  # cycle 2: inside
+    assert r.cycle(0xFFFF, True) is None  # cycle 3: outside

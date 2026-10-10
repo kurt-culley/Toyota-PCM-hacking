@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from pcmre.romcapture import console_section, parse_intel_hex, report, save
+from pcmre.romcapture import check_dump_image, console_section, parse_intel_hex, report, save
 from pcmre.roundtrip import ROOT
 
 CAP = (ROOT / "TOYOTA Bluetop PCM/cap.bin").read_bytes()
@@ -57,3 +57,9 @@ def test_never_overwrites_different_dump(tmp_path):
     assert (tmp_path / "x.bin.sha256").read_text().endswith("  x.bin\n")
     with pytest.raises(SystemExit, match="not overwriting"):
         save(CAP[:-1] + bytes([CAP[-1] ^ 1]), out)
+
+
+def test_size_image_not_saved_as_rom():
+    check_dump_image(0xF000, CAP)
+    with pytest.raises(SystemExit, match="not saved"):
+        check_dump_image(0xE000, bytes(0x1000) + CAP)

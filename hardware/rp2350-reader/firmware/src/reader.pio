@@ -4,37 +4,47 @@
 ; bus6301: one pass per 6301 bus cycle (multiplexed bus, E = 250 kHz).
 ;   in_base  = BUS_BASE (pins.h layout: AD +0..7, A8-15 +10..17, AS +18, E +19, R/W +20)
 ;   out_base = AD0, 8 pins;  jmp_pin = E
-;   Y        = snoop delay after E rises (loop passes), loaded once at start.
-; Per cycle it pushes two words to the CPU: the address sample (21 bits) at AS falling,
-; then the snoop sample (AD0-7 read while E is high, or all ones if the CPU answered too
-; late). The CPU answers each address with one word: bits 0-7 data, bits 8-15 pin
-; directions (0x00 listen, 0xFF drive). The bus is always released when E falls, and
-; nothing is driven if the answer arrives after E has already fallen.
+;   Y        = snoop delay after E rises (2 PIO clocks per pass), loaded once at start.
+;
+; Words to the CPU, tagged by bit 31:
+;   address sample, bit 31 = 0: the 21 bus pins at AS falling;
+;   snoop sample,   bit 31 = 1: 0xFFFFFF00 | AD0-7 read while E is high.
+; Words from the CPU: bits 0-7 data, bits 8-15 pin directions (0xFF = drive). The CPU
+; sends a word only for a cycle it wants driven.
+;
+; Fail-safe rules:
+;   - The answer must already be waiting when E rises; if not, the cycle is listen-only
+;     (`pull noblock` with X = 0). The CPU never sends an answer once it is late.
+;   - Any answer still queued when the next cycle starts (AS high) is thrown away, so an
+;     answer can never be used in a later cycle.
+;   - The bus is released when E falls, even if that happens during the snoop delay
+;     (the snoop sample is then skipped).
 ; ---------------------------------------------------------------------------------------
 .program bus6301
     pull block
     mov y, osr
-cycle:
 .wrap_target
-    wait 1 pin 18           ; AS high (address phase)
+    wait 1 pin 18           ; AS high: a new cycle begins
+    pull noblock            ; discard any stale answer
     wait 0 pin 18           ; AS falls: AD0-7 hold the low address byte
     in pins, 21
     push noblock
+    mov x, null             ; default answer: listen
     wait 1 pin 19           ; E rises: data phase
-    pull block              ; the CPU's answer
-    jmp pin in_time         ; E still high?
-    mov isr, ~null          ; too late: drive nothing, flag it
-    push noblock
-    jmp cycle
-in_time:
+    pull noblock            ; the CPU's answer if it is already here, else 0
     out pins, 8             ; data value
     out pindirs, 8          ; 0xFF drives, 0x00 keeps listening
     mov x, y
 delay:
+    jmp pin hold            ; E still high?
+    jmp release             ; E fell early: release now, no snoop sample
+hold:
     jmp x-- delay
-    in pins, 8              ; snoop sample
+    mov isr, ~null
+    in pins, 8              ; snoop sample: 0xFFFFFF00 | AD0-7
     push noblock
     wait 0 pin 19           ; E falls: the 6301 latches read data here
+release:
     out pindirs, 8          ; release (OSR bits 16-23 are zero)
 .wrap
 

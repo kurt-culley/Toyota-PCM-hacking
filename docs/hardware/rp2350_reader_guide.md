@@ -5,7 +5,7 @@ This guide takes the spare 89661-17140 ECU's CPU (IC7, the D151801-7110) from th
 How it works is in [RE_PLAN §6a](../RE_PLAN.md#6a-rp2350-rom-reader-p3). In short, the RP2350 does four jobs:
 - clocks the chip;
 - holds it in reset until its clock is steady;
-- serves it a 42-byte program;
+- serves it a 43-byte program;
 - receives the ROM over the chip's own serial port, while also listening to the bus as a second copy.
 
 **Parts:** [`../../hardware/BOM.md`](../../hardware/BOM.md) section A.
@@ -160,6 +160,8 @@ The 5 V jumper runs from Pico pin 40 (VBUS) to the 5 V rail.
 
 The 10 µF capacitor is polarised: its + leg goes to pin 21 (the 5 V side). Keep the two capacitors' legs short.
 
+The unused port pins (11, 13–20) are CMOS inputs left open. That is safe for short runs. If you have spare resistors, 47–100 kΩ from each to the 5 V rail keeps them quiet; never tie them straight to a rail.
+
 ## 4. Multimeter checklist (nothing powered)
 
 The agent goes through this with you **one line at a time**. Report each reading before moving on.
@@ -175,6 +177,8 @@ The agent goes through this with you **one line at a time**. Report each reading
 6. **Polarity:** the 10 µF + leg is on the pin 21 side.
 
 ## 5. `rigcheck` (USB only, no chip, 5 V jumper out)
+
+**The chip must be out of the breadboard.** `rigcheck` cannot tell an unpowered chip from an empty socket, and its pull-ups would feed the chip through its input diodes.
 
 Plug in USB and type `rigcheck`. It pulls every bus line up gently, then pulls each one low in turn, looking for lines stuck low or shorted together.
 
@@ -199,9 +203,17 @@ clock: PASS
 
 E is the chip's own output at EXTAL/4, so this proves the chip is powered and clocked. This measurement replaces a scope.
 
+With the meter, check the 5 V rail at chip pin 21 (4.75–5.25 V). RES (pin 6) reads near 0 V now, because the reader holds it low.
+
 ### `listen`
 
-RES is released for 5 ms while the reader **drives nothing**. The log shows the chip's first bus cycles. Look for `$FFFF`, `$FFFE`, `$FFFF` near the top: the reset-vector fetch. After that the chip is reading floating values, which is harmless. Send the agent the whole log.
+RES is released for 5 ms while the reader **drives nothing**. The log shows the chip's first bus cycles: `$FFFF`, `$FFFE`, `$FFFF` near the top is the reset-vector fetch. After that the chip runs from a floating vector, which is harmless because nothing is driven. Send the agent the whole log.
+
+```
+listen: vector fetch at cycle 1 reads $FEFF (floating bus, external as expected) -> PASS
+```
+
+With nothing driving, the vector reads float and echo the address bus (`$FE`, `$FF`). This is the check that the vector really is external in mode 0. **If it says STOP, do not run `probe` or `dump`**: the chip may be driving its vector itself, and serving it would make both chips drive the bus. Send the log to the agent.
 
 ### `probe`
 
@@ -222,7 +234,7 @@ PYTHONPATH=analysis uv run --with pyserial python -m pcmre.romcapture <port>
 The reader runs the dump **three times** (about 3 s each). It checks four things before printing the ROM:
 - the latched mode is 0;
 - all three runs are identical;
-- how much of the snoop channel agrees;
+- how much of the snoop channel agrees (`$FFFF` is not compared: the 6301's dummy cycles read it too);
 - the 16-bit word sum and the vectors.
 
 The tool then:
@@ -239,10 +251,11 @@ Then type `size` in the terminal. It reports whether `$E000`–`$EFFF` is also i
 |---|---|---|
 | `clock` reports 0 Hz | 5 V jumper out; chip not seated; EXTAL not reaching pin 3 | Check the jumper, then the multimeter checklist steps 1–4 for pins 3, 21 and 1 |
 | `clock` frequency is wrong, or E is high nearly all the time | EXTAL pull-up missing or wrong value; XTAL (pin 2) wired by mistake | 470 Ω from pin 3 to the rail; pin 2 open |
-| `listen` shows no cycles | AS (39) or E (40) not wired; RES not rising | Check pins 39, 40 and 6, and the 10 kΩ RES pull-up |
+| `listen` shows no cycles | AS (39) or E (40) not wired; RES not rising | Check pins 39, 40 and 6, and the 10 kΩ RES pull-up. RES must reach 4.5 V when released; if it does not, the agent will have you swap its pull-up to 4.7 kΩ |
+| `listen` says STOP | The vector did not float, or came late | Do not run `probe` or `dump`. Send the log to the agent |
 | `listen` shows endless odd activity, never `$FFFE` | Wrong mode: a strap missing (upstream issue #4) | Pins 8, 9 and 10 each 10 kΩ to GND |
-| `probe` FAIL with `$FFFE` at cycle 3 or later | The chip takes longer after reset than the handbook window | Send the log to the agent; the window is one constant in the firmware |
-| `late cycles` above 0 | The RP2350 answered after E fell; nothing was driven | Report it; it should never happen at 250 kHz |
+| `probe` FAIL with `$FFFE` at cycle 3 or later | The chip fetches its vector later than the handbook's window | Send the log to the agent. Do not change the window: outside it, the vector is internal |
+| `late cycles` above 0 | The RP2350 could not answer before E rose; it stopped driving for the rest of that run, so the run fails | Report it; it should never happen at 250 kHz |
 | `wrong mode` in `dump` | A mode strap is wrong | As for "endless odd activity" |
 | `runs differ` | A loose wire or a marginal connection | Re-seat the chip and jumpers, then repeat; never accept a dump that differs |
 | `ABORT: bus stopped` | The 5 V jumper came out, or the chip lost its clock | RES is already held low; check the jumper and wiring |

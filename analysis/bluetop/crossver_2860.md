@@ -77,6 +77,118 @@ From the reset routine's initialisation table (0642 `$FFAF`, 2860 `$FFAE`), comp
 | `$4C` | `$4C` | byte_4C | — | `$02` |
 | `$54` | `$54` | ADC_TPS | `$73` | `$99` |
 
+## 16-bit operands that differ
+
+The alignment ignores 16-bit operands, so every aligned pair whose operand differs is listed here. **Changed constant** means no move explains it: a behaviour change.
+
+| 0642 | 2860 | Routine (0642) | Instruction | 0642 | 2860 | Explanation |
+|---|---|---|---|---|---|---|
+| `$F01B` | `$F01B` | reset | ldx | `$6081` | `$6F81` | **changed constant** |
+| `$F020` | `$F020` | reset | ldx | `$EE12` | `$FE12` | **changed constant** |
+| `$F025` | `$F025` | reset | jsr | `$FC6E` | `$FC73` | code pointer, follows its target |
+| `$F036` | `$F036` | reset | ldx | `$FFAE` | `$FFAD` | RAM-init table pointer |
+| `$F052` | `$F052` | reset | jsr | `$FA9B` | `$FAA0` | code pointer, follows its target |
+| `$F067` | `$F067` | reset | ldd | `$EE12` | `$FE12` | **changed constant** |
+| `$F06C` | `$F06C` | reset | ldx | `$6081` | `$6F81` | **changed constant** |
+| `$F0A3` | `$F0A3` | reset | jsr | `$FAA7` | `$FAAC` | code pointer, follows its target |
+| `$F0CE` | `$F0CE` | reset | jsr | `$FD11` | `$FD15` | code pointer, follows its target |
+| `$F0DC` | `$F0DB` | reset | jsr | `$FB46` | `$FB4B` | code pointer, follows its target |
+| `$F0F7` | `$F0F2` | reset | jsr | `$FD41` | `$FD45` | code pointer, follows its target |
+| `$F0FA` | `$F0F5` | reset | jsr | `$F96A` | `$F968` | code pointer, follows its target |
+| `$F105` | `$F100` | reset | jsr | `$F420` | `$F41B` | code pointer, follows its target |
+| `$F108` | `$F103` | reset | jsr | `$F814` | `$F80D` | code pointer, follows its target |
+| `$F113` | `$F10E` | reset | jsr | `$F534` | `$F52F` | code pointer, follows its target |
+| `$F1BE` | `$F1B9` | IRQinpcap | jmp | `$F242` | `$F23D` | code pointer, follows its target |
+| `$F1FF` | `$F1FA` | IRQinpcap | jsr | `$F6E9` | `$F6E4` | code pointer, follows its target |
+| `$F21E` | `$F219` | IRQinpcap | jsr | `$F131` | `$F12C` | code pointer, follows its target |
+| `$F23A` | `$F235` | IRQinpcap | jsr | `$F194` | `$F18F` | code pointer, follows its target |
+| `$F23E` | `$F239` | IRQinpcap | jsr | `$F138` | `$F133` | code pointer, follows its target |
+| `$F2F5` | `$F2F0` | IRQinpcap | jsr | `$F3B9` | `$F3B4` | code pointer, follows its target |
+| `$F2F8` | `$F2F3` | IRQinpcap | jsr | `$F17A` | `$F175` | code pointer, follows its target |
+| `$F3A9` | `$F3A4` | IRQoutcmp | jsr | `$F952` | `$F950` | code pointer, follows its target |
+| `$F3AC` | `$F3A7` | IRQoutcmp | jsr | `$F28F` | `$F28A` | code pointer, follows its target |
+| `$F3D7` | `$F3D2` | IRQoutcmp | jsr | `$F17A` | `$F175` | code pointer, follows its target |
+| `$F3E4` | `$F3DF` | IRQSerial | jsr | `$FB18` | `$FB1D` | code pointer, follows its target |
+| `$F43A` | `$F435` | sub_F420 | ldx | `$FF98` | `$FF97` | helper pointer: `$FF,x` reaches RAM `$97`, which moved to `$96` |
+| `$F443` | `$F43E` | sub_F420 | jsr | `$FD11` | `$FD15` | code pointer, follows its target |
+| `$F446` | `$F441` | sub_F420 | ldx | `$FC81` | `$FC86` | code pointer, follows its target |
+| `$F454` | `$F44F` | sub_F420 | ldx | `$FEF9` | `$FF14` | pointer to `rpm_reciprocal`, which moved |
+| `$F459` | `$F454` | sub_F420 | jsr | `$FC7D` | `$FC82` | code pointer, follows its target |
+| `$F46D` | `$F468` | sub_F420 | jsr | `$F5E3` | `$F5DE` | code pointer, follows its target |
+| `$F48A` | `$F485` | sub_F420 | jsr | `$F5E2` | `$F5DD` | code pointer, follows its target |
+| `$F49F` | `$F49A` | sub_F420 | jsr | `$F5E3` | `$F5DE` | code pointer, follows its target |
+| `$F4B3` | `$F4AE` | sub_F420 | jsr | `$FB43` | `$FB48` | code pointer, follows its target |
+| `$F4C6` | `$F4C1` | sub_F420 | jsr | `$FB46` | `$FB4B` | code pointer, follows its target |
+| `$F4D3` | `$F4CE` | sub_F420 | jsr | `$F119` | `$F114` | code pointer, follows its target |
+| `$F4DF` | `$F4DA` | sub_F420 | jsr | `$F11A` | `$F115` | code pointer, follows its target |
+| `$F534` | `$F52F` | loc_F534 | jsr | `$F119` | `$F114` | code pointer, follows its target |
+| `$F53F` | `$F53A` | loc_F534 | jsr | `$F11A` | `$F115` | code pointer, follows its target |
+| `$F552` | `$F54D` | loc_F534 | jsr | `$F6FC` | `$F6F7` | code pointer, follows its target |
+| `$F563` | `$F55E` | loc_F534 | ldx | `$FEB6` | `$FED8` | pointer to `thw_FEB6`, which moved |
+| `$F56A` | `$F565` | loc_F534 | ldx | `$FEC4` | `$FEE6` | pointer to `thw_FEC4`, which moved |
+| `$F579` | `$F574` | loc_F534 | ldx | `$FECB` | `$FEA0` | pointer to `thw_FECB`, which moved |
+| `$F584` | `$F57F` | loc_F534 | ldx | `$FE9C` | `$FEBF` | pointer to `se056_max`, which moved |
+| `$F589` | `$F584` | loc_F534 | jsr | `$FC7C` | `$FC81` | code pointer, follows its target |
+| `$F593` | `$F58E` | loc_F534 | jsr | `$F6FC` | `$F6F7` | code pointer, follows its target |
+| `$F598` | `$F593` | loc_F534 | ldx | `$FED2` | `$FEED` | pointer to `thw_FED2`, which moved |
+| `$F59E` | `$F599` | loc_F534 | jsr | `$F6E3` | `$F6DE` | code pointer, follows its target |
+| `$F5CB` | `$F5C6` | loc_F534 | jmp | `$F673` | `$F66E` | code pointer, follows its target |
+| `$F6B3` | `$F6AE` | loc_F534 | ldx | `$FF9D` | `$FF9C` | helper pointer: `$FF,x` reaches RAM `$9C`, which moved to `$9B` |
+| `$F6B8` | `$F6B3` | loc_F534 | jsr | `$F7BE` | `$F7B9` | code pointer, follows its target |
+| `$F714` | `$F70F` | sub_F70A | jsr | `$F5E1` | `$F5DC` | code pointer, follows its target |
+| `$F744` | `$F73F` | sub_F70A | jsr | `$FB46` | `$FB4B` | code pointer, follows its target |
+| `$F771` | `$F76C` | sub_F751 | jsr | `$FB46` | `$FB4B` | code pointer, follows its target |
+| `$F77F` | `$F77A` | sub_F751 | jsr | `$FB46` | `$FB4B` | code pointer, follows its target |
+| `$F7E7` | `$F7E0` | Calc76 | ldx | `$FF9C` | `$FEAC` | pointer to `pwr_o2_trim`, which moved |
+| `$F7EE` | `$F7E7` | Calc76 | ldx | `$F7A6` | `$F7A1` | pointer to a data block that moved (first 4 bytes identical) |
+| `$F830` | `$F82C` | BeginCalcADV | jsr | `$FB43` | `$FB48` | code pointer, follows its target |
+| `$F840` | `$F83C` | BeginCalcADV | jsr | `$FB46` | `$FB4B` | code pointer, follows its target |
+| `$F869` | `$F869` | BeginCalcADV | jmp | `$F8F0` | `$F8EE` | code pointer, follows its target |
+| `$F880` | `$F880` | BeginCalcADV | ldx | `$FF40` | `$FF5A` | pointer to `ign_base`, which moved |
+| `$F88A` | `$F88A` | BeginCalcADV | jsr | `$FF28` | `$FF42` | code pointer, follows its target |
+| `$F891` | `$F891` | BeginCalcADV | jsr | `$FF28` | `$FF42` | code pointer, follows its target |
+| `$F89A` | `$F89A` | BeginCalcADV | jsr | `$FF35` | `$FF4F` | code pointer, follows its target |
+| `$F8A5` | `$F8A5` | BeginCalcADV | ldx | `$FF94` | `$FEA4` | pointer to `pwr_ign_trim`, which moved |
+| `$F8B1` | `$F8B1` | BeginCalcADV | jsr | `$FB46` | `$FB4B` | code pointer, follows its target |
+| `$F8E2` | `$F8E2` | BeginCalcADV | jsr | `$F5E3` | `$F5DE` | code pointer, follows its target |
+| `$F8E6` | `$F8E6` | BeginCalcADV | jsr | `$FB46` | `$FB4B` | code pointer, follows its target |
+| `$F8F5` | `$F8F3` | BeginCalcADV | jsr | `$FC7D` | `$FC82` | code pointer, follows its target |
+| `$F8FC` | `$F8FA` | BeginCalcADV | jsr | `$F6E9` | `$F6E4` | code pointer, follows its target |
+| `$F94D` | `$F94B` | BeginCalcADV | jsr | `$F28F` | `$F28A` | code pointer, follows its target |
+| `$F987` | `$F985` | sub_F96A | jsr | `$FB46` | `$FB4B` | code pointer, follows its target |
+| `$F9DF` | `$F9DD` | sub_F96A | jsr | `$F751` | `$F74C` | code pointer, follows its target |
+| `$F9EC` | `$F9EA` | sub_F96A | ldx | `$F7A2` | `$F79D` | pointer to a data block that moved (first 4 bytes identical) |
+| `$F9F4` | `$F9F2` | sub_F96A | jsr | `$F6D4` | `$F6CF` | code pointer, follows its target |
+| `$FA22` | `$FA20` | sub_F96A | jsr | `$F121` | `$F11C` | code pointer, follows its target |
+| `$FA2E` | `$FA2C` | sub_F96A | jsr | `$F6BB` | `$F6B6` | code pointer, follows its target |
+| `$FA3B` | `$FA39` | sub_F96A | ldd | `$10FE` | `$10FC` | **changed constant** |
+| `$FA5A` | `$FA58` | sub_F96A | jsr | `$F129` | `$F124` | code pointer, follows its target |
+| `$FA9F` | `$FAA4` | procJmpTable | ldx | `$FD39` | `$FD3D` | pointer to a table of code pointers that moved (entries follow their targets) |
+| `$FAD0` | `$FAD5` | procJmpTable | ldx | `$FEF0` | `$FF0B` | pointer to `thw_linearise`, which moved |
+| `$FAE0` | `$FAE5` | procJmpTable | jsr | `$FD02` | `$FD06` | code pointer, follows its target |
+| `$FAFB` | `$FB00` | procJmpTable | jsr | `$FD02` | `$FD06` | code pointer, follows its target |
+| `$FB61` | `$FB66` | jmptable2 | jsr | `$FD02` | `$FD06` | code pointer, follows its target |
+| `$FBB4` | `$FBB9` | jmptable2 | ldx | `$FEA7` | `$FED0` | pointer to `accel_enrich`, which moved |
+| `$FBC8` | `$FBCD` | jmptable2 | jsr | `$F6E9` | `$F6E4` | code pointer, follows its target |
+| `$FBCC` | `$FBD1` | jmptable2 | jsr | `$F121` | `$F11C` | code pointer, follows its target |
+| `$FBD7` | `$FBDC` | jmptable4 | ldx | `$FEE2` | `$FEFD` | pointer to `decel_cut_rpm`, which moved |
+| `$FBEA` | `$FBEF` | jmptable4 | jsr | `$FB46` | `$FB4B` | code pointer, follows its target |
+| `$FBF3` | `$FBF8` | jmptable4 | ldx | `$FED9` | `$FEF4` | pointer to `tha_corr`, which moved |
+| `$FBFA` | `$FBFF` | jmptable4 | ldx | `$FF0A` | `$FF25` | pointer to `thw_FF0A`, which moved |
+| `$FC06` | `$FC0B` | jmptable4 | jsr | `$FB46` | `$FB4B` | code pointer, follows its target |
+| `$FC0B` | `$FC10` | jmptable4 | ldx | `$FF11` | `$FF2B` | pointer to `overheat_adv`, which moved |
+| `$FC94` | `$FC98` | jmptable3 | ldx | `$FEE9` | `$FF04` | pointer to `inj_dead_time`, which moved |
+| `$FCA2` | `$FCA6` | jmptable3 | ldx | `$FF12` | `$FF2C` | pointer to `dwell_battery`, which moved |
+| `$FD41` | `$FD45` | sub_FD41 | ldx | `$FEAF` | `$FECA` | pointer to `thw_FEAF`, which moved |
+| `$FD48` | `$FD4C` | sub_FD41 | ldx | `$FEBD` | `$FEDF` | pointer to `thw_FEBD`, which moved |
+| `$FE48` | `$FE4C` | sub_FD41 | jsr | `$FC6E` | `$FC73` | code pointer, follows its target |
+| `$FE5F` | `$FE63` | sub_FD41 | jsr | `$FC6E` | `$FC73` | code pointer, follows its target |
+| `$FE90` | `$FE94` | sub_FD41 | jsr | `$FC6E` | `$FC73` | code pointer, follows its target |
+
+## 2860 data not accounted for
+
+None: every 2860 byte outside code is mapped from 0642.
+
 ## Code differences
 
 ### Behaviour-change candidates (17)

@@ -94,7 +94,15 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
 - [x] TunerPro RT XDF generated from the YAML ([`../analysis/bluetop/bluetop.xdf`](../analysis/bluetop/bluetop.xdf)) with display equations for advance, dead time, dwell and max airflow. **Not yet opened in TunerPro: owner check.**
   - Checksum helper [`../analysis/pcmre/checksum.py`](../analysis/pcmre/checksum.py): the word sum must be $AA55, balanced at $FFEE [ROM:$FE50].
   - A TunerStudio INI needs a comms protocol, so it moves to P7.
-- [x] Cross-version analysis 0642 against 2860 ([`bluetop/versions.md`](bluetop/versions.md), `pcmre.crossver`). The same program, revised: all 19 maps ported automatically and **identical**; same load-sensing chain; 9 behaviour changes (A/C idle advance gated by coolant ≥ 218 °F, stall-flag logic, a diagnostic rpm threshold 1000 → 1500, P1-5 high in safe states, …); 8 RAM variables moved. `cap4.bin` is a second capture of 2860. Generated 2860 defs, CSVs and XDF [EMU:test_crossver]. Not yet reviewed by a Verifier.
+- [x] Cross-version analysis 0642 against 2860 ([`bluetop/versions.md`](bluetop/versions.md), `pcmre.crossver`). The same program, revised: all 19 maps ported automatically and **identical**; a load-sensing chain consistent with the same sensor type (LIKELY). 9 behaviour changes:
+  - port direction registers (P1-4, P3-0 to P3-3 become outputs);
+  - stall-flag logic;
+  - the A/C idle advance kept only above 218 °F, i.e. removed in normal running;
+  - fault-flag `$10` rpm path 1000 → 1500 rpm;
+  - P1-5 high in the self-test failure paths;
+  - …
+
+  8 RAM variables moved. Generated 2860 defs, CSVs and XDF [EMU:test_crossver]. **Verifier (independent agent, 2026-10-10): FAIL.** It found the missed direction-register and STA-clear changes, a false "counter reload" change, and a misread A/C change. All are fixed: the tool now checks every differing 16-bit operand and 2860-only data, and hand-written byte tests were added. Re-check pending.
 - [x] Rev limiter mapped ([`bluetop/rev_limiter.md`](bluetop/rev_limiter.md)): a fuel-only cut after 6 passes above 7400 rpm, with no hysteresis. Constants: the limit word `$F434` and the reload byte `$F42C` (`$7E` is the maximum; `$7F` cuts fuel at every rpm) [EMU:test_rev_limiter].
 - [x] Spark-cut limiter prototype ([`../analysis/patches/bluetop_sparkcut.asm`](../analysis/patches/bluetop_sparkcut.asm), `pcmre.patch`): no dwell while limiting, fuel kept, IGF safety cut held off only while limiting, 38 bytes of code at `$E000` [EMU:test_sparkcut]. **Open:** whether hardware outside the CPU fires the coil when dwell is withheld at speed (bench, P8). Not yet reviewed by a Verifier.
 

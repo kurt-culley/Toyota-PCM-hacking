@@ -5,30 +5,30 @@
 # them (overlaps, evidence) are 0642 addresses; `addr` and `entry` are 2860's.
 rom: bluetop_2860
 file: TOYOTA Bluetop PCM/cap2-151801-2860.bin
-base: 61440
+base: 0xF000
 sha256: 7444a4747ffa02c64a296477b66d1fcad2e2af6ca0ac90dfec8f0fb6379034e6
 variables:
   RPMish:
-    addr: 100
+    addr: 0x0064
     unit: rpm index
     to_physical: rpm ~= (RPMish + 32) * 25 below RPMish 160 (4800 rpm); rpm ~= (RPMish - 64) * 50 above
     evidence: '[ROM:$F4B8 staa RPMish] [EMU:sweep of CalcRPM $F446 with deltaNE = 30e6/rpm]'
     confidence: LIKELY (assumes rpm = 30,000,000 / deltaNE, from the ROM's 7400 rpm rev-limit constant $0FD6)
   Load:
-    addr: 127
+    addr: 0x007F
     unit: us (air-temperature-corrected airflow delay)
     to_physical: Load = Calc72(SE056plstime) = 3/4 x + x*ThAcorr/512, x = SE056 delay after the NE edge in us; mass-flow
       meaning unknown until the SE056 is measured
     evidence: '[ROM:$F550-$F556, $F6FC-$F709] [EMU:tests/test_fuel_chain.py, tests/test_sim.py]'
     confidence: LIKELY (formula and unit); GUESS (airflow per stroke)
   ADC_ThW:
-    addr: 87
+    addr: 0x0057
     unit: degF (after the $FEF0 linearisation)
     to_physical: degC = (raw - 32) / 1.8
     evidence: '[ROM:$FAD3 ldx #$FEF0 / jsr $38,x; bounded to 241] [cap.asm comments ''water temp in fahrenheit'']'
     confidence: LIKELY
   ADC_12V:
-    addr: 85
+    addr: 0x0055
     unit: raw ADC
     to_physical: volts = raw * 25 / 255 (+B1 divided by 5, 5 V reference)
     evidence: '[ROM:$FC8F-$FCAF] [cap.asm comment ''+B1 terminal divided by 5'']'
@@ -37,7 +37,7 @@ maps:
 - id: ign_base
   category: Ignition
   name: Base ignition advance (3D)
-  addr: 65370
+  addr: 0xFF5A
   kind: 3d
   rows: 6
   cols: 14
@@ -99,9 +99,9 @@ maps:
 - id: thw_linearise
   category: Sensors
   name: Coolant sensor linearisation (raw ADC -> degF)
-  addr: 65291
+  addr: 0xFF0B
   kind: 1d
-  entry: 65346
+  entry: 0xFF42
   length: 17
   axis:
     var: raw coolant ADC
@@ -114,9 +114,9 @@ maps:
 - id: tha_corr
   category: Fuel
   name: Air temperature correction (ThAcorr)
-  addr: 65268
+  addr: 0xFEF4
   kind: 1d
-  entry: 65343
+  entry: 0xFF3F
   length: 9
   axis:
     var: ADC_ThA
@@ -131,9 +131,9 @@ maps:
 - id: inj_dead_time
   category: Fuel
   name: Injector dead time vs battery voltage (last 2 cells overlap $FEF0)
-  addr: 65284
+  addr: 0xFF04
   kind: 1d
-  entry: 65343
+  entry: 0xFF3F
   length: 9
   axis:
     var: ADC_12V - $53 (0 below 8.1 V)
@@ -153,9 +153,9 @@ maps:
 - id: dwell_battery
   category: Ignition
   name: Coil dwell term vs battery voltage (first cell shared with $FF11)
-  addr: 65324
+  addr: 0xFF2C
   kind: 1d
-  entry: 65343
+  entry: 0xFF3F
   length: 9
   axis:
     var: ADC_12V
@@ -172,9 +172,9 @@ maps:
 - id: se056_max
   category: Fuel
   name: Maximum airflow delay (SE056Maxtime) vs engine speed
-  addr: 65215
+  addr: 0xFEBF
   kind: 1d
-  entry: 65351
+  entry: 0xFF47
   length: 11
   axis:
     var: FullRPM high byte (about rpm/800)
@@ -204,9 +204,9 @@ maps:
 - id: accel_enrich
   category: Fuel
   name: Acceleration enrichment vs throttle opening rate
-  addr: 65232
+  addr: 0xFED0
   kind: 1d
-  entry: 65349
+  entry: 0xFF45
   length: 8
   axis:
     var: TPS rise byte_5D - byte_5A, bounded 4..$1C
@@ -229,9 +229,9 @@ maps:
 - id: overheat_adv
   category: Ignition
   name: Over-temperature ignition retard (ThW_tADV when hot; cells 1-2 shared with $FF12)
-  addr: 65323
+  addr: 0xFF2B
   kind: 1d
-  entry: 65348
+  entry: 0xFF44
   length: 3
   axis:
     var: ADC_ThW - 218 F, bounded 0..15
@@ -252,7 +252,7 @@ maps:
 - id: pwr_ign_trim
   category: Ignition
   name: Ignition trim selected by the PWRr input (8-step staircase, no interpolation)
-  addr: 65188
+  addr: 0xFEA4
   kind: step
   length: 8
   axis:
@@ -269,7 +269,7 @@ maps:
 - id: pwr_o2_trim
   category: Fuel
   name: O2-loop value selected by the PWRr input (8-step staircase)
-  addr: 65196
+  addr: 0xFEAC
   kind: step
   length: 8
   axis:
@@ -285,9 +285,9 @@ maps:
 - id: decel_cut_rpm
   category: Fuel
   name: Decel fuel-cut rpm vs coolant temperature
-  addr: 65277
+  addr: 0xFEFD
   kind: 1d
-  entry: 65333
+  entry: 0xFF35
   length: 7
   axis:
     var: ADC_ThW
@@ -304,9 +304,9 @@ maps:
 - id: rpm_reciprocal
   category: Sensors
   name: Reciprocal table used to compute FullRPM from the NE period
-  addr: 65300
+  addr: 0xFF14
   kind: 1d
-  entry: 65351
+  entry: 0xFF47
   length: 17
   axis:
     var: normalised deltaNE (A = segment
@@ -320,9 +320,9 @@ maps:
 - category: Coolant
   id: thw_FEAF
   name: Coolant table $FEAF -> byte_83
-  addr: 65226
+  addr: 0xFECA
   kind: 1d
-  entry: 65333
+  entry: 0xFF35
   length: 7
   axis:
     var: ADC_ThW
@@ -335,9 +335,9 @@ maps:
 - category: Coolant
   id: thw_FEB6
   name: Coolant table $FEB6 -> byte_84
-  addr: 65240
+  addr: 0xFED8
   kind: 1d
-  entry: 65333
+  entry: 0xFF35
   length: 7
   axis:
     var: ADC_ThW
@@ -350,9 +350,9 @@ maps:
 - category: Coolant
   id: thw_FEBD
   name: Coolant table $FEBD -> byte_8B
-  addr: 65247
+  addr: 0xFEDF
   kind: 1d
-  entry: 65333
+  entry: 0xFF35
   length: 7
   axis:
     var: ADC_ThW
@@ -365,9 +365,9 @@ maps:
 - category: Coolant
   id: thw_FEC4
   name: Coolant table $FEC4 -> word_8C
-  addr: 65254
+  addr: 0xFEE6
   kind: 1d
-  entry: 65333
+  entry: 0xFF35
   length: 7
   axis:
     var: ADC_ThW
@@ -380,9 +380,9 @@ maps:
 - category: Coolant
   id: thw_FECB
   name: Coolant table $FECB
-  addr: 65184
+  addr: 0xFEA0
   kind: 1d
-  entry: 65333
+  entry: 0xFF35
   length: 7
   axis:
     var: ADC_ThW
@@ -395,9 +395,9 @@ maps:
 - category: Coolant
   id: thw_FED2
   name: Coolant table $FED2 (multiplies word_72)
-  addr: 65261
+  addr: 0xFEED
   kind: 1d
-  entry: 65333
+  entry: 0xFF35
   length: 7
   axis:
     var: ADC_ThW
@@ -410,9 +410,9 @@ maps:
 - category: Ignition
   id: thw_FF0A
   name: Warm-up advance ThW_tADV vs coolant (below 218 F)
-  addr: 65317
+  addr: 0xFF25
   kind: 1d
-  entry: 65333
+  entry: 0xFF35
   length: 7
   axis:
     var: ADC_ThW

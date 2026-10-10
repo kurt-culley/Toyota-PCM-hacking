@@ -74,3 +74,38 @@ def test_generated_outputs_are_current():
     assert (base / "bluetop_2860.xdf").read_text() == gen.xdf, hint
     for mid, csv in gen.csvs.items():
         assert (base / "maps" / f"{mid}.csv").read_text() == csv, mid
+
+
+# -- hand-written checks of known differences (independent of the tool's own report) ----------
+
+
+def test_wide_operand_changes_are_found():
+    """16-bit constants are not in the alignment tokens; these known changes must still be reported."""
+    _, _, xa, xb, al, ports = analysis()
+    changed = {(a, oa, ob) for a, _, _, oa, ob, why in cv.wide_operand_diffs(xa, xb, al, ports) if why is None}
+    assert changed == {
+        (0xF01B, 0x6081, 0x6F81),  # DDR3 $60 -> $6F (P3-0..3 outputs), DDR4 $81
+        (0xF020, 0xEE12, 0xFE12),  # DDR1 $EE -> $FE (P1-4 output), DDR2 $12
+        (0xF067, 0xEE12, 0xFE12),
+        (0xF06C, 0x6081, 0x6F81),
+        (0xFA3B, 0x10FE, 0x10FC),  # while STA is high, also clear byte_4C bit 1
+    }
+
+
+def test_known_bytes_in_both_roms():
+    rom_a, rom_b, *_ = analysis()
+
+    def at(rom, addr, n):
+        return rom[addr - cv.ORG : addr - cv.ORG + n]
+
+    assert at(rom_a, 0xF020, 3) == b"\xce\xee\x12" and at(rom_b, 0xF020, 3) == b"\xce\xfe\x12"
+    assert at(rom_a, 0xFA3B, 3) == b"\xcc\x10\xfe" and at(rom_b, 0xFA39, 3) == b"\xcc\x10\xfc"
+    # 2860 A/C idle advance: ldab ADC_ThW / cmpb #$DA / ldab #$0E / bcc / clrb
+    assert at(rom_b, 0xF841, 9) == b"\xd6\x57\xc1\xda\xc6\x0e\x24\x01\x5f"
+    # byte_96 reload: 0642 ldab #$89 ... stab; 2860 ldab #$8A then decb before std: same value
+    assert at(rom_a, 0xF0E4, 2) == b"\xc6\x89" and at(rom_b, 0xF0E3, 3) == b"\xc6\x8a\x5a"
+
+
+def test_no_2860_data_unaccounted():
+    _, _, xa, xb, al, ports = analysis()
+    assert cv.reverse_unexplained(xa, xb, al, ports) == []

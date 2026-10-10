@@ -279,6 +279,30 @@ def render(
                 fb = "—" if vb is None else f"`${vb:02X}`"
                 lines.append(f"| `${ra:02X}` | `${rb:02X}` | {xa.name(ra)} | {fa} | {fb} |")
         lines.append("")
+    wd = wide_operand_diffs(xa, xb, al, ports)
+    lines += [
+        "## 16-bit operands that differ",
+        "",
+        "The alignment ignores 16-bit operands, so every aligned pair whose operand differs is listed here. "
+        "**Changed constant** means no move explains it: a behaviour change.",
+        "",
+        "| 0642 | 2860 | Routine (0642) | Instruction | 0642 | 2860 | Explanation |",
+        "|---|---|---|---|---|---|---|",
+    ]
+    for a, b, ia, oa, ob, why in wd:
+        lines.append(
+            f"| `${a:04X}` | `${b:04X}` | {name_a(a)} | {ia.mnemonic} | `${oa:04X}` | `${ob:04X}` | "
+            f"{why or '**changed constant**'} |"
+        )
+    lines.append("")
+    rev = reverse_unexplained(xa, xb, al, ports)
+    lines += ["## 2860 data not accounted for", ""]
+    lines.append(
+        "None: every 2860 byte outside code is mapped from 0642."
+        if not rev
+        else "Bytes outside code in 2860 that no 0642 byte maps to: " + ", ".join(f"`${x:04X}`" for x in rev)
+    )
+    lines.append("")
     groups = classify(xa, xb, al)
     titles = {
         "relocated": "Calls whose target moved (same routine, different address or helper entry offset)",
@@ -324,6 +348,29 @@ def ram_init_table(x: xref.Xref) -> tuple[int, int, dict[int, int]] | None:
     return None
 
 
+def reverse_unexplained(xa: xref.Xref, xb: xref.Xref, al: Alignment, ports: list[Port]) -> list[int]:
+    """2860 bytes outside code that no 0642 byte maps to (data only in 2860)."""
+    code_b = {b + k for b, i in xb.instrs.items() for k in range(i.length)}
+    covered = set(code_b)
+    for p in ports:
+        if p.addr_b is not None:
+            covered.update(range(p.addr_b, p.addr_b + p.size))
+    init_b = ram_init_table(xb)
+    if init_b:
+        covered.update(range(init_b[0], init_b[1]))
+    sm = difflib.SequenceMatcher(None, xa.rom, xb.rom, autojunk=False)
+    for tag, i1, i2, j1, j2 in sm.get_opcodes():
+        if tag == "equal" or (tag == "replace" and i2 - i1 == j2 - j1):
+            covered.update(range(ORG + j1, ORG + j2))
+    starts = sorted(xb.instrs)
+    for d in range(ORG, ORG + len(xb.rom)):  # inline parameters just after an instruction
+        if d not in covered:
+            prev = [s for s in starts if s < d][-1:]
+            if prev and d - prev[0] - xb.instrs[prev[0]].length < 4 and prev[0] in set(al.a_to_b.values()):
+                covered.add(d)
+    return [d for d in range(ORG, ORG + len(xb.rom)) if d not in covered]
+
+
 def data_diffs(xa: xref.Xref, xb: xref.Xref, al: Alignment, ports: list[Port]) -> list[tuple[int, int, int, int, str]]:
     """Non-code bytes of A that differ in B: (addr A, addr B, value A, value B, how mapped).
 
@@ -367,6 +414,56 @@ def data_diffs(xa: xref.Xref, xb: xref.Xref, al: Alignment, ports: list[Port]) -
             if d in (0xFFEE, 0xFFEF):
                 how = "checksum balance word (`$FFEE`)"
             out.append((d, b, va, vb, how))
+    return out
+
+
+def wide_operand_diffs(xa: xref.Xref, xb: xref.Xref, al: Alignment, ports: list[Port]) -> list[tuple]:
+    """Aligned instruction pairs whose 16-bit operands differ, each with an explanation.
+
+    The alignment ignores 16-bit operands (they move with the code), so a changed 16-bit
+    constant would otherwise pass as "equal". Every differing pair is explained as one of:
+    a pointer to code that moved, a pointer into a ported map, a pointer whose ``$FF,x``
+    use wraps to a RAM variable that moved, the RAM-init table pointer, or a pointer to a
+    data block with identical bytes. Anything else is a changed constant (``None``).
+    Returns (addr A, addr B, instruction A, operand A, operand B, explanation or None).
+    """
+    init_a, init_b = ram_init_table(xa), ram_init_table(xb)
+    out = []
+    for a, b in sorted(al.a_to_b.items()):
+        ia, ib = xa.instrs[a], xb.instrs[b]
+        if ia.mode not in ("imm16", "ext") or ib.mode != ia.mode or ia.operand == ib.operand:
+            continue
+        oa, ob = ia.operand, ib.operand
+        why = None
+        if al.a_to_b.get(oa) == ob:
+            why = "code pointer, follows its target"
+        hits = [
+            p
+            for p in ports
+            if why is None
+            and p.addr_b is not None
+            and p.addr_a <= oa < p.addr_a + p.size
+            and ob - oa == p.addr_b - p.addr_a
+        ]
+        if hits:  # overlapping maps: prefer the one that starts at the pointer
+            p = min(hits, key=lambda p: (oa != p.addr_a, p.addr_a))
+            why = f"pointer {'to' if oa == p.addr_a else 'into'} `{p.id}`, which moved"
+        ram = (oa + 0xFF) & 0xFFFF
+        if why is None and ram < 0x100 and ram in al.ram and ob - oa == al.ram[ram] - ram:
+            why = f"helper pointer: `$FF,x` reaches RAM `${ram:02X}`, which moved to `${al.ram[ram]:02X}`"
+        if why is None and init_a and init_b and oa + 1 == init_a[0] and ob + 1 == init_b[0]:
+            why = "RAM-init table pointer"
+        if why is None and ORG <= oa < ORG + len(xa.rom) - 1 and ORG <= ob < ORG + len(xb.rom) - 1:
+            wa = xa.rom[oa - ORG] << 8 | xa.rom[oa - ORG + 1]
+            wb = xb.rom[ob - ORG] << 8 | xb.rom[ob - ORG + 1]
+            if al.a_to_b.get(wa) == wb:
+                why = "pointer to a table of code pointers that moved (entries follow their targets)"
+        if why is None and oa >= ORG and ob >= ORG:
+            n = 4
+            da, db = xa.rom[oa - ORG : oa - ORG + n], xb.rom[ob - ORG : ob - ORG + n]
+            if len(da) == n and da == db:
+                why = f"pointer to a data block that moved (first {n} bytes identical)"
+        out.append((a, b, ia, oa, ob, why))
     return out
 
 
@@ -453,7 +550,29 @@ def ported_defs(spec: dict, ports: list[Port], al: Alignment, rom_b: bytes) -> s
         "# pcmre/crossver.py instead. Names and notes are copied from 0642, so addresses quoted in\n"
         "# them (overlaps, evidence) are 0642 addresses; `addr` and `entry` are 2860's.\n"
     )
-    return head + yaml.safe_dump(out, sort_keys=False, width=110, allow_unicode=True)
+    return head + yaml.dump(_hexify(out), Dumper=_HexDumper, sort_keys=False, width=110, allow_unicode=True)
+
+
+class _Hex(int):
+    pass
+
+
+class _HexDumper(yaml.SafeDumper):
+    pass
+
+
+_HexDumper.add_representer(_Hex, lambda d, v: d.represent_scalar("tag:yaml.org,2002:int", f"0x{v:04X}"))
+
+
+def _hexify(v, key: str = ""):
+    """Addresses (`addr`, `entry`, `base`) as 0x hex, as in the hand-written 0642 file."""
+    if isinstance(v, dict):
+        return {k: _hexify(x, k) for k, x in v.items()}
+    if isinstance(v, list):
+        return [_hexify(x) for x in v]
+    if key in ("addr", "entry", "base") and isinstance(v, int) and not isinstance(v, bool):
+        return _Hex(v)
+    return v
 
 
 def run() -> tuple[str, list[Port]]:

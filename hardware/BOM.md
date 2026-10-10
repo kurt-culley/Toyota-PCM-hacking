@@ -20,9 +20,8 @@
 | A7 | Desoldering pump, desoldering braid (2–2.5 mm), no-clean flux | — | Removing the D151801 | Amazon UK | ~£10 |
 | A8 | **Chip Quik SMD1** low-melt removal alloy (leaded) | 1 kit | Backup removal method | RS UK, Amazon UK | ~£17 |
 | A9 | Isopropyl alcohol 99% | 1 | Conformal-coat removal and flux clean-up | Amazon UK | ~£5 |
-| opt | ESD wrist strap | 1 | Protects the only D151801 | Amazon UK | ~£5 |
-
 | A10 | **Full-size breadboard, 830 points** (or two half-size joined) | 1 | The Pico and the DIP-40 need 20 rows each | Amazon UK | ~£5 |
+| opt | ESD wrist strap | 1 | Protects the only D151801 | Amazon UK | ~£5 |
 
 Already owned: male-to-male jumpers, multimeter. No scope or logic analyser is needed: the reader firmware measures the chip's E clock itself.
 

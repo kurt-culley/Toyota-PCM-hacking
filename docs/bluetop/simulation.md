@@ -58,6 +58,13 @@ sim.injector_pulses("#10")[-1]             # µs the injector was open
 sim.spark_advance()[-1]                    # degrees BTDC
 ```
 
+**Other ECU variants:** `Simulation(rom, profile=...)` selects how inputs are wired (`emu.engine.EcuProfile`):
+- which sensor feeds each serial-ADC channel: `tps`, `batt`, `tha`, `thw`, `pwr`, `o2`, `pim`, `co`;
+- the ROM's coolant linearisation table;
+- whether the SE056 airflow edge exists.
+
+`BLUETOP` is the default. `mr2_dtype(adc, thw_table)` builds a MAP-sensor profile for the 17140 once its channel map is read from the dump. The 17140 board has a serial ADC and no SE056, so PIM is expected on an ADC channel (GUESS until P4). `inputs.map_kpa` drives PIM through the factory vacuum-sensor curve ([`../../analysis/emu/sensors.py`](../../analysis/emu/sensors.py): V = 0.6 + 0.03 × kPa, a straight line through the EWD points, LIKELY). `inputs.mixture_raw` drives a mixture-screw channel. ROMs larger than 4 KB load so that they end at `$FFFF` [EMU:tests/test_profiles.py].
+
 `Simulation(rom, extra={0xE000: code})` adds code or data outside the 4 KB ROM, as external memory on the P7 board. `pcmre.patch.build()` produces both from an asl patch source; see [`rev_limiter.md`](rev_limiter.md).
 
 Run `PYTHONPATH=analysis uv run python ...` from the repo root. Speed is about real time: one simulated second takes about one second of CPU.

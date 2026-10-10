@@ -17,7 +17,7 @@ from functools import cache
 from pathlib import Path
 
 from .cpu import HD6301, VEC_TRAP
-from .engine import BLUETOP_ROM, Engine, EngineInputs
+from .engine import BLUETOP, BLUETOP_ROM, EcuProfile, Engine, EngineInputs
 from .periph import Peripherals
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -41,15 +41,20 @@ def symbols(listing: Path = LISTING) -> dict[str, int]:
 
 class Simulation:
     def __init__(
-        self, rom: bytes | None = None, inputs: EngineInputs | None = None, extra: dict[int, bytes] | None = None
+        self,
+        rom: bytes | None = None,
+        inputs: EngineInputs | None = None,
+        extra: dict[int, bytes] | None = None,
+        profile: EcuProfile = BLUETOP,
     ):
         """``extra`` maps addresses to code or data outside the ROM (external memory, as on the P7 board)."""
         self.rom = rom if rom is not None else BLUETOP_ROM.read_bytes()
-        self.periph = Peripherals(self.rom)
+        self.rom_base = 0x10000 - len(self.rom)  # 4 KB at $F000 (Bluetop); larger ROMs end at $FFFF too
+        self.periph = Peripherals(self.rom, self.rom_base)
         for addr, data in (extra or {}).items():
             self.periph.mem[addr : addr + len(data)] = data
         self.cpu = HD6301(self.periph)
-        self.engine = Engine(self.periph, self.rom, inputs)
+        self.engine = Engine(self.periph, self.rom, inputs, profile)
         self.inputs = self.engine.inputs
         self.irq_counts: dict[int, int] = {}
         self.cpu.reset()
@@ -62,7 +67,8 @@ class Simulation:
             t = p.next_event_time()
             cpu.cycles += max(1, (t - p.now) if t is not None else 1)
         else:
-            if cpu.pc == self.rom[VEC_TRAP - 0xF000] << 8 | self.rom[VEC_TRAP - 0xF000 + 1]:
+            trap = VEC_TRAP - self.rom_base
+            if cpu.pc == self.rom[trap] << 8 | self.rom[trap + 1]:
                 raise SimulationError(f"TRAP taken (undefined opcode) at cycle {p.now}")
             cpu.step()
         p.advance(cpu.cycles - before)

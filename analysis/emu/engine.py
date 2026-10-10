@@ -58,6 +58,7 @@ from pathlib import Path
 from pcmre.tables import lookup_1d
 
 from .periph import Peripherals
+from .sensors import pim_raw
 
 ROOT = Path(__file__).resolve().parents[2]
 BLUETOP_ROM = ROOT / "TOYOTA Bluetop PCM/cap.bin"
@@ -81,21 +82,74 @@ class EngineInputs:
     starter: bool = False
     t_shorted: bool = False
     igf: bool = True
+    map_kpa: float = 100.0  # manifold absolute pressure, for a profile with a "pim" channel
+    mixture_raw: int = 0x80  # mixture-screw (CO resistor) reading, for a profile with a "co" channel
+
+
+# Signals a profile can put on an ADC channel. Each maps the inputs to an 8-bit reading.
+ADC_SIGNALS = ("tps", "batt", "tha", "thw", "pwr", "o2", "pim", "co")
+
+
+@dataclass(frozen=True)
+class EcuProfile:
+    """How an ECU variant's inputs are wired, so one engine model can drive different ROMs.
+
+    ``adc``: serial-ADC channel -> signal name (``ADC_SIGNALS``).
+    ``thw_table``: (address, helper entry) of the ROM's coolant linearisation, used to
+    present temperatures in the ROM's own scale; ``None`` falls back to ``thw_raw_fallback``.
+    ``airflow_edge``: True if the ECU measures load as the SE056 airflow delay after each NE
+    edge (L-type, on IC1); False for a MAP-sensor ECU that reads PIM on the ADC.
+    """
+
+    name: str
+    adc: dict[int, str]
+    thw_table: tuple[int, int] | None
+    airflow_edge: bool
+
+    def __post_init__(self):
+        bad = set(self.adc.values()) - set(ADC_SIGNALS)
+        if bad:
+            raise ValueError(f"unknown ADC signals {bad}")
+
+
+BLUETOP = EcuProfile(
+    name="Bluetop D151801-0642 (L-type)",
+    adc={0: "tps", 1: "batt", 2: "tha", 3: "thw", 4: "pwr", 5: "o2"},  # [ROM:$FAA7-$FB2E]
+    thw_table=(0xFEF0, 0xFF28),
+    airflow_edge=True,
+)
+
+
+def mr2_dtype(adc: dict[int, str], thw_table: tuple[int, int] | None) -> EcuProfile:
+    """A MAP-sensor (D-type) profile, e.g. the 17140, once its ADC channel map is read from the dump.
+
+    GUESS until P4: the 17140 board has a serial ADC (IC6) and no SE056, so PIM is
+    expected on an ADC channel; ``pcmre.ingest`` reports the channel map.
+    """
+    if "pim" not in adc.values():
+        raise ValueError("a D-type profile needs a 'pim' channel")
+    return EcuProfile(name="MR2 D-type (from dump)", adc=adc, thw_table=thw_table, airflow_edge=False)
 
 
 @cache
-def _thw_inverse(rom: bytes) -> tuple[int, ...]:
-    """For each °F 0..255, the raw ADC value whose $FEF0 linearisation is closest."""
-    table = rom[0xFEF0 - 0xF000 : 0xFEF0 - 0xF000 + 17]
+def _thw_inverse(rom: bytes, table_addr: int = 0xFEF0, entry: int = 0xFF28) -> tuple[int, ...]:
+    """For each °F 0..255, the raw ADC value whose linearisation (the ROM's own table) is closest."""
+    base = 0x10000 - len(rom)
+    table = rom[table_addr - base : table_addr - base + 17]
     out = []
-    lin = [lookup_1d(table, raw, entry=0xFF28) for raw in range(256)]
+    lin = [lookup_1d(table, raw, entry=entry) for raw in range(256)]
     for f in range(256):
         out.append(min(range(256), key=lambda r: (abs(lin[r] - f), r)))
     return tuple(out)
 
 
-def thw_raw(rom: bytes, degf: float) -> int:
-    return _thw_inverse(rom)[max(0, min(255, round(degf)))]
+def thw_raw(rom: bytes, degf: float, table: tuple[int, int] = (0xFEF0, 0xFF28)) -> int:
+    return _thw_inverse(rom, *table)[max(0, min(255, round(degf)))]
+
+
+def thw_raw_fallback(degf: float) -> int:
+    """No ROM table known yet: a monotonic stand-in (hotter = lower reading, as an NTC to ground). GUESS."""
+    return max(0, min(255, round(255 - degf)))
 
 
 def volts_raw(v: float, full_scale: float = 5.0) -> int:
@@ -105,9 +159,12 @@ def volts_raw(v: float, full_scale: float = 5.0) -> int:
 class Engine:
     """Drives the ECU's input pins from ``inputs`` and listens to its outputs."""
 
-    def __init__(self, periph: Peripherals, rom: bytes, inputs: EngineInputs | None = None):
+    def __init__(
+        self, periph: Peripherals, rom: bytes, inputs: EngineInputs | None = None, profile: EcuProfile = BLUETOP
+    ):
         self.p = periph
         self.rom = rom
+        self.profile = profile
         self.inputs = inputs or EngineInputs()
         self.edge = 0  # NE falling-edge count
         self.falls: list[int] = []  # NE falling-edge times
@@ -124,12 +181,8 @@ class Engine:
     def update_sensors(self) -> None:
         i = self.inputs
         p = self.p
-        p.adc[0] = i.tps_raw & 0xFF
-        p.adc[1] = volts_raw(i.battery_v, 25.0)
-        p.adc[2] = thw_raw(self.rom, i.intake_f)
-        p.adc[3] = thw_raw(self.rom, i.coolant_f)
-        p.adc[4] = i.pwr_raw & 0xFF
-        p.adc[5] = volts_raw(i.o2_v)
+        for ch, sig in self.profile.adc.items():
+            p.adc[ch] = self.adc_value(sig)
         p.set_pin(4, 2, 1 if i.idl else 0)  # high = closed at the CPU pin (see module notes)
         p.set_pin(4, 3, 1 if i.ac else 0)
         p.set_pin(4, 4, 1 if i.starter else 0)
@@ -138,6 +191,24 @@ class Engine:
         if i.rpm > 0 and not self._running:
             self._running = True
             self.p.at(self.p.now + 1000, self._fall)
+
+    def adc_value(self, signal: str) -> int:
+        i = self.inputs
+
+        def temp(degf: float) -> int:
+            t = self.profile.thw_table
+            return thw_raw(self.rom, degf, t) if t else thw_raw_fallback(degf)
+
+        return {
+            "tps": lambda: i.tps_raw & 0xFF,
+            "batt": lambda: volts_raw(i.battery_v, 25.0),
+            "tha": lambda: temp(i.intake_f),
+            "thw": lambda: temp(i.coolant_f),
+            "pwr": lambda: i.pwr_raw & 0xFF,
+            "o2": lambda: volts_raw(i.o2_v),
+            "pim": lambda: pim_raw(i.map_kpa),
+            "co": lambda: i.mixture_raw & 0xFF,
+        }[signal]()
 
     # -- crank signals ----------------------------------------------------------------------
     def period(self) -> int:
@@ -158,8 +229,9 @@ class Engine:
         p.set_pin(1, 0, 0)  # NE falling edge -> IC2
         if self.edge % 4 == 0:
             p.at(t + T // 4, lambda: p.set_pin(3, 7, 1))  # G+ back high
-        af = round(self.inputs.airflow_us)
-        p.at(t + af, lambda: p.set_pin(2, 0, 1))  # SE056 airflow edge -> IC1
+        if self.profile.airflow_edge:
+            af = round(self.inputs.airflow_us)
+            p.at(t + af, lambda: p.set_pin(2, 0, 1))  # SE056 airflow edge -> IC1
         p.at(t + round(T * (1 - self.inputs.ne_duty)), self._rise)
         p.at(t + T, self._fall)
 

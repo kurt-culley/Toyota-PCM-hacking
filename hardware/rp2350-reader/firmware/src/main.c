@@ -61,7 +61,8 @@ static uint32_t snoop_seen[0x10000 / 32];
 
 static uint8_t serve_page[256];  // served from RAM: no flash-cache stalls on core 1
 
-static PIO pio = pio0;
+static PIO pio = pio0;      // bus server and EXTAL clock
+static PIO pio_sci = pio1;  // SCI receiver (pio0 is full)
 static uint sm_bus, sm_clk, sm_sci;
 
 // Core 1: one address word per cycle, optionally followed by a snoop word (bit 31 set).
@@ -75,12 +76,12 @@ static void __not_in_flash_func(core1_bus)(void) {
     uint32_t prev_log = LOG_N;
     for (;;) {
         uint32_t w = pio_sm_get_blocking(pio, sm_bus);
-        if (w >> 31) {  // snoop sample for the previous cycle
-            if (have_prev && prev_listened) {
+        if (w >> 31) {  // snoop sample (bit 8 set) or early-release marker for the previous cycle
+            if (have_prev && prev_listened && (w & 0x100u)) {
                 snoop_img[prev_addr] = (uint8_t)w;
                 snoop_seen[prev_addr >> 5] |= 1u << (prev_addr & 31);
             }
-            if (prev_log < LOG_N && !(cycle_log[prev_log].flags & LOG_DROVE))
+            if (prev_log < LOG_N && !(cycle_log[prev_log].flags & LOG_DROVE) && (w & 0x100u))
                 cycle_log[prev_log].data = (uint8_t)w;
             have_prev = false;
             continue;
@@ -112,8 +113,22 @@ static void __not_in_flash_func(core1_bus)(void) {
                 d = DECODE_LISTEN;
             } else {
                 pio_sm_put(pio, sm_bus, 0xFF00u | (uint32_t)d);
-                drive_cycles++;
-                flags |= LOG_DROVE;
+                // Confirm the PIO took it at E rise. If it is still queued after E rose,
+                // this cycle was not driven: count it late and stop driving this run.
+                uint32_t spin = 0;
+                while (!gpio_get(PIN_E) && ++spin < 4000u)
+                    tight_loop_contents();
+                for (int k = 0; k < 16; k++)  // > the PIO's input sync + pull latency
+                    __asm volatile("nop");
+                if (!pio_sm_is_tx_fifo_empty(pio, sm_bus)) {
+                    given_up = true;
+                    late_cycles++;
+                    flags |= LOG_LATE;
+                    d = DECODE_LISTEN;
+                } else {
+                    drive_cycles++;
+                    flags |= LOG_DROVE;
+                }
             }
         }
         bus_cycles++;
@@ -204,15 +219,18 @@ static void pio_init_all(void) {
     pio_sm_init(pio, sm_clk, off, &c);
 
     // SCI receiver, 8 PIO clocks per bit
-    sm_sci = pio_claim_unused_sm(pio, true);
-    off = pio_add_program(pio, &sci_rx_program);
+#if PIO_GPIO_BASE
+    pio_set_gpio_base(pio_sci, PIO_GPIO_BASE);
+#endif
+    sm_sci = pio_claim_unused_sm(pio_sci, true);
+    off = pio_add_program(pio_sci, &sci_rx_program);
     c = sci_rx_program_get_default_config(off);
     sm_config_set_in_pins(&c, PIN_SCI);
     sm_config_set_jmp_pin(&c, PIN_SCI);
     sm_config_set_in_shift(&c, true, false, 32);
     sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_RX);
     sm_config_set_clkdiv(&c, sys / (8.0f * SCI_BAUD));
-    pio_sm_init(pio, sm_sci, off, &c);
+    pio_sm_init(pio_sci, sm_sci, off, &c);
 
     // bus server: AD0-7 start as inputs
     sm_bus = pio_claim_unused_sm(pio, true);
@@ -228,7 +246,7 @@ static void pio_init_all(void) {
     pio_sm_init(pio, sm_bus, off, &c);
     pio_sm_put(pio, sm_bus, (uint32_t)(SNOOP_DELAY_NS * (sys / 1e9f) / 2.0f));  // 2 clocks per pass
 
-    pio_sm_set_enabled(pio, sm_sci, true);
+    pio_sm_set_enabled(pio_sci, sm_sci, true);
     pio_sm_set_enabled(pio, sm_bus, true);
     pio_sm_set_enabled(pio, sm_clk, true);
 }
@@ -279,8 +297,8 @@ static bool start_run(const uint8_t *page, bool drive) {
     if (!power_good(false))
         return false;
     memset(snoop_seen, 0, sizeof snoop_seen);
-    while (!pio_sm_is_rx_fifo_empty(pio, sm_sci))
-        (void)pio_sm_get(pio, sm_sci);
+    while (!pio_sm_is_rx_fifo_empty(pio_sci, sm_sci))
+        (void)pio_sm_get(pio_sci, sm_sci);
     if (page)
         memcpy(serve_page, page, sizeof serve_page);
     dec.page = page ? serve_page : NULL;
@@ -302,8 +320,8 @@ static bool start_run(const uint8_t *page, bool drive) {
 static uint32_t receive(uint8_t *buf, uint32_t want, uint32_t timeout_ms) {
     uint32_t n = 0, t0 = time_us_32(), tick = t0, cyc = bus_cycles;
     while (n < want && time_us_32() - t0 < timeout_ms * 1000u) {
-        if (!pio_sm_is_rx_fifo_empty(pio, sm_sci))
-            buf[n++] = (uint8_t)(pio_sm_get(pio, sm_sci) >> 24);
+        if (!pio_sm_is_rx_fifo_empty(pio_sci, sm_sci))
+            buf[n++] = (uint8_t)(pio_sm_get(pio_sci, sm_sci) >> 24);
         if (time_us_32() - tick > 5000u) {
             if (bus_cycles == cyc) {
                 end_run();
@@ -413,10 +431,23 @@ static void cmd_listen(void) {
                fffe_at, VECTOR_WINDOW);
     else if (fffe == 0xFEFF)
         printf("listen: vector fetch at cycle %d reads $FEFF (floating bus, external as expected) -> PASS\n", fffe_at);
-    else
-        printf("listen: vector fetch at cycle %d reads $%04X, not the floating $FEFF -> STOP: do not run probe;\n"
-               "        the chip may be driving its vector internally (wrong mode?). Send this log to the agent.\n",
+    else if (fffe >= 0xF000)
+        printf("listen: vector fetch at cycle %d reads $%04X, a plausible internal vector -> STOP: do not run\n"
+               "        probe; the chip may be driving its vector itself (wrong mode?). Send this log to the agent.\n",
                fffe_at, fffe);
+    else
+        printf("listen: vector fetch at cycle %d reads $%04X, not the floating $FEFF -> UNCLEAR: send this log\n"
+               "        to the agent before running probe.\n",
+               fffe_at, fffe);
+}
+
+static void cmd_res(void) {
+    if (!start_run(NULL, false))
+        return;
+    printf("res: RES released for 15 s, nothing driven. Measure chip pin 6 to GND now (want >= 4.5 V).\n");
+    sleep_ms(15000);
+    end_run();
+    printf("res: RES held low again.\n");
 }
 
 static uint8_t probe_page[256];
@@ -537,7 +568,7 @@ static void help(void) {
     printf("Wiring: AD0 GP%u, A8 GP%u, AS GP%u, E GP%u, R/W GP%u, RES GP%u, EXTAL GP%u, SCI GP%u\n", PIN_AD0, PIN_A8,
            PIN_AS, PIN_E, PIN_RW, PIN_RES, PIN_EXTAL, PIN_SCI);
     printf("RES is held low. Plug the 6301 5 V jumper in only now; unplug it before USB.\n");
-    printf("Commands: rigcheck  clock  listen  probe  dump  size  help\n");
+    printf("Commands: rigcheck  clock  listen  res  probe  dump  size  help\n");
 }
 
 int main(void) {
@@ -570,6 +601,8 @@ int main(void) {
             cmd_clock();
         else if (!strcmp(line, "listen"))
             cmd_listen();
+        else if (!strcmp(line, "res"))
+            cmd_res();
         else if (!strcmp(line, "probe"))
             cmd_probe();
         else if (!strcmp(line, "dump"))

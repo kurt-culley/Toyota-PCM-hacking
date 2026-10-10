@@ -17,7 +17,7 @@ flowchart TD
   C --> D[4. Multimeter checklist<br/>unpowered]
   D --> E[5. rigcheck<br/>USB only, no chip, 5 V jumper out]
   E --> F[6. Fit the chip, 5 V jumper in last]
-  F --> G[clock] --> H[listen] --> I[probe] --> J[dump x3<br/>romcapture.py] --> K[size]
+  F --> G[clock] --> H[listen] --> R[res: meter on pin 6] --> I[probe] --> J[dump x3<br/>romcapture.py] --> K[size]
   K --> L[5 V jumper out first, then USB]
 ```
 
@@ -69,7 +69,7 @@ The agent asks for your go-ahead before each powered step (CLAUDE.md, hardware s
 HD6301 ROM reader on Raspberry Pi Pico 2 W(H)
 Wiring: AD0 GP0, A8 GP10, AS GP18, E GP19, R/W GP20, RES GP8, EXTAL GP9, SCI GP21
 RES is held low. Plug the 6301 5 V jumper in only now; unplug it before USB.
-Commands: rigcheck  clock  listen  probe  dump  size  help
+Commands: rigcheck  clock  listen  res  probe  dump  size  help
 >
 ```
 
@@ -213,7 +213,16 @@ RES is released for 5 ms while the reader **drives nothing**. The log shows the 
 listen: vector fetch at cycle 1 reads $FEFF (floating bus, external as expected) -> PASS
 ```
 
-With nothing driving, the vector reads float and echo the address bus (`$FE`, `$FF`). This is the check that the vector really is external in mode 0. **If it says STOP, do not run `probe` or `dump`**: the chip may be driving its vector itself, and serving it would make both chips drive the bus. Send the log to the agent.
+With nothing driving, the vector reads float and echo the address bus (`$FE`, `$FF`). This is the check that the vector really is external in mode 0.
+
+- **STOP** (it read a plausible internal vector, `$F000` or above): do not run `probe` or `dump`. The chip may be driving its vector itself, and serving it would make both chips drive the bus.
+- **UNCLEAR** (some other value): a floating line may have drifted. The agent reads the whole log before you go on.
+
+In both cases send the log to the agent.
+
+### `res`
+
+`res` releases RES for 15 s with nothing driven. Measure chip pin 6 to GND during that time: it must read at least 4.5 V.
 
 ### `probe`
 
@@ -251,8 +260,8 @@ Then type `size` in the terminal. It reports whether `$E000`–`$EFFF` is also i
 |---|---|---|
 | `clock` reports 0 Hz | 5 V jumper out; chip not seated; EXTAL not reaching pin 3 | Check the jumper, then the multimeter checklist steps 1–4 for pins 3, 21 and 1 |
 | `clock` frequency is wrong, or E is high nearly all the time | EXTAL pull-up missing or wrong value; XTAL (pin 2) wired by mistake | 470 Ω from pin 3 to the rail; pin 2 open |
-| `listen` shows no cycles | AS (39) or E (40) not wired; RES not rising | Check pins 39, 40 and 6, and the 10 kΩ RES pull-up. RES must reach 4.5 V when released; if it does not, the agent will have you swap its pull-up to 4.7 kΩ |
-| `listen` says STOP | The vector did not float, or came late | Do not run `probe` or `dump`. Send the log to the agent |
+| `listen` shows no cycles | AS (39) or E (40) not wired; RES not rising | Check pins 39, 40 and 6, and the 10 kΩ RES pull-up. Run `res` and measure pin 6: it must reach 4.5 V. If it does not, the agent will have you swap its pull-up to 4.7 kΩ |
+| `listen` says STOP or UNCLEAR | The vector did not float, or came late | Do not run `probe` or `dump`. Send the log to the agent |
 | `listen` shows endless odd activity, never `$FFFE` | Wrong mode: a strap missing (upstream issue #4) | Pins 8, 9 and 10 each 10 kΩ to GND |
 | `probe` FAIL with `$FFFE` at cycle 3 or later | The chip fetches its vector later than the handbook's window | Send the log to the agent. Do not change the window: outside it, the vector is internal |
 | `late cycles` above 0 | The RP2350 could not answer before E rose; it stopped driving for the rest of that run, so the run fails | Report it; it should never happen at 250 kHz |

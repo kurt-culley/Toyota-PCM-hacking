@@ -286,7 +286,7 @@ flowchart LR
   RP[RP2350 board<br/>USB to PC] -->|EXTAL 1 MHz open-drain, RES open-drain<br/>pull-ups to the 6301 5 V rail| MCU[D151801 / HD6301<br/>on breadboard, mode 0]
   MCU <-->|AD0-7 multiplexed bus<br/>direct, 5 V-tolerant pads| RP
   MCU -->|A8-15, AS, E, R/W, SCI TX| RP
-  RP <-->|USB serial| PC[romcapture.py<br/>3 dumps, SHA-256]
+  RP <-->|USB serial| PC[romcapture.py<br/>3 dumps compared, SHA-256]
 ```
 
 ```mermaid
@@ -308,6 +308,20 @@ sequenceDiagram
 - **Drive only where nothing else can:** the RP2350 drives the bus only for reads of `$C0xx` and for the in-window vector. It never drives during reset, `$0000`–`$00FF`, `$F000`–`$FFFF` outside the window, or write cycles. The handbook forbids overlapping internal and external space, because internal reads are driven onto the bus in mode 0.
 - **Two dump channels:** the program sends the ROM over the 6301's own SCI, and the RP2350 also samples the bus during the internal reads.
 - **Safety:** the mode straps go to GND through 10 kΩ (never bare wires); the 6301's 5 V rail is connected last and removed first; power-good waits for a steady E clock before releasing RES; the AD lines use the lowest drive strength to limit any contention.
+- **Pin map:** one PIO program serves both boards; the bus block keeps the same layout relative to its base pin. On the BB48R the reader avoids the board's own GPIOs: GP0–7 (UEXT, Qwiic with 2.2 kΩ pull-ups), GP8 (PSRAM chip-select), GP9–11/24 (microSD), GP25 (LED) and the non-5 V-tolerant GP40–47.
+
+  | 6301 signal (pin) | BB48R | Pico 2 WH |
+  |---|---|---|
+  | AD0–AD7 (37…30) | GP16–23 | GP0–7 |
+  | A8–A15 (29…22) | GP26–33 | GP10–17 |
+  | AS (39) | GP34 | GP18 |
+  | E (40) | GP35 | GP19 |
+  | R/W (38) | GP36 | GP20 |
+  | RES (6), open-drain, 10 kΩ pull-up | GP37 | GP8 |
+  | EXTAL (3), open-drain, 470 Ω pull-up | GP38 | GP9 |
+  | P24/TX (12), 10 kΩ pull-up | GP39 | GP21 |
+
+  Firmware: [`../hardware/rp2350-reader/firmware/`](../hardware/rp2350-reader/firmware/) (C, pico-sdk ≥ 2.1, PIO; CI builds a UF2 per board). The drive/listen rule in `decode.h` is tested against the Python model in `analysis/pcmre/readerdecode.py`, and the dump program runs on the emulator against `cap.bin` [EMU:tests/test_romdump.py].
 - **Carrier PCB:** a DIP-40 ZIF socket, headers for the BB48R, the resistors and capacitors, and a load switch that sequences the 6301's 5 V rail automatically. Ordered factory-assembled (JLCPCB PCBA). It later serves as the P4 real-CPU harness.
 
 The parts list is in [`../hardware/BOM.md`](../hardware/BOM.md).

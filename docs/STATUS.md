@@ -3,7 +3,7 @@
 The Lead agent updates this file at the end of every session. The plan is in [`RE_PLAN.md`](RE_PLAN.md).
 
 **Last updated:** 2026-10-10:
-- **P3 hardware is now RP2350-based** (RE_PLAN §6): an Olimex RP2350-PICO2-BB48R plus a Raspberry Pi Pico 2 WH, wired straight to the D151801 on a breadboard (no level shifters), with the chip in mode 0. Next: order BOM section A; dump program, firmware and guide in progress.
+- **P3 hardware is now RP2350-based** (RE_PLAN §6): an Olimex RP2350-PICO2-BB48R plus a Raspberry Pi Pico 2 WH, wired straight to the D151801 on a breadboard (no level shifters), with the chip in mode 0. Next: order BOM section A. The dump program, reader firmware and host tool are written and tested off-hardware; the guide and carrier PCB are in progress.
 
 Earlier:
 - **P2 is complete and signed off** (independent Verifier PASS, 2026-10-10).
@@ -104,11 +104,12 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
 ### P3 tasks (ROM dump, RP2350 reader)
 - [x] Mode for the dump: **mode 0** (P22/P21/P20 = L/L/L, pins 10/9/8), "Multiplexed Test": internal ROM on, reset vector external for 3–4 cycles after RES rises [handbook Table 2-1-1].
 - [x] Clock: E = 0.1–1.0 MHz, so EXTAL 0.4–4 MHz; not static. The reader runs EXTAL at 1 MHz [handbook p.128, p.188].
-- [x] ROM size: confirmed on the hardware by the reader's `size` run (4 KB at `$F000` expected, as on the D151801 Bluetops).
+- [x] ROM size method: the reader's `size` run sends `$E000`–`$FFFF`; a 4 KB block counts as ROM only if three runs agree and it does not echo the address bus. 4 KB at `$F000` is expected, as on the D151801 Bluetops.
 - [x] Self-test plan: multimeter checklist, `rigcheck`, `clock`, `listen`, `probe`, then `dump` ([`hardware/rp2350_reader_guide.md`](hardware/rp2350_reader_guide.md)).
 - [ ] Owner orders [`../hardware/BOM.md`](../hardware/BOM.md) section A.
-- [ ] 6301 dump program, tested in the emulator.
-- [ ] RP2350 reader firmware, built in CI.
+- [x] 6301 dump program ([`../hardware/rp2350-reader/6301/`](../hardware/rp2350-reader/6301/)): in the emulator against `cap.bin` it sends the mode byte then the ROM exactly, with no stack use, no contention and no TDRE violation [EMU:tests/test_romdump.py].
+- [x] RP2350 reader firmware ([`../hardware/rp2350-reader/firmware/`](../hardware/rp2350-reader/firmware/)): builds warning-free for the BB48R and the Pico 2 W(H) (pico-sdk 2.1.1); CI uploads both UF2s. Its decode rule matches the Python model [EMU:tests/test_reader_decode_c.py]. Not yet run on hardware.
+- [x] Host capture tool `analysis/pcmre/romcapture.py` [EMU:tests/test_romcapture.py].
 - [ ] Reader guide with wiring picture and checklist.
 - [ ] Carrier PCB (KiCad, factory-assembled).
 - [ ] Chip removed from the spare ECU, socket fitted.

@@ -1,0 +1,69 @@
+; PIO programs for the HD6301 ROM reader.
+
+; ---------------------------------------------------------------------------------------
+; bus6301: one pass per 6301 bus cycle (multiplexed bus, E = 250 kHz).
+;   in_base  = BUS_BASE (pins.h layout: AD +0..7, A8-15 +10..17, AS +18, E +19, R/W +20)
+;   out_base = AD0, 8 pins;  jmp_pin = E
+;   Y        = snoop delay after E rises (loop passes), loaded once at start.
+; Per cycle it pushes two words to the CPU: the address sample (21 bits) at AS falling,
+; then the snoop sample (AD0-7 read while E is high, or all ones if the CPU answered too
+; late). The CPU answers each address with one word: bits 0-7 data, bits 8-15 pin
+; directions (0x00 listen, 0xFF drive). The bus is always released when E falls, and
+; nothing is driven if the answer arrives after E has already fallen.
+; ---------------------------------------------------------------------------------------
+.program bus6301
+    pull block
+    mov y, osr
+cycle:
+.wrap_target
+    wait 1 pin 18           ; AS high (address phase)
+    wait 0 pin 18           ; AS falls: AD0-7 hold the low address byte
+    in pins, 21
+    push noblock
+    wait 1 pin 19           ; E rises: data phase
+    pull block              ; the CPU's answer
+    jmp pin in_time         ; E still high?
+    mov isr, ~null          ; too late: drive nothing, flag it
+    push noblock
+    jmp cycle
+in_time:
+    out pins, 8             ; data value
+    out pindirs, 8          ; 0xFF drives, 0x00 keeps listening
+    mov x, y
+delay:
+    jmp x-- delay
+    in pins, 8              ; snoop sample
+    push noblock
+    wait 0 pin 19           ; E falls: the 6301 latches read data here
+    out pindirs, 8          ; release (OSR bits 16-23 are zero)
+.wrap
+
+; ---------------------------------------------------------------------------------------
+; extal_od: open-drain square wave for the 6301 EXTAL input (pin 3, 470R pull-up to 5 V).
+; The pin's output value stays 0; only its direction toggles, so the RP2350 never drives
+; it high. Two instructions per period: run at 2x the wanted frequency.
+; ---------------------------------------------------------------------------------------
+.program extal_od
+.wrap_target
+    set pindirs, 1          ; pull low
+    set pindirs, 0          ; release: the pull-up takes it to 5 V
+.wrap
+
+; ---------------------------------------------------------------------------------------
+; sci_rx: 8N1 receiver for the 6301 P24/TX line, 8 PIO clocks per bit.
+;   in_base = jmp_pin = the SCI pin. Bytes arrive in bits 31-24 of each RX FIFO word.
+;   A character with a bad stop bit is dropped (the dump length check then fails).
+; ---------------------------------------------------------------------------------------
+.program sci_rx
+start:
+    wait 0 pin 0            ; start bit
+    set x, 7 [10]           ; to the middle of data bit 0 (12 clocks from the edge)
+bitloop:
+    in pins, 1
+    jmp x-- bitloop [6]     ; 8 clocks per bit
+    jmp pin stop_ok
+    wait 1 pin 0            ; framing error: wait for idle, drop the byte
+    mov isr, null
+    jmp start
+stop_ok:
+    push block

@@ -84,7 +84,7 @@ Outputs (from the DDRs and every port write; the simulation logs each one):
 | P1-1 | injector group #20 (OC2, low = open) | [ROM:$F138, $F3B9] [EMU:sim] |
 | P4-7 | injector group #10 (software, low = open) | [ROM:$F154, $F17A] [EMU:sim] |
 | P2-1 | /IGT (OC1; rising edge = spark) | [ROM:$F370] [EMU:sim] |
-| P1-5 | idle-up output (LIKELY the V-ISC idle-up VSV of the 1988 RM): on from key-on until about 10 s after start, and at idle whenever the learned trim `word_42` is below $42 | [ROM:$FCBB–$FCD4] [EMU:tests/test_sim.py::test_p1_5_output_on_for_ten_seconds_after_start] |
+| P1-5 | idle-up output (LIKELY the V-ISC idle-up VSV of the 1988 RM): on from key-on until about 10 s after start, and at idle whenever the learned trim `word_42` is below $42 | [ROM:$FCBB–$FCD4] [EMU:tests/test_sim.py::test_p1_5_output_on_for_ten_seconds_after_start, test_p1_5_stays_on_at_idle_while_learned_trim_is_low] |
 | P1-6 | /TVIS | [ROM:$FC49–$FC6C] |
 | P1-7 | /VF (diagnostic/feedback monitor) | [ROM:$F974–$F97C] |
 | P1-3 | MIL (check-engine lamp) | [ROM:$FE1B–$FE24] |

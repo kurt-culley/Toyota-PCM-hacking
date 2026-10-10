@@ -3,7 +3,9 @@
 The Lead agent updates this file at the end of every session. The plan is in [`RE_PLAN.md`](RE_PLAN.md).
 
 **Last updated:** 2026-10-09 (later):
-- **P2 work complete, gate review pending.**
+- **P2 is complete and signed off** (independent Verifier PASS, 2026-10-10).
+  - Next is **P3, dumping the 17140 ROM**. It needs the owner to order [`../hardware/BOM.md`](../hardware/BOM.md) section A.
+  - Owner checks outstanding: load `analysis/bluetop/bluetop.xdf` in TunerPro, continuity Test B, and Q10 (a powered check).
   - Whole-ROM simulation and warm-up results (PR #4).
   - All Tier-A claims have Bluetop evidence; every table is defined.
   - TunerPro XDF and checksum helper.
@@ -25,7 +27,7 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
 |---|---|---|---|
 | P0 | Foundations: tooling, asl round-trip, xref, emulator | ✅ done | ☑ 2026-10-09 (independent Verifier agents: xref and emulator, both after fixes) |
 | P1 | Ross claim register, figures, digitised data, diagrams | ✅ done | — |
-| P2 | Bluetop analysis + Tier-A verification | ◐ all tasks done; gate review fixes awaiting Verifier re-check | ☐ |
+| P2 | Bluetop analysis + Tier-A verification | ✅ done | ☑ 2026-10-10 (independent Verifier agents: simulation, then P2 gate; PASS after fixes) |
 | P3 | Dump the MR2 89661-17140 ROM (Arduino Zero reader) | ☐ | — |
 | P4 | MR2 analysis + Tier-B verification → **Ross verified** | ☐ | ☐ |
 | P5 | Warm-up / cold start (goal 1), blocked until the P4 gate | ☐ blocked | ☐ |
@@ -80,7 +82,7 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
 - **P2 gate Verifier (independent agent, 2026-10-10): PASS WITH ISSUES.**
   - Confirmed against the ROM: the table maths, the $FEE9/$FF12 correction, the Port 1/3 audit, the standby RAM and the checksum.
   - Fixed: the second P1-5 path (idle while learned `word_42` < $42) and the toned-down coolant wording; `se056_max` is 11 entries (FullRPM is capped at $09FF); `thw_FF0A` named as the warm-up advance; `pwr_o2_trim` marked signed; the R-I14 and R-F10 wording; extra overheat and P1-5 tests; overlap warnings in the table titles.
-  - Re-check pending.
+  - **Re-check (independent agent, 2026-10-10): PASS.** All items are fixed; it confirmed the second P1-5 path, the $F84F/$F9BF/$F461 citations and the XDF/CSV outputs. Its wording nits (Load ≥ $190 plus the T-terminal condition in R-I14, the extra test citation for P1-5) are applied.
 - [x] Every table the code reads is now defined: 19 maps in the YAML.
   - New: `$FE9C` max airflow delay vs rpm, `$FEA7` acceleration enrichment, `$FF11` over-temperature retard, and the PWRr staircases `$FF94`/`$FF9C`.
   - **Correction:** the injector dead time is `$FEE9` (8·v + 464 µs); `$FF12` is the dwell term.

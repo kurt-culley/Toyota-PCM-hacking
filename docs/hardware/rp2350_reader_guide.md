@@ -276,4 +276,6 @@ An independent Verifier re-checks the capture before P4 starts:
 - that the snoop and SCI channels agree;
 - that `pcmre` disassembles the image cleanly.
 
+Then the agent runs the day-one analysis (`python -m pcmre.ingest`, RE_PLAN P4), which turns the dump into a first map of the program.
+
 Keep the chip in its socket in the spare ECU. The socket also serves the P4 real-CPU harness.

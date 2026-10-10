@@ -173,6 +173,15 @@ flowchart LR
 
 ### P4: MR2 analysis and Tier-B verification → "Ross verified" gate
 
+- **Day one:** `PYTHONPATH=analysis uv run python -m pcmre.ingest "AW11 MR2 PCM/89661-17140.bin" --name mr2_17140 --write`. It writes `analysis/mr2_17140/ingest.md` and an auto-ported `analysis/defs/mr2_17140.yaml`, and does the following:
+  - checks the size and origin, vectors and checksum;
+  - traces the code and aligns it with the Bluetop;
+  - ports every Bluetop map through the code that reads it, and lists RAM moves and behaviour changes;
+  - lists candidate tables;
+  - searches for Ross's 17×8 ignition table byte for byte, and for his density and speed maps by shape;
+  - finds the ADC result array, mixture-screw candidates and rpm constants (rev limit, T-VIS).
+
+  The report is a set of leads to review, not conclusions. Then set the simulator's `mr2_dtype` profile from the ADC channel map ([`bluetop/simulation.md`](bluetop/simulation.md)).
 - Run the P0 and P2 steps on the MR2 ROM. Reuse Bluetop labels wherever routines match. A `pcmre` signature matcher compares instruction byte patterns with operands masked out, since addresses shift between ROMs.
 - Check every Tier-B claim, including:
   - the 11-site density maps split at 3200 rpm

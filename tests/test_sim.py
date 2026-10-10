@@ -75,7 +75,7 @@ def test_cold_injection_is_simultaneous_every_edge():
 def test_off_idle_advance_follows_the_3d_map(rpm, airflow):
     s, since = sim_at(ms=1200, rpm=rpm, airflow_us=airflow, idl=False)
     t = s.rom[0xFF40 - 0xF000 : 0xFF40 - 0xF000 + 6 * 14 + 2]
-    tvis = 8 if s.ram("TVIScounter") < 0x80 else 0  # +8 while T-VIS is off [ROM:$F8A3]
+    tvis = 8 if s.ram("TVIScounter") < 0x80 else 0  # +8 once T-VIS has opened, above 4350 rpm [ROM:$F8A3]
     assert s.ram("BaseAdvance") == lookup_3d(t, 14, s.ram("RPMish"), s.ram("Load", 2)) + tvis
     want = advance_from_rom_formula(s.ram("BaseAdvance"), s.ram("ThW_tADV"), s.ram("IDLcompADV"), s.ram("deltaNE", 2))
     got = s.spark_advance(since)

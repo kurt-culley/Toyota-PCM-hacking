@@ -109,7 +109,7 @@ The alignment ignores 16-bit operands, so every aligned pair whose operand diffe
 | `$F3AC` | `$F3A7` | IRQoutcmp | jsr | `$F28F` | `$F28A` | code pointer, follows its target |
 | `$F3D7` | `$F3D2` | IRQoutcmp | jsr | `$F17A` | `$F175` | code pointer, follows its target |
 | `$F3E4` | `$F3DF` | IRQSerial | jsr | `$FB18` | `$FB1D` | code pointer, follows its target |
-| `$F43A` | `$F435` | sub_F420 | ldx | `$FF98` | `$FF97` | helper pointer: `$FF,x` reaches RAM `$97`, which moved to `$96` |
+| `$F43A` | `$F435` | sub_F420 | ldx | `$FF98` | `$FF97` | helper pointer: `jsr` to `$FFE1` counts RAM `$97`→`$96`, `$98`→`$97`, which moved |
 | `$F443` | `$F43E` | sub_F420 | jsr | `$FD11` | `$FD15` | code pointer, follows its target |
 | `$F446` | `$F441` | sub_F420 | ldx | `$FC81` | `$FC86` | code pointer, follows its target |
 | `$F454` | `$F44F` | sub_F420 | ldx | `$FEF9` | `$FF14` | pointer to `rpm_reciprocal`, which moved |
@@ -133,14 +133,14 @@ The alignment ignores 16-bit operands, so every aligned pair whose operand diffe
 | `$F598` | `$F593` | loc_F534 | ldx | `$FED2` | `$FEED` | pointer to `thw_FED2`, which moved |
 | `$F59E` | `$F599` | loc_F534 | jsr | `$F6E3` | `$F6DE` | code pointer, follows its target |
 | `$F5CB` | `$F5C6` | loc_F534 | jmp | `$F673` | `$F66E` | code pointer, follows its target |
-| `$F6B3` | `$F6AE` | loc_F534 | ldx | `$FF9D` | `$FF9C` | helper pointer: `$FF,x` reaches RAM `$9C`, which moved to `$9B` |
+| `$F6B3` | `$F6AE` | loc_F534 | ldx | `$FF9D` | `$FF9C` | helper pointer: `jsr` to `$FFE3` counts RAM `$9C`→`$9B`, which moved |
 | `$F6B8` | `$F6B3` | loc_F534 | jsr | `$F7BE` | `$F7B9` | code pointer, follows its target |
 | `$F714` | `$F70F` | sub_F70A | jsr | `$F5E1` | `$F5DC` | code pointer, follows its target |
 | `$F744` | `$F73F` | sub_F70A | jsr | `$FB46` | `$FB4B` | code pointer, follows its target |
 | `$F771` | `$F76C` | sub_F751 | jsr | `$FB46` | `$FB4B` | code pointer, follows its target |
 | `$F77F` | `$F77A` | sub_F751 | jsr | `$FB46` | `$FB4B` | code pointer, follows its target |
 | `$F7E7` | `$F7E0` | Calc76 | ldx | `$FF9C` | `$FEAC` | pointer to `pwr_o2_trim`, which moved |
-| `$F7EE` | `$F7E7` | Calc76 | ldx | `$F7A6` | `$F7A1` | pointer to a data block that moved (first 4 bytes identical) |
+| `$F7EE` | `$F7E7` | Calc76 | ldx | `$F7A6` | `$F7A1` | pointer to a 4-byte data block that moved with its code (contents identical) |
 | `$F830` | `$F82C` | BeginCalcADV | jsr | `$FB43` | `$FB48` | code pointer, follows its target |
 | `$F840` | `$F83C` | BeginCalcADV | jsr | `$FB46` | `$FB4B` | code pointer, follows its target |
 | `$F869` | `$F869` | BeginCalcADV | jmp | `$F8F0` | `$F8EE` | code pointer, follows its target |
@@ -157,13 +157,13 @@ The alignment ignores 16-bit operands, so every aligned pair whose operand diffe
 | `$F94D` | `$F94B` | BeginCalcADV | jsr | `$F28F` | `$F28A` | code pointer, follows its target |
 | `$F987` | `$F985` | sub_F96A | jsr | `$FB46` | `$FB4B` | code pointer, follows its target |
 | `$F9DF` | `$F9DD` | sub_F96A | jsr | `$F751` | `$F74C` | code pointer, follows its target |
-| `$F9EC` | `$F9EA` | sub_F96A | ldx | `$F7A2` | `$F79D` | pointer to a data block that moved (first 4 bytes identical) |
+| `$F9EC` | `$F9EA` | sub_F96A | ldx | `$F7A2` | `$F79D` | pointer to a 8-byte data block that moved with its code (contents identical) |
 | `$F9F4` | `$F9F2` | sub_F96A | jsr | `$F6D4` | `$F6CF` | code pointer, follows its target |
 | `$FA22` | `$FA20` | sub_F96A | jsr | `$F121` | `$F11C` | code pointer, follows its target |
 | `$FA2E` | `$FA2C` | sub_F96A | jsr | `$F6BB` | `$F6B6` | code pointer, follows its target |
 | `$FA3B` | `$FA39` | sub_F96A | ldd | `$10FE` | `$10FC` | **changed constant** |
 | `$FA5A` | `$FA58` | sub_F96A | jsr | `$F129` | `$F124` | code pointer, follows its target |
-| `$FA9F` | `$FAA4` | procJmpTable | ldx | `$FD39` | `$FD3D` | pointer to a table of code pointers that moved (entries follow their targets) |
+| `$FA9F` | `$FAA4` | procJmpTable | ldx | `$FD39` | `$FD3D` | pointer to a table of 4 code pointers, all following their targets |
 | `$FAD0` | `$FAD5` | procJmpTable | ldx | `$FEF0` | `$FF0B` | pointer to `thw_linearise`, which moved |
 | `$FAE0` | `$FAE5` | procJmpTable | jsr | `$FD02` | `$FD06` | code pointer, follows its target |
 | `$FAFB` | `$FB00` | procJmpTable | jsr | `$FD02` | `$FD06` | code pointer, follows its target |

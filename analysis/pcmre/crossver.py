@@ -428,6 +428,9 @@ def wide_operand_diffs(xa: xref.Xref, xb: xref.Xref, al: Alignment, ports: list[
     Returns (addr A, addr B, instruction A, operand A, operand B, explanation or None).
     """
     init_a, init_b = ram_init_table(xa), ram_init_table(xb)
+    callee_a = {c.site: c.callee for c in xa.calls}
+    starts_a = sorted(xa.instrs)
+    code_a = {s + k for s, i in xa.instrs.items() for k in range(i.length)}
     out = []
     for a, b in sorted(al.a_to_b.items()):
         ia, ib = xa.instrs[a], xb.instrs[b]
@@ -448,23 +451,83 @@ def wide_operand_diffs(xa: xref.Xref, xb: xref.Xref, al: Alignment, ports: list[
         if hits:  # overlapping maps: prefer the one that starts at the pointer
             p = min(hits, key=lambda p: (oa != p.addr_a, p.addr_a))
             why = f"pointer {'to' if oa == p.addr_a else 'into'} `{p.id}`, which moved"
-        ram = (oa + 0xFF) & 0xFFFF
-        if why is None and ram < 0x100 and ram in al.ram and ob - oa == al.ram[ram] - ram:
-            why = f"helper pointer: `$FF,x` reaches RAM `${ram:02X}`, which moved to `${al.ram[ram]:02X}`"
+        if why is None:
+            why = _helper_pointer(xa, al, a, oa, ob, callee_a, starts_a)
         if why is None and init_a and init_b and oa + 1 == init_a[0] and ob + 1 == init_b[0]:
             why = "RAM-init table pointer"
-        if why is None and ORG <= oa < ORG + len(xa.rom) - 1 and ORG <= ob < ORG + len(xb.rom) - 1:
-            wa = xa.rom[oa - ORG] << 8 | xa.rom[oa - ORG + 1]
-            wb = xb.rom[ob - ORG] << 8 | xb.rom[ob - ORG + 1]
-            if al.a_to_b.get(wa) == wb:
-                why = "pointer to a table of code pointers that moved (entries follow their targets)"
-        if why is None and oa >= ORG and ob >= ORG:
-            n = 4
-            da, db = xa.rom[oa - ORG : oa - ORG + n], xb.rom[ob - ORG : ob - ORG + n]
-            if len(da) == n and da == db:
-                why = f"pointer to a data block that moved (first {n} bytes identical)"
+        if why is None:
+            why = _pointer_table(xa, xb, al, oa, ob)
+        if why is None:
+            why = _data_block(xa, xb, al, oa, ob, code_a, starts_a)
         out.append((a, b, ia, oa, ob, why))
     return out
+
+
+def _helper_pointer(xa, al, a, oa, ob, callee_a, starts_a) -> str | None:
+    """``ldx #$FFxx / jsr N,x`` into a counter helper that uses ``$FF,x``: X wraps to RAM.
+
+    Explained only if the next instruction is that call, the helper's first access is
+    ``$FF,x``, and every byte it counts (two when it starts with ``bsr``, as at ``$FFE1``)
+    moved by the same amount as the pointer.
+    """
+    k = starts_a.index(a)
+    if k + 1 >= len(starts_a) or callee_a.get(starts_a[k + 1]) is None:
+        return None
+    callee = callee_a[starts_a[k + 1]]
+    first = xa.instrs.get(callee)
+    if first is None:
+        return None
+    body = callee
+    if first.mnemonic == "bsr":
+        body = first.operand
+    acc = xa.instrs.get(body)
+    if acc is None or acc.mode != "idx" or acc.operand != 0xFF:
+        return None
+    count = 2 if first.mnemonic == "bsr" else 1
+    rams = [(oa + 0xFF + n) & 0xFFFF for n in range(count)]
+    delta = ob - oa
+    if all(r < 0x100 and al.ram.get(r, r) - r == delta for r in rams):
+        moved = ", ".join(f"`${r:02X}`→`${al.ram.get(r, r):02X}`" for r in rams)
+        return f"helper pointer: `jsr` to `${callee:04X}` counts RAM {moved}, which moved"
+    return None
+
+
+def _pointer_table(xa, xb, al, oa, ob) -> str | None:
+    """A table of code pointers: every consecutive entry that is code in A must follow its target."""
+    n = 0
+    while n < 64 and ORG <= oa + 2 * n < ORG + len(xa.rom) - 1:
+        wa = xa.rom[oa + 2 * n - ORG] << 8 | xa.rom[oa + 2 * n + 1 - ORG]
+        if wa not in xa.instrs:
+            break
+        if ob + 2 * n >= ORG + len(xb.rom) - 1:
+            return None
+        wb = xb.rom[ob + 2 * n - ORG] << 8 | xb.rom[ob + 2 * n + 1 - ORG]
+        if al.a_to_b.get(wa) != wb:
+            return None
+        n += 1
+    return f"pointer to a table of {n} code pointers, all following their targets" if n else None
+
+
+def _data_block(xa, xb, al, oa, ob, code_a, starts_a) -> str | None:
+    """Embedded data that moved with the code around it, with identical contents.
+
+    The pointer must shift by the same amount as the nearest aligned instruction, the whole
+    run of non-code bytes at the target must match, and a run of one repeated byte (padding)
+    is never accepted.
+    """
+    if not (ORG <= oa < ORG + len(xa.rom) and ORG <= ob < ORG + len(xb.rom)):
+        return None
+    near = min((s for s in starts_a if s in al.a_to_b), key=lambda s: abs(s - oa), default=None)
+    if near is None or al.a_to_b[near] - near != ob - oa:
+        return None
+    end = oa
+    while end < ORG + len(xa.rom) and end not in code_a and end - oa < 64:
+        end += 1
+    n = end - oa
+    da, db = xa.rom[oa - ORG : end - ORG], xb.rom[ob - ORG : ob - ORG + n]
+    if n == 0 or da != db or len(set(da)) == 1:
+        return None
+    return f"pointer to a {n}-byte data block that moved with its code (contents identical)"
 
 
 def classify(xa: xref.Xref, xb: xref.Xref, al: Alignment) -> dict[str, list]:

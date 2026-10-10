@@ -20,11 +20,11 @@ ROM: `TOYOTA Bluetop PCM/cap.bin` (sha256 `62b2a3f29039…`), base `$F000`.
 | [`ign_base`](#ign_base) | `$FF40` | 3d | 6×14 | Base ignition advance (3D) | CONFIRMED (layout and interpolation); LIKELY (rpm axis, degrees) |
 | [`thw_linearise`](#thw_linearise) | `$FEF0` | 1d | 17 | Coolant sensor linearisation (raw ADC -> degF) | LIKELY |
 | [`tha_corr`](#tha_corr) | `$FED9` | 1d | 9 | Air temperature correction (ThAcorr) | LIKELY |
-| [`inj_dead_time`](#inj_dead_time) | `$FEE9` | 1d | 9 | Injector dead time vs battery voltage | CONFIRMED (use and scaling); LIKELY (volts axis) |
-| [`dwell_battery`](#dwell_battery) | `$FF12` | 1d | 9 | Coil dwell term vs battery voltage | CONFIRMED (use); LIKELY (dwell meaning) |
-| [`se056_max`](#se056_max) | `$FE9C` | 1d | 12 | Maximum airflow delay (SE056Maxtime) vs engine speed | CONFIRMED (use); LIKELY (rpm axis) |
+| [`inj_dead_time`](#inj_dead_time) | `$FEE9` | 1d | 9 | Injector dead time vs battery voltage (last 2 cells overlap $FEF0) | CONFIRMED (use and scaling); LIKELY (volts axis) |
+| [`dwell_battery`](#dwell_battery) | `$FF12` | 1d | 9 | Coil dwell term vs battery voltage (first cell shared with $FF11) | CONFIRMED (use); LIKELY (dwell meaning) |
+| [`se056_max`](#se056_max) | `$FE9C` | 1d | 11 | Maximum airflow delay (SE056Maxtime) vs engine speed | CONFIRMED (use); LIKELY (rpm axis) |
 | [`accel_enrich`](#accel_enrich) | `$FEA7` | 1d | 8 | Acceleration enrichment vs throttle opening rate | CONFIRMED (structure); LIKELY (meaning) |
-| [`overheat_adv`](#overheat_adv) | `$FF11` | 1d | 3 | Over-temperature ignition retard (ThW_tADV when hot) | CONFIRMED |
+| [`overheat_adv`](#overheat_adv) | `$FF11` | 1d | 3 | Over-temperature ignition retard (ThW_tADV when hot; cells 1-2 shared with $FF12) | CONFIRMED |
 | [`pwr_ign_trim`](#pwr_ign_trim) | `$FF94` | step | 8 | Ignition trim selected by the PWRr input (8-step staircase, no interpolation) | CONFIRMED (structure); GUESS (what PWRr is: likely a calibration or option resistor) |
 | [`pwr_o2_trim`](#pwr_o2_trim) | `$FF9C` | step | 8 | O2-loop value selected by the PWRr input (8-step staircase) | CONFIRMED (structure); GUESS (meaning) |
 | [`decel_cut_rpm`](#decel_cut_rpm) | `$FEE2` | 1d | 7 | Decel fuel-cut rpm vs coolant temperature | LIKELY |
@@ -35,7 +35,7 @@ ROM: `TOYOTA Bluetop PCM/cap.bin` (sha256 `62b2a3f29039…`), base `$F000`.
 | [`thw_FEC4`](#thw_FEC4) | `$FEC4` | 1d | 7 | Coolant table $FEC4 -> word_8C | CONFIRMED (layout); purpose unknown |
 | [`thw_FECB`](#thw_FECB) | `$FECB` | 1d | 7 | Coolant table $FECB | CONFIRMED (layout); purpose unknown |
 | [`thw_FED2`](#thw_FED2) | `$FED2` | 1d | 7 | Coolant table $FED2 (multiplies word_72) | CONFIRMED (layout); LIKELY warm-up fuel |
-| [`thw_FF0A`](#thw_FF0A) | `$FF0A` | 1d | 7 | Coolant table $FF0A | CONFIRMED (layout); purpose unknown |
+| [`thw_FF0A`](#thw_FF0A) | `$FF0A` | 1d | 7 | Warm-up advance ThW_tADV vs coolant (below 218 F) | CONFIRMED |
 
 ## ign_base
 
@@ -86,7 +86,7 @@ ROM: `TOYOTA Bluetop PCM/cap.bin` (sha256 `62b2a3f29039…`), base `$F000`.
 
 ## inj_dead_time
 
-**Injector dead time vs battery voltage** at `$FEE9`, read through helper entry `$FF25`.
+**Injector dead time vs battery voltage (last 2 cells overlap $FEF0)** at `$FEE9`, read through helper entry `$FF25`.
 
 - Cells: raw. InjDeadTime = v*8 + 464 us (the helper's A:B/32 + $1D0); 255 -> 2504 us at 8.1 V or less. Input is at most $AC, so entries 7-8 (which overlap $FEF0) are never reached
 - Ross claims: R-F17
@@ -100,7 +100,7 @@ ROM: `TOYOTA Bluetop PCM/cap.bin` (sha256 `62b2a3f29039…`), base `$F000`.
 
 ## dwell_battery
 
-**Coil dwell term vs battery voltage** at `$FF12`, read through helper entry `$FF25`.
+**Coil dwell term vs battery voltage (first cell shared with $FF11)** at `$FF12`, read through helper entry `$FF25`.
 
 - Cells: raw. word_BF is filtered towards v*32 us; Dwell = deltaNE/16 + word_BF. Shares bytes with $FF11
 - Evidence: [ROM:$FCA2-$FCAF ldx #$FF12 / lsrd x3 / addd word_BF / lsrd] [ROM:$F913 Dwell = deltaNE/16 + word_BF]
@@ -115,14 +115,14 @@ ROM: `TOYOTA Bluetop PCM/cap.bin` (sha256 `62b2a3f29039…`), base `$F000`.
 
 **Maximum airflow delay (SE056Maxtime) vs engine speed** at `$FE9C`, read through helper entry `$FF2D`.
 
-- Cells: raw. SE056Maxtime = v*8 + $800 us; clamps the measured airflow delay and scales the acceleration enrichment. FullRPM is at most $0A00, so only 12 entries are reached (the next bytes are $FEA7)
+- Cells: raw. SE056Maxtime = v*8 + $800 us; clamps the measured airflow delay and scales the acceleration enrichment. FullRPM is capped at $09FF [ROM:$F461], so entries 0-10 are read; the next byte is $FEA7 (accel_enrich)
 - Evidence: [ROM:$F582-$F58E ldd FullRPM / ldx #$FE9C / jsr $91,x / DivDby32 / adda #$08 / std SE056Maxtime] [ROM:$F1DA clamp]
 - Confidence: CONFIRMED (use); LIKELY (rpm axis)
 - Axis: `FullRPM high byte (about rpm/800)` (FullRPM/256), raw points every 1
 
-| FullRPM high byte (about rpm/800) | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| value | 31 | 31 | 35 | 62 | 62 | 87 | 100 | 100 | 104 | 92 | 79 | 0 |
+| FullRPM high byte (about rpm/800) | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| value | 31 | 31 | 35 | 62 | 62 | 87 | 100 | 100 | 104 | 92 | 79 |
 
 ## accel_enrich
 
@@ -139,9 +139,9 @@ ROM: `TOYOTA Bluetop PCM/cap.bin` (sha256 `62b2a3f29039…`), base `$F000`.
 
 ## overheat_adv
 
-**Over-temperature ignition retard (ThW_tADV when hot)** at `$FF11`, read through helper entry `$FF2A`.
+**Over-temperature ignition retard (ThW_tADV when hot; cells 1-2 shared with $FF12)** at `$FF11`, read through helper entry `$FF2A`.
 
-- Cells: raw advance (replaces ThW_tADV). 28 at 218 F falling to 6 from 226 F: about -7.7 deg. Applied only off idle with Load >= $9C4; otherwise ThW_tADV = 28. Shares bytes with $FF12
+- Cells: raw advance (replaces ThW_tADV). 28 at 218 F falling to 6 from 226 F: about -7.7 deg. Above 218 F it applies only off idle with Load >= $9C4; there ThW_tADV is otherwise 28. Below 218 F ThW_tADV comes from thw_FF0A. Shares bytes with $FF12
 - Ross claims: R-I12
 - Evidence: [ROM:$FC03-$FC1E] [EMU:tests/test_sim.py::test_overheat_retard_only_at_high_load]
 - Confidence: CONFIRMED
@@ -169,14 +169,14 @@ ROM: `TOYOTA Bluetop PCM/cap.bin` (sha256 `62b2a3f29039…`), base `$F000`.
 
 **O2-loop value selected by the PWRr input (8-step staircase)** at `$FF9C`.
 
-- Cells: raw. subtracted from $6C or $6F (by Load) and stored in unk_9B
+- Cells: raw. signed bytes, subtracted from $6C or $6F (by Load) and stored in unk_9B
 - Evidence: [ROM:$F7E7-$F7EC ldx #$FF9C / jsr $08,x -> $FFA4]
 - Confidence: CONFIRMED (structure); GUESS (meaning)
 - Axis: `ADC_PWRr` (raw ADC), raw points every 32
 
 | ADC_PWRr | 0 | 32 | 64 | 96 | 128 | 160 | 192 | 224 |
 |---|---|---|---|---|---|---|---|---|
-| value | 7 | 0 | 251 | 0 | 0 | 7 | 251 | 254 |
+| value | 7 | 0 | -5 | 0 | 0 | 7 | -5 | -2 |
 
 ## decel_cut_rpm
 
@@ -285,11 +285,11 @@ ROM: `TOYOTA Bluetop PCM/cap.bin` (sha256 `62b2a3f29039…`), base `$F000`.
 
 ## thw_FF0A
 
-**Coolant table $FF0A** at `$FF0A`, read through helper entry `$FF1B`.
+**Warm-up advance ThW_tADV vs coolant (below 218 F)** at `$FF0A`, read through helper entry `$FF1B`.
 
-- Cells: raw
-- Evidence: [ROM:$FBFD]
-- Confidence: CONFIRMED (layout); purpose unknown
+- Cells: raw advance added to the base (28 = no extra advance)
+- Evidence: [ROM:$FBFA ldx #$FF0A / jsr $11,x / staa ThW_tADV] [EMU:docs/bluetop/warmup_sim.md 56 cold -> 28 warm]
+- Confidence: CONFIRMED
 - Axis: `ADC_ThW` (degF), raw points every 32
 
 | ADC_ThW | 0 | 32 | 64 | 96 | 128 | 160 | 192 |

@@ -61,7 +61,7 @@ maps:
     cell:
       unit: raw advance
       equation: "X*90/256-0.9"
-      eq_unit: deg BTDC (warm, plus a 256 us lead; LIKELY, Bluetop only)
+      eq_unit: deg BTDC (warm, PWRr trim 0, off idle, plus a 256 us lead; LIKELY, Bluetop only)
       note: "Warm (ThW_tADV = 28) the spark is about v*90/256 - 0.9 deg BTDC plus a fixed 256 us lead [EMU:sim, docs/bluetop/simulation.md]. The PWRr staircase ($FF94) is subtracted, and 8 is added while T-VIS is shut"
     evidence: "[ROM:$F86C-$F89F] [EMU:tests/test_tables.py::test_3d_ignition_lookup_matches_emulator]"
     confidence: CONFIRMED (layout and interpolation); LIKELY (rpm axis, degrees)
@@ -94,7 +94,7 @@ maps:
 
   - id: inj_dead_time
     category: Fuel
-    name: Injector dead time vs battery voltage
+    name: Injector dead time vs battery voltage (last 2 cells overlap $FEF0)
     addr: 0xFEE9
     kind: 1d
     entry: 0xFF25
@@ -111,7 +111,7 @@ maps:
 
   - id: dwell_battery
     category: Ignition
-    name: Coil dwell term vs battery voltage
+    name: Coil dwell term vs battery voltage (first cell shared with $FF11)
     addr: 0xFF12
     kind: 1d
     entry: 0xFF25
@@ -131,13 +131,13 @@ maps:
     addr: 0xFE9C
     kind: 1d
     entry: 0xFF2D
-    length: 12
-    axis: {var: "FullRPM high byte (about rpm/800)", shift: 0, unit: "FullRPM/256", raw: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]}
+    length: 11
+    axis: {var: "FullRPM high byte (about rpm/800)", shift: 0, unit: "FullRPM/256", raw: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]}
     cell:
       unit: raw
       equation: "X*8+2048"
       eq_unit: us maximum airflow delay
-      note: "SE056Maxtime = v*8 + $800 us; clamps the measured airflow delay and scales the acceleration enrichment. FullRPM is at most $0A00, so only 12 entries are reached (the next bytes are $FEA7)"
+      note: "SE056Maxtime = v*8 + $800 us; clamps the measured airflow delay and scales the acceleration enrichment. FullRPM is capped at $09FF [ROM:$F461], so entries 0-10 are read; the next byte is $FEA7 (accel_enrich)"
     evidence: "[ROM:$F582-$F58E ldd FullRPM / ldx #$FE9C / jsr $91,x / DivDby32 / adda #$08 / std SE056Maxtime] [ROM:$F1DA clamp]"
     confidence: CONFIRMED (use); LIKELY (rpm axis)
 
@@ -157,7 +157,7 @@ maps:
 
   - id: overheat_adv
     category: Ignition
-    name: Over-temperature ignition retard (ThW_tADV when hot)
+    name: Over-temperature ignition retard (ThW_tADV when hot; cells 1-2 shared with $FF12)
     addr: 0xFF11
     kind: 1d
     entry: 0xFF2A
@@ -165,7 +165,7 @@ maps:
     axis: {var: "ADC_ThW - 218 F, bounded 0..15", shift: 3, unit: degF above 218, raw: [0, 8, 16]}
     cell:
       unit: raw advance (replaces ThW_tADV)
-      note: "28 at 218 F falling to 6 from 226 F: about -7.7 deg. Applied only off idle with Load >= $9C4; otherwise ThW_tADV = 28. Shares bytes with $FF12"
+      note: "28 at 218 F falling to 6 from 226 F: about -7.7 deg. Above 218 F it applies only off idle with Load >= $9C4; there ThW_tADV is otherwise 28. Below 218 F ThW_tADV comes from thw_FF0A. Shares bytes with $FF12"
     evidence: "[ROM:$FC03-$FC1E] [EMU:tests/test_sim.py::test_overheat_retard_only_at_high_load]"
     confidence: CONFIRMED
     claims: [R-I12]
@@ -189,7 +189,7 @@ maps:
     kind: step
     length: 8
     axis: {var: ADC_PWRr, shift: 5, unit: raw ADC}
-    cell: {unit: raw, note: "subtracted from $6C or $6F (by Load) and stored in unk_9B"}
+    cell: {unit: raw, signed: true, note: "signed bytes, subtracted from $6C or $6F (by Load) and stored in unk_9B"}
     evidence: "[ROM:$F7E7-$F7EC ldx #$FF9C / jsr $08,x -> $FFA4]"
     confidence: CONFIRMED (structure); GUESS (meaning)
 
@@ -230,5 +230,6 @@ maps:
      axis: {var: ADC_ThW, shift: 5, unit: degF}, cell: {unit: raw}, evidence: "[ROM:$F57C]", confidence: CONFIRMED (layout); purpose unknown}
   - {category: Coolant, id: thw_FED2, name: "Coolant table $FED2 (multiplies word_72)", addr: 0xFED2, kind: 1d, entry: 0xFF1B, length: 7,
      axis: {var: ADC_ThW, shift: 5, unit: degF}, cell: {unit: raw multiplier}, evidence: "[ROM:$F59B]", confidence: CONFIRMED (layout); LIKELY warm-up fuel}
-  - {category: Coolant, id: thw_FF0A, name: "Coolant table $FF0A", addr: 0xFF0A, kind: 1d, entry: 0xFF1B, length: 7,
-     axis: {var: ADC_ThW, shift: 5, unit: degF}, cell: {unit: raw}, evidence: "[ROM:$FBFD]", confidence: CONFIRMED (layout); purpose unknown}
+  - {category: Ignition, id: thw_FF0A, name: "Warm-up advance ThW_tADV vs coolant (below 218 F)", addr: 0xFF0A, kind: 1d, entry: 0xFF1B, length: 7,
+     axis: {var: ADC_ThW, shift: 5, unit: degF}, cell: {unit: raw advance added to the base (28 = no extra advance)},
+     evidence: "[ROM:$FBFA ldx #$FF0A / jsr $11,x / staa ThW_tADV] [EMU:docs/bluetop/warmup_sim.md 56 cold -> 28 warm]", confidence: CONFIRMED}

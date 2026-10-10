@@ -63,7 +63,7 @@
     </XDFAXIS>
     <XDFAXIS id="z">
       <EMBEDDEDDATA mmedaddress="0xF40" mmedelementsizebits="8" mmedrowcount="6" mmedcolcount="14" mmedmajorstridebits="0" mmedminorstridebits="0" />
-      <units>deg BTDC (warm, plus a 256 us lead; LIKELY, Bluetop only)</units>
+      <units>deg BTDC (warm, PWRr trim 0, off idle, plus a 256 us lead; LIKELY, Bluetop only)</units>
       <decimalpl>1</decimalpl>
       <outputtype>1</outputtype>
       <MATH equation="X*90/256-0.9">
@@ -176,8 +176,8 @@
     </XDFAXIS>
   </XDFTABLE>
   <XDFTABLE uniqueid="0x4" flags="0x0">
-    <title>inj_dead_time: Injector dead time vs battery voltage</title>
-    <description>Injector dead time vs battery voltage. Evidence: [ROM:$FC8F-$FC9E suba #$53 / ldx #$FEE9 / DivDby32 / addd #$01D0 / std InjDeadTime] [EMU:tests/test_sim.py 1183 us at 14 V]. Confidence: CONFIRMED (use and scaling); LIKELY (volts axis). InjDeadTime = v*8 + 464 us (the helper's A:B/32 + $1D0); 255 -&gt; 2504 us at 8.1 V or less. Input is at most $AC, so entries 7-8 (which overlap $FEF0) are never reached</description>
+    <title>inj_dead_time: Injector dead time vs battery voltage (last 2 cells overlap $FEF0)</title>
+    <description>Injector dead time vs battery voltage (last 2 cells overlap $FEF0). Evidence: [ROM:$FC8F-$FC9E suba #$53 / ldx #$FEE9 / DivDby32 / addd #$01D0 / std InjDeadTime] [EMU:tests/test_sim.py 1183 us at 14 V]. Confidence: CONFIRMED (use and scaling); LIKELY (volts axis). InjDeadTime = v*8 + 464 us (the helper's A:B/32 + $1D0); 255 -&gt; 2504 us at 8.1 V or less. Input is at most $AC, so entries 7-8 (which overlap $FEF0) are never reached</description>
     <CATEGORYMEM index="0" category="2" />
     <XDFAXIS id="x" uniqueid="0x0">
       <EMBEDDEDDATA mmedelementsizebits="8" mmedmajorstridebits="-32" mmedminorstridebits="0" />
@@ -224,8 +224,8 @@
     </XDFAXIS>
   </XDFTABLE>
   <XDFTABLE uniqueid="0x5" flags="0x0">
-    <title>dwell_battery: Coil dwell term vs battery voltage</title>
-    <description>Coil dwell term vs battery voltage. Evidence: [ROM:$FCA2-$FCAF ldx #$FF12 / lsrd x3 / addd word_BF / lsrd] [ROM:$F913 Dwell = deltaNE/16 + word_BF]. Confidence: CONFIRMED (use); LIKELY (dwell meaning). word_BF is filtered towards v*32 us; Dwell = deltaNE/16 + word_BF. Shares bytes with $FF11</description>
+    <title>dwell_battery: Coil dwell term vs battery voltage (first cell shared with $FF11)</title>
+    <description>Coil dwell term vs battery voltage (first cell shared with $FF11). Evidence: [ROM:$FCA2-$FCAF ldx #$FF12 / lsrd x3 / addd word_BF / lsrd] [ROM:$F913 Dwell = deltaNE/16 + word_BF]. Confidence: CONFIRMED (use); LIKELY (dwell meaning). word_BF is filtered towards v*32 us; Dwell = deltaNE/16 + word_BF. Shares bytes with $FF11</description>
     <CATEGORYMEM index="0" category="3" />
     <XDFAXIS id="x" uniqueid="0x0">
       <EMBEDDEDDATA mmedelementsizebits="8" mmedmajorstridebits="-32" mmedminorstridebits="0" />
@@ -273,12 +273,12 @@
   </XDFTABLE>
   <XDFTABLE uniqueid="0x6" flags="0x0">
     <title>se056_max: Maximum airflow delay (SE056Maxtime) vs engine speed</title>
-    <description>Maximum airflow delay (SE056Maxtime) vs engine speed. Evidence: [ROM:$F582-$F58E ldd FullRPM / ldx #$FE9C / jsr $91,x / DivDby32 / adda #$08 / std SE056Maxtime] [ROM:$F1DA clamp]. Confidence: CONFIRMED (use); LIKELY (rpm axis). SE056Maxtime = v*8 + $800 us; clamps the measured airflow delay and scales the acceleration enrichment. FullRPM is at most $0A00, so only 12 entries are reached (the next bytes are $FEA7)</description>
+    <description>Maximum airflow delay (SE056Maxtime) vs engine speed. Evidence: [ROM:$F582-$F58E ldd FullRPM / ldx #$FE9C / jsr $91,x / DivDby32 / adda #$08 / std SE056Maxtime] [ROM:$F1DA clamp]. Confidence: CONFIRMED (use); LIKELY (rpm axis). SE056Maxtime = v*8 + $800 us; clamps the measured airflow delay and scales the acceleration enrichment. FullRPM is capped at $09FF [ROM:$F461], so entries 0-10 are read; the next byte is $FEA7 (accel_enrich)</description>
     <CATEGORYMEM index="0" category="2" />
     <XDFAXIS id="x" uniqueid="0x0">
       <EMBEDDEDDATA mmedelementsizebits="8" mmedmajorstridebits="-32" mmedminorstridebits="0" />
       <units>FullRPM high byte (about rpm/800)</units>
-      <indexcount>12</indexcount>
+      <indexcount>11</indexcount>
       <embedinfo type="1" />
       <datatype>0</datatype>
       <unittype>0</unittype>
@@ -294,7 +294,6 @@
       <LABEL index="8" value="8" />
       <LABEL index="9" value="9" />
       <LABEL index="10" value="10" />
-      <LABEL index="11" value="11" />
       <MATH equation="X">
         <VAR id="X" />
       </MATH>
@@ -313,7 +312,7 @@
       </MATH>
     </XDFAXIS>
     <XDFAXIS id="z">
-      <EMBEDDEDDATA mmedaddress="0xE9C" mmedelementsizebits="8" mmedrowcount="1" mmedcolcount="12" mmedmajorstridebits="0" mmedminorstridebits="0" />
+      <EMBEDDEDDATA mmedaddress="0xE9C" mmedelementsizebits="8" mmedrowcount="1" mmedcolcount="11" mmedmajorstridebits="0" mmedminorstridebits="0" />
       <units>us maximum airflow delay</units>
       <decimalpl>1</decimalpl>
       <outputtype>1</outputtype>
@@ -370,8 +369,8 @@
     </XDFAXIS>
   </XDFTABLE>
   <XDFTABLE uniqueid="0x8" flags="0x0">
-    <title>overheat_adv: Over-temperature ignition retard (ThW_tADV when hot)</title>
-    <description>Over-temperature ignition retard (ThW_tADV when hot). Evidence: [ROM:$FC03-$FC1E] [EMU:tests/test_sim.py::test_overheat_retard_only_at_high_load]. Confidence: CONFIRMED. 28 at 218 F falling to 6 from 226 F: about -7.7 deg. Applied only off idle with Load &gt;= $9C4; otherwise ThW_tADV = 28. Shares bytes with $FF12</description>
+    <title>overheat_adv: Over-temperature ignition retard (ThW_tADV when hot; cells 1-2 shared with $FF12)</title>
+    <description>Over-temperature ignition retard (ThW_tADV when hot; cells 1-2 shared with $FF12). Evidence: [ROM:$FC03-$FC1E] [EMU:tests/test_sim.py::test_overheat_retard_only_at_high_load]. Confidence: CONFIRMED. 28 at 218 F falling to 6 from 226 F: about -7.7 deg. Above 218 F it applies only off idle with Load &gt;= $9C4; there ThW_tADV is otherwise 28. Below 218 F ThW_tADV comes from thw_FF0A. Shares bytes with $FF12</description>
     <CATEGORYMEM index="0" category="3" />
     <XDFAXIS id="x" uniqueid="0x0">
       <EMBEDDEDDATA mmedelementsizebits="8" mmedmajorstridebits="-32" mmedminorstridebits="0" />
@@ -460,7 +459,7 @@
   </XDFTABLE>
   <XDFTABLE uniqueid="0xA" flags="0x0">
     <title>pwr_o2_trim: O2-loop value selected by the PWRr input (8-step staircase)</title>
-    <description>O2-loop value selected by the PWRr input (8-step staircase). Evidence: [ROM:$F7E7-$F7EC ldx #$FF9C / jsr $08,x -&gt; $FFA4]. Confidence: CONFIRMED (structure); GUESS (meaning). subtracted from $6C or $6F (by Load) and stored in unk_9B</description>
+    <description>O2-loop value selected by the PWRr input (8-step staircase). Evidence: [ROM:$F7E7-$F7EC ldx #$FF9C / jsr $08,x -&gt; $FFA4]. Confidence: CONFIRMED (structure); GUESS (meaning). signed bytes, subtracted from $6C or $6F (by Load) and stored in unk_9B</description>
     <CATEGORYMEM index="0" category="2" />
     <XDFAXIS id="x" uniqueid="0x0">
       <EMBEDDEDDATA mmedelementsizebits="8" mmedmajorstridebits="-32" mmedminorstridebits="0" />
@@ -496,7 +495,7 @@
       </MATH>
     </XDFAXIS>
     <XDFAXIS id="z">
-      <EMBEDDEDDATA mmedaddress="0xF9C" mmedelementsizebits="8" mmedrowcount="1" mmedcolcount="8" mmedmajorstridebits="0" mmedminorstridebits="0" />
+      <EMBEDDEDDATA mmedaddress="0xF9C" mmedelementsizebits="8" mmedrowcount="1" mmedcolcount="8" mmedmajorstridebits="0" mmedminorstridebits="0" mmedtypeflags="0x01" />
       <units>raw</units>
       <decimalpl>0</decimalpl>
       <outputtype>1</outputtype>
@@ -884,9 +883,9 @@
     </XDFAXIS>
   </XDFTABLE>
   <XDFTABLE uniqueid="0x13" flags="0x0">
-    <title>thw_FF0A: Coolant table $FF0A</title>
-    <description>Coolant table $FF0A. Evidence: [ROM:$FBFD]. Confidence: CONFIRMED (layout); purpose unknown.</description>
-    <CATEGORYMEM index="0" category="1" />
+    <title>thw_FF0A: Warm-up advance ThW_tADV vs coolant (below 218 F)</title>
+    <description>Warm-up advance ThW_tADV vs coolant (below 218 F). Evidence: [ROM:$FBFA ldx #$FF0A / jsr $11,x / staa ThW_tADV] [EMU:docs/bluetop/warmup_sim.md 56 cold -&gt; 28 warm]. Confidence: CONFIRMED.</description>
+    <CATEGORYMEM index="0" category="3" />
     <XDFAXIS id="x" uniqueid="0x0">
       <EMBEDDEDDATA mmedelementsizebits="8" mmedmajorstridebits="-32" mmedminorstridebits="0" />
       <units>ADC_ThW</units>
@@ -921,7 +920,7 @@
     </XDFAXIS>
     <XDFAXIS id="z">
       <EMBEDDEDDATA mmedaddress="0xF0A" mmedelementsizebits="8" mmedrowcount="1" mmedcolcount="7" mmedmajorstridebits="0" mmedminorstridebits="0" />
-      <units>raw</units>
+      <units>raw advance added to the base (28 = no extra advance)</units>
       <decimalpl>0</decimalpl>
       <outputtype>1</outputtype>
       <MATH equation="X">

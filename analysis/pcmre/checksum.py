@@ -2,8 +2,9 @@
 
 The ROM checks this in its diagnostic path [ROM:$FE50 ChkSumLoop / subd #$AA55]. A
 mismatch flags a fault instead of running the RAM test. The TRAP vector at $FFEE is never
-used by the code, so Denso set it to whatever word balances the sum (cap.asm: "illegal
-opcode trap vector is used to force ROM checksum to equal AA55"). An edited ROM must be
+reached in normal running (its stock value $C7BE is already unmapped), so Denso set it
+to whatever word balances the sum (cap.asm: "illegal opcode trap vector is used to force
+ROM checksum to equal AA55"). An edited ROM must be
 re-balanced the same way before it goes back in a car:
 
     PYTHONPATH=analysis uv run python -m pcmre.checksum edited.bin --fix

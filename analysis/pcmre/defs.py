@@ -45,6 +45,13 @@ def load(rom_name: str) -> tuple[dict, bytes]:
     return spec, rom
 
 
+def cell_values(m: dict, data: bytes) -> list[int]:
+    """Cell values for display: two's complement when the YAML marks the cells signed."""
+    if m["cell"].get("signed"):
+        return [b - 256 if b >= 128 else b for b in data]
+    return list(data)
+
+
 def map_bytes(spec: dict, rom: bytes, m: dict) -> bytes:
     size = m["rows"] * m["cols"] if m["kind"] == "3d" else m["length"]
     off = m["addr"] - spec["base"]
@@ -119,9 +126,10 @@ def generate(spec: dict, rom: bytes) -> Generated:
             pts = axis_1d(m)
             w(f"- Axis: `{ax['var']}` ({ax['unit']}), raw points every {1 << ax.get('shift', 0)}\n\n")
             w(f"| {ax['var']} | " + " | ".join(_fmt_axis(pts)) + " |\n" + "|---" * (len(pts) + 1) + "|\n")
-            w("| value | " + " | ".join(map(str, data)) + " |\n")
+            vals = cell_values(m, data)
+            w("| value | " + " | ".join(map(str, vals)) + " |\n")
             csv.write(f"{ax['var']},value\n")
-            for p, v in zip(pts, data, strict=True):
+            for p, v in zip(pts, vals, strict=True):
                 csv.write(f"{p},{v}\n")
         w("\n")
         csvs[m["id"]] = csv.getvalue()
@@ -195,7 +203,9 @@ def xdf(spec: dict) -> str:
             _axis_xml("y", yl, str(yu)),
             '    <XDFAXIS id="z">',
             f'      <EMBEDDEDDATA mmedaddress="0x{off:X}" mmedelementsizebits="8" mmedrowcount="{rows}" '
-            f'mmedcolcount="{cols}" mmedmajorstridebits="0" mmedminorstridebits="0" />',
+            f'mmedcolcount="{cols}" mmedmajorstridebits="0" mmedminorstridebits="0"'
+            + (' mmedtypeflags="0x01"' if cell.get("signed") else "")
+            + " />",
             f"      <units>{escape(str(unit))}</units>",
             "      <decimalpl>1</decimalpl>" if eq != "X" else "      <decimalpl>0</decimalpl>",
             "      <outputtype>1</outputtype>",

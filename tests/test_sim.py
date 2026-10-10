@@ -167,7 +167,10 @@ def _warm_off_idle(setup=None, ms=1200, airflow=1500):
 
 @pytest.mark.parametrize(("port", "bit"), [(3, 0), (3, 1), (3, 2), (3, 3), (1, 4)])
 def test_spare_input_pins_select_no_alternative_map(port, bit):
-    """No Bluetop digital input outside the known switches changes spark or fuel (R-F12/R-I15)."""
+    """No Bluetop digital input outside the known switches changes spark or fuel (R-F12/R-I15).
+
+    One warm operating point only: the claim rests on the static audit of every Port 1/3 read; this is a check.
+    """
     ref = _warm_off_idle()
     for level in (0, 1):
         s = _warm_off_idle(lambda s, level=level: s.periph.set_pin(port, bit, level))
@@ -185,19 +188,25 @@ def test_pwr_input_selects_a_staircase_trim():
 
 
 def test_overheat_retard_only_at_high_load():
-    """Above 218 F the warm-up advance is replaced by table $FF11 (28 -> 6), but only with Load >= $9C4."""
+    """Above 218 F the warm-up advance is replaced by table $FF11 (28 -> 6), but only off idle with Load >= $9C4
+    [ROM:$FC03-$FC1E]. Below 218 F the high load changes nothing."""
     hot = lambda s: setattr(s.inputs, "coolant_f", 230)  # noqa: E731
-    assert _warm_off_idle(hot, airflow=1500).ram("ThW_tADV") == 28
+    assert _warm_off_idle(hot, airflow=1500).ram("ThW_tADV") == 28  # light load
     s = _warm_off_idle(hot, airflow=2800)
     assert s.ram("Load", 2) >= 0x9C4 and s.ram("ThW_tADV") == 6
+    s = _warm_off_idle(lambda s: setattr(s.inputs, "coolant_f", 200), airflow=2800)
+    assert s.ram("Load", 2) >= 0x9C4 and s.ram("ThW_tADV") == 28  # below 218 F
+    s, _ = sim_at(ms=1500, rpm=900, coolant_f=230, airflow_us=2800)  # idle (byte_95 negative)
+    assert s.ram("byte_95") >= 0x80 and s.ram("ThW_tADV") == 28
 
 
-def test_p1_5_output_on_for_ten_seconds_after_start():
-    """P1-5 is on from key-on through cranking until about 10 s after start, whatever the coolant temperature
-    [ROM:$FCBB-$FCD4]. The 1988 repair manual gives the same timing for the V-ISC idle-up VSV (FI-119)."""
+@pytest.mark.parametrize("coolant_f", [32, 176])
+def test_p1_5_output_on_for_ten_seconds_after_start(coolant_f):
+    """P1-5 is on from key-on through cranking until about 10 s after start, the same cold and warm in these
+    runs [ROM:$FCBB-$FCD4]. The 1988 repair manual gives the same timing for the V-ISC idle-up VSV (FI-119)."""
     from emu.scenarios import start
 
-    s = start(176)  # key on 0.3 s, crank 1.5 s, then idle
+    s = start(coolant_f)  # key on 0.3 s, crank 1.5 s, then idle
     events = []
     s.periph.listeners.append(lambda n, lv, t: events.append((t, lv)) if n == "P1-5" else None)
     assert s.periph.read(0x02) & 0x20  # on during cranking
@@ -205,6 +214,21 @@ def test_p1_5_output_on_for_ten_seconds_after_start():
     s.run_ms(12_000)
     off = [t for t, lv in events if lv == 0]
     assert off and 9.5e6 < off[0] - t_start < 11e6
+
+
+def test_p1_5_stays_on_at_idle_while_learned_trim_is_low():
+    """Second path: at idle P1-5 is held on while word_42's high byte is below $42 [ROM:$FCBB-$FCC7]."""
+    from emu.scenarios import start
+
+    s = Simulation()
+    s.run_ms(300)
+    kept = bytearray(s.periph.mem[0x40:0x4B])
+    kept[2:4] = bytes([0x30, 0xCF])  # word_42 = $30 (value, complement) in standby RAM
+    sim = start(176)
+    sim.periph.mem[0x40:0x4B] = kept  # as if retained from the last drive (checked at each pass)
+    sim.run_ms(14_000)
+    assert sim.ram("word_42") < 0x42
+    assert sim.periph.read(0x02) & 0x20
 
 
 def test_learned_values_survive_a_restart_in_standby_ram():

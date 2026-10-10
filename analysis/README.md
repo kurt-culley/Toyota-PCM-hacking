@@ -24,13 +24,13 @@ tools/setup_mame_ref.sh              # builds the MAME HD6301 reference for the 
 | `pcmre/xref.py` | Cross-references and Mermaid call graphs. It walks the code from the vectors with a small abstract state (X and B as value sets, and a stack whose return address is a symbol), so it follows Denso's indexed calls, RAM-wrapping indexed accesses, jump tables, inline-parameter routines and stack-argument routines. Checked against all 514 of IDA's own XREF comments in `cap.asm`. |
 | `emu/cpu.py` | HD6301V1 CPU core: all documented opcodes, cycle counts, TRAP on undefined opcodes, WAI/SLP, IRQ/NMI entry. Peripherals sit behind a `Bus` and call `irq()`/`nmi()`. Written from the Hitachi handbook tables 3-2-1 to 3-2-4, and checked against MAME (below). |
 | `emu/harness.py` | Runs one ROM routine (`call`) or a stretch of straight-line code (`run`) in the emulator, with preset registers, RAM, inline parameters and stacked arguments. Used to characterise lookups and maths helpers. |
-| `pcmre/checksum.py` | Bluetop ROM checksum (16-bit word sum = $AA55, balanced at the unused TRAP vector $FFEE). `--fix` re-balances an edited image. |
-| `pcmre/defs.py` → `bluetop/bluetop.xdf` | TunerPro RT definition generated from `defs/bluetop.yaml` (with `maps.md` and the CSVs). |
 | `emu/periph.py` | HD6301V1 on-chip peripherals plus the D151801's second timer channel: FRC, input capture/output compare with the handbook flag-clear sequences, the serial ADC on the SCI, ports with external pins, the IS3 flag and an event queue. See [`../docs/bluetop/simulation.md`](../docs/bluetop/simulation.md). |
 | `emu/engine.py` | Engine and sensor stimulus: NE/G edges from rpm, the SE056 airflow delay, IGF after each spark, ADC readings from °F/volts, digital inputs. |
 | `emu/sim.py` | `Simulation`: boots a ROM from reset and runs it against `engine.py`. Probes give RAM by name, injector pulses and spark angle. |
 | `emu/scenarios.py` | Warm-up experiments (cold start, after-start decay, steady values vs coolant) → `bluetop/sim/*.csv`, written up in [`../docs/bluetop/warmup_sim.md`](../docs/bluetop/warmup_sim.md). |
 | `pcmre/tables.py` | Python model of the Bluetop interpolating lookups: the six entry points of the 1D helper at `$FF1B`–`$FF3F` and the 3D ignition-map lookup. `find_1d_uses()` lists every table the code reads. Proven equal to the emulator by `tests/test_tables.py`. |
+| `pcmre/checksum.py` | Bluetop ROM checksum (16-bit word sum = $AA55, balanced at the TRAP vector $FFEE, which is never reached in normal running). `--fix` re-balances an edited image. |
+| `pcmre/defs.py` → `bluetop/bluetop.xdf` | TunerPro RT definition generated from `defs/bluetop.yaml` (with `maps.md` and the CSVs). |
 | `pcmre/defs.py` | Generates `<rom>/maps.md` and `<rom>/maps/*.csv` from the single definition file `defs/<rom>.yaml`. |
 | `pcmre/roundtrip.py` | The P0 gate. It regenerates the source, assembles it with both assemblers and requires byte-identical output. |
 

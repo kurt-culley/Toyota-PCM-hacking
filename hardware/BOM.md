@@ -11,7 +11,7 @@
 
 | # | Item | Qty | Why | Where | Approx. |
 |---|---|---|---|---|---|
-| A1 | **Raspberry Pi Pico 2 WH** (RP2350A, Wi-Fi/BLE, pre-soldered headers; order code SC1634). Must be a **Pico 2** model; the older Pico/Pico W (RP2040) is not 5 V tolerant | 1 (+1 optional spare) | Runs the ROM reader on its own; later the wireless link | Amazon UK, The Pi Hut, Pimoroni | ~£7–8 |
+| A1 | **Raspberry Pi Pico 2 W with headers** (RP2350A, Wi-Fi/BLE, pre-soldered headers). This repo calls it the "Pico 2 WH", but shops list it as "Pico 2 W with headers" or "pre-soldered". Do **not** buy the "Pico WH" or "Pico W": those are the older RP2040 boards, and their pins are not 5 V tolerant. Check: the chip is marked **RP2350**, and BOOTSEL mode shows a drive called **`RP2350`** (an RP2040 shows `RPI-RP2`) | 1 (+1 optional spare) | Runs the ROM reader on its own; later the wireless link | Amazon UK, The Pi Hut, Pimoroni | ~£7–8 |
 | A2 | **Olimex RP2350-PICO2-BB48R** (RP2350B, all 48 GPIOs pre-soldered, PSRAM, microSD). The BB48 (no PSRAM/microSD) also works | 1 | Main wired board: reader, real-CPU harness, bench, logger, P7 prototype. Not needed for the first dump | Olimex, The Pi Hut (BB48) | ~£11–13 |
 | A3 | Micro-USB **data** cable (skip if owned) | 1 | Pico 2 WH power and USB serial | — | ~£3 |
 | A4 | Resistors: **470 Ω ×1, 10 kΩ ×5** (an assortment kit is fine). Acceptable: EXTAL pull-up 470 Ω–2.2 kΩ, never below 390 Ω (e.g. 330 Ω + 220 Ω in series); RES 4.7–10 kΩ; TX 4.7–22 kΩ; mode straps 4.7–47 kΩ | — | EXTAL pull-up; RES, SCI TX and 3× mode-strap pull-downs | Amazon UK, CPC, or salvaged through-hole parts (measure each) | ~£5 |

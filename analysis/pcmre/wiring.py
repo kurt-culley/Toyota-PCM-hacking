@@ -166,16 +166,231 @@ def draw(board: str, out: Path) -> None:
     img.save(out, optimize=True)
 
 
+# --- Physical layout on an 830-point breadboard (Pico 2 WH) -------------------------------------------
+#
+# Holes a-e | centre gap | f-j across, rows 1-63 along; a +/- rail pair runs beside column a and beside j.
+# Both parts sit face up across the gap. The Pico uses columns c and h (0.7" header rows), USB off the
+# row-1 end, so its pin 1 is c1 and a-b and i-j stay free. The 6301 (0.6") uses columns d and h, rows
+# 25-44, NOTCH TOWARDS ROW 44, so its bus pins (21-40, column d) face the Pico's GP0-15 side: pin 1 is h44.
+COLS = "abcdefghij"
+CHIP_ROW0 = 25
+RAIL_LINK_ROWS = {"+": 50, "-": 52}
+
+
+def pico_hole(pin: int) -> tuple[str, int]:
+    return ("c", pin) if pin <= 20 else ("h", 41 - pin)
+
+
+def chip_hole(pin: int) -> tuple[str, int]:
+    return ("h", CHIP_ROW0 + 20 - pin) if pin <= 20 else ("d", CHIP_ROW0 + pin - 21)
+
+
+def _free(hole: tuple[str, int], k: int = 0) -> str:
+    """The k-th free hole in a pin's row, counted outwards from the part."""
+    col, row = hole
+    side = {"c": "ba", "d": "cba", "h": "ij"}[col]
+    return f"{side[k]}{row}"
+
+
+def _rail(name: str, row: int) -> str:
+    return f"{name}@{row}"
+
+
+def is_rail(h: str) -> bool:
+    return "@" in h
+
+
+def _row(hole: str) -> int:
+    return int(hole.split("@")[1]) if is_rail(hole) else int(hole[1:])
+
+
+def breadboard() -> tuple[list[tuple[str, str, str, str]], list[tuple[str, str, str]]]:
+    """(wires, parts) for the Pico 2 WH layout.
+
+    wires: (tag, from, to, what); parts: (part, from, to). Holes are like "b26"; rail holes are like
+    "j+@42": the + strip beside column j, level with row 42.
+    """
+    sig = board_pins("pico2w")
+    dip = {name: pin for pin, name in DIP.items()}
+
+    def to_rail(hole: str, rail: str) -> tuple[str, str]:
+        return hole, _rail(rail, _row(hole))
+
+    wires: list[tuple[str, str, str, str]] = []
+    for pin in sorted((p for p in DIP if DIP[p] in sig), key=lambda p: (p <= 20, chip_hole(p)[1])):
+        name, g = DIP[pin], sig[DIP[pin]]
+        pp = PICO_PIN[f"GP{g}"]
+        chip = _free(chip_hole(pin), 1 if pin > 20 else 0)
+        wires.append((str(len(wires) + 1), chip, _free(pico_hole(pp)), f"{name} (pin {pin}) → GP{g} (Pico pin {pp})"))
+    wires += [
+        ("5V", *to_rail(_free(pico_hole(40)), "j+"), "THE 5 V JUMPER: Pico VBUS → + rail beside j. Last in, first out"),
+        ("G1", *to_rail(_free(pico_hole(3)), "a-"), "Pico GND → − rail beside a"),
+        ("G2", *to_rail(_free(pico_hole(38)), "j-"), "Pico GND → − rail beside j"),
+        ("L+", _rail("a+", RAIL_LINK_ROWS["+"]), _rail("j+", RAIL_LINK_ROWS["+"]), "link the two + rails"),
+        ("L−", _rail("a-", RAIL_LINK_ROWS["-"]), _rail("j-", RAIL_LINK_ROWS["-"]), "link the two − rails"),
+        ("Vcc", *to_rail(_free(chip_hole(21), 1), "a+"), "6301 pin 21 Vcc → + rail beside a"),
+        ("Vss", *to_rail(_free(chip_hole(1), 1), "j-"), "6301 pin 1 Vss → − rail beside j"),
+    ]
+    wires += [(DIP[p], *to_rail(_free(chip_hole(p), 1), "j+"), f"6301 pin {p} {DIP[p]} → + rail beside j")
+              for p in (4, 5, 7)]  # fmt: skip
+    beside_vcc = chip_hole(21)[1] - 1
+    parts = [
+        ("100 nF", *to_rail(_free(chip_hole(21), 2), "a-")),
+        ("10 µF, + leg on the + rail", _rail("a+", beside_vcc), _rail("a-", beside_vcc)),
+        ("470 Ω", *to_rail(_free(chip_hole(dip["EXTAL"]), 1), "j+")),
+        ("10 kΩ", *to_rail(_free(chip_hole(dip["/RES"]), 1), "j+")),
+        ("10 kΩ", *to_rail(_free(chip_hole(dip["P24/TX"]), 1), "j+")),
+        *[("10 kΩ", *to_rail(_free(chip_hole(dip[s]), 1), "j-")) for s in ("P20", "P21", "P22")],
+    ]
+    return wires, parts
+
+
+def hole_name(h: str) -> str:
+    if not is_rail(h):
+        return h
+    return f"{'+' if '+' in h else '−'} rail beside {h[0]} (row {_row(h)})"
+
+
+def breadboard_table() -> str:
+    wires, parts = breadboard()
+    rows = ["| Wire | From | To | What |", "|---|---|---|---|"]
+    rows += [f"| {t} | {hole_name(a)} | {hole_name(b)} | {w} |" for t, a, b, w in wires]
+    rows += ["", "| Part | From | To |", "|---|---|---|"]
+    rows += [f"| {part} | {hole_name(a)} | {hole_name(b)} |" for part, a, b in parts]
+    return "\n".join(rows)
+
+
+def draw_breadboard(out: Path) -> None:
+    """A top view, row 1 on the left: on a real board that puts column j at the top and a at the bottom."""
+    from PIL import Image, ImageDraw, ImageFont
+
+    def font(size: int, bold: bool = False):
+        try:
+            return ImageFont.truetype("DejaVuSans-Bold.ttf" if bold else "DejaVuSans.ttf", size)
+        except OSError:
+            return ImageFont.load_default()
+
+    wires, parts = breadboard()
+    p, x0, top = 26, 70, 150  # pitch and origin, px
+    # lane (y) of each hole column and rail, in pitches; the centre gap is 3 pitches (e to f = 0.3")
+    lane = {"j-": 0, "j+": 1, **{c: 3 + i for i, c in enumerate("jihgf")}, **{c: 10 + i for i, c in enumerate("edcba")},
+            "a+": 16, "a-": 17}  # fmt: skip
+    f10, f13b, f15, f15b, f24b = font(10), font(13, True), font(15), font(15, True), font(24, True)
+    img = Image.new("RGB", (x0 + 64 * p + 40, 1200), "white")
+    d = ImageDraw.Draw(img)
+
+    def xy(hole: str) -> tuple[int, int]:
+        key = hole.split("@")[0] if is_rail(hole) else hole[0]
+        return x0 + _row(hole) * p, top + lane[key] * p
+
+    def vlabel(text: str, cx: int, cy: int, colour) -> None:
+        t = Image.new("RGBA", (int(d.textlength(text, font=f10)) + 4, 16), (0, 0, 0, 0))
+        ImageDraw.Draw(t).text((2, 0), text, fill=colour, font=f10)
+        t = t.rotate(90, expand=True)
+        img.paste(t, (cx - t.width // 2, cy - t.height // 2), t)
+
+    head = [
+        ("HD6301 / D151801 ROM reader: breadboard layout (Raspberry Pi Pico 2 WH, 830-point board)", f24b, "black"),
+        ("Top view, row 1 on the left. Generated from pins.h (python -m pcmre.wiring --png). Same number = one wire.",
+         f15, "black"),
+        ("Chip NOTCH points to row 44, away from the Pico. Pink wire = the 5 V jumper: last in, first out.",
+         f15b, (190, 0, 0)),
+    ]  # fmt: skip
+    for i, (t, fnt, c) in enumerate(head):
+        d.text((30, 20 + i * 30), t, fill=c, font=fnt)
+    # the board, its holes and rails
+    d.rounded_rectangle([x0 - 25, top - 30, x0 + 64 * p, top + 18 * p + 15], 10, fill=(245, 243, 236), outline="grey")
+    d.rectangle([x0, top + 7 * p + 6, x0 + 63 * p, top + 10 * p - 6], fill=(225, 222, 212))
+    for name in ("j-", "j+", "a+", "a-"):
+        y = top + lane[name] * p
+        c = (200, 0, 0) if "+" in name else (0, 90, 200)
+        dy = -12 if name in ("j-", "a+") else 12
+        d.line([x0 + p // 2, y + dy, x0 + 63 * p, y + dy], fill=c, width=2)
+        d.text((x0 - 15, y), "+" if "+" in name else "−", fill=c, font=f13b, anchor="mm")
+    for key, y_lane in lane.items():
+        y = top + y_lane * p
+        if len(key) == 1:
+            d.text((x0 - 15, y), key, fill="black", font=f13b, anchor="mm")
+        for r in range(1, 64):
+            d.rectangle([x0 + r * p - 3, y - 3, x0 + r * p + 3, y + 3], fill=(150, 150, 150))
+    for r in [1, *range(5, 64, 5)]:
+        d.text((x0 + r * p, top - 20), str(r), fill="black", font=f10, anchor="mm")
+        d.text((x0 + r * p, top + 18 * p + 2), str(r), fill="black", font=f10, anchor="mm")
+    # Pico 2 WH, face up, USB off the row-1 end
+    yh, yc = top + lane["h"] * p, top + lane["c"] * p
+    d.rectangle([x0 + p // 2 - 4, yh - 12, x0 + 20 * p + p // 2, yc + 12], fill=(30, 110, 60), outline="black")
+    d.rectangle([x0 - 22, (yc + yh) // 2 - 22, x0 + 8, (yc + yh) // 2 + 22], fill=(190, 190, 190), outline="black")
+    d.text((x0 - 7, (yc + yh) // 2), "USB", fill="black", font=f10, anchor="mm")
+    d.text((x0 + 10 * p + p // 2, (yc + yh) // 2), "Pico 2 WH (face up)", fill="white", font=f15, anchor="mm")
+    for pin, label in PICO.items():
+        col, r = pico_hole(pin)
+        x, y = x0 + r * p, top + lane[col] * p
+        d.ellipse([x - 5, y - 5, x + 5, y + 5], fill=(230, 190, 60), outline="black")
+        short = {"3V3(OUT)": "3V3", "ADC_VREF": "VREF", "3V3_EN": "EN"}.get(label, label)
+        vlabel(f"{pin} {short}", x, y + (34 if col == "h" else -34), "white")
+    # 6301, face up, notch towards row 44
+    yd = top + lane["d"] * p
+    xa, xb = x0 + CHIP_ROW0 * p - p // 2, x0 + (CHIP_ROW0 + 19) * p + p // 2
+    d.rectangle([xa, yh - 12, xb, yd + 12], fill=(40, 40, 40), outline="black")
+    d.pieslice([xb - 18, (yd + yh) // 2 - 18, xb + 18, (yd + yh) // 2 + 18], 90, 270, fill=(245, 243, 236))
+    d.text(((xa + xb) // 2, (yd + yh) // 2), "D151801 (face up)   notch →", fill="white", font=f15, anchor="mm")
+    for pin, name in DIP.items():
+        col, r = chip_hole(pin)
+        x, y = x0 + r * p, top + lane[col] * p
+        d.ellipse([x - 5, y - 5, x + 5, y + 5], fill=(200, 200, 200), outline="black")
+        vlabel(f"{pin} {name}", x, y + (36 if col == "h" else -36), "white")
+    # parts: drawn from the hole to the rail, label turned along the part
+    for part, a, b in parts:
+        (xa_, ya), (xb_, yb) = xy(a), xy(b)
+        d.line([xa_, ya, xb_, yb], fill=(90, 90, 90), width=2)
+        mx, my = (xa_ + xb_) // 2, (ya + yb) // 2
+        if "F" in part:  # capacitor
+            d.rectangle([mx - 7, my - 5, mx + 7, my + 5], fill=(60, 120, 220) if "µ" in part else (230, 160, 40))
+        else:
+            d.rectangle([mx - 4, my - 9, mx + 4, my + 9], fill=(225, 200, 150), outline="black")
+        vlabel(part.split(",")[0], mx + 12, my, "black")
+    # wires: short ones to a rail drawn in full, signal ones as numbered tags at both ends
+    sig_colour = {"AD": (0, 110, 200), "A": (0, 140, 70), "ctl": (200, 90, 0)}
+    for tag, a, b, what in wires:
+        (xa_, ya), (xb_, yb) = xy(a), xy(b)
+        if is_rail(b):
+            colour = (230, 0, 160) if tag == "5V" else (200, 0, 0) if "+" in b else (0, 90, 200)
+            d.line([xa_, ya, xb_, yb], fill=colour, width=4)
+            continue
+        kind = "AD" if what.startswith("AD") else "A" if re.match(r"A\d", what) else "ctl"
+        for x, y in ((xa_, ya), (xb_, yb)):
+            d.ellipse([x - 10, y - 10, x + 10, y + 10], fill=sig_colour[kind], outline="black")
+            d.text((x, y), tag, fill="white", font=f10, anchor="mm")
+    # key
+    ky = top + 18 * p + 40
+    d.text((30, ky), "Signal wires", fill="black", font=f15b)
+    sig = [w for w in wires if not is_rail(w[2])]
+    for i, (tag, a, b, what) in enumerate(sig):
+        col, row = divmod(i, 8)
+        d.text((30 + col * 560, ky + 28 + row * 22), f"{tag:>2}: {a} ↔ {b}   {what}", fill="black", font=f15)
+    ky2 = ky + 28 + 8 * 22 + 20
+    d.text((30, ky2), "Power, ground and parts", fill="black", font=f15b)
+    lines = [f"{w}: {hole_name(a)} ↔ {hole_name(b)}" for _, a, b, w in wires if is_rail(b)]
+    lines += [f"{part}: {hole_name(a)} ↔ {hole_name(b)}" for part, a, b in parts]
+    for i, t in enumerate(lines):
+        col, row = divmod(i, 10)
+        d.text((30 + col * 860, ky2 + 28 + row * 22), t, fill="black", font=f15)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    img.save(out, optimize=True)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--png", action="store_true")
     a = ap.parse_args()
     for b in BOARDS:
         print(f"## {b}\n\n{table(b)}\n")
-    print(f"## local\n\n{local_table()}")
+    print(f"## local\n\n{local_table()}\n")
+    print(f"## breadboard (pico2w)\n\n{breadboard_table()}")
     if a.png:
         for b in BOARDS:
             draw(b, PNG_DIR / f"wiring_{b}.png")
+        draw_breadboard(PNG_DIR / "breadboard_pico2w.png")
     return 0
 
 

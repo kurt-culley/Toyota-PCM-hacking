@@ -77,7 +77,7 @@ Unplug USB again before wiring.
 
 ## 3. Wire the breadboard (chip NOT fitted)
 
-Put the board along one end of the breadboard and leave room for the chip to straddle the centre gap, notch towards the board. Wire the chip's holes, not the chip. "The 5 V rail" is a separate breadboard rail strip, fed by **one** jumper from the board's VBUS: this is the **5 V jumper**, and it stays out until step 6.
+Put the board along one end of the breadboard and leave room for the chip to straddle the centre gap. On the Pico 2 WH, follow the [breadboard layout](#breadboard-layout-pico-2-wh-830-point-board) below. Wire the chip's holes, not the chip. "The 5 V rail" is a separate breadboard rail strip, fed by **one** jumper from the board's VBUS: this is the **5 V jumper**, and it stays out until step 6.
 
 <!-- generated: python -m pcmre.wiring (from pins.h); tests/test_wiring.py checks these tables -->
 
@@ -160,6 +160,69 @@ The 5 V jumper runs from Pico pin 40 (VBUS) to the 5 V rail.
 
 The 10 µF capacitor is polarised: its + leg goes to pin 21 (the 5 V side). Keep the two capacitors' legs short.
 
+### Breadboard layout (Pico 2 WH, 830-point board)
+
+One tested arrangement of the tables above, hole by hole.
+
+![Breadboard layout](photos/rp2350_reader/breadboard_pico2w.png)
+
+- **The Pico** sits face up across the centre gap in columns **c and h**, USB off the row-1 end, so its pin 1 (GP0) is in **c1**. That leaves holes a–b and i–j free in each of its rows.
+- **The chip** (step 6 only) sits face up in columns **d and h**, rows 25–44, with its **notch towards row 44**. Its pin 1 is **h44** and pin 21 is **d25**. It is turned this way round so its bus pins face the Pico's GP0–15 side. Until step 6, wire its holes.
+- **Rails:**
+  - The + and − strips are the ones marked red and blue on your board.
+  - Some 830-point boards break each rail strip halfway. Beep a rail from row 1 to row 63; if it is split, bridge the break with a short wire.
+  - The two + rails become the switched 5 V rail. They are fed only by the **5 V jumper** from the Pico's VBUS.
+
+<!-- generated: python -m pcmre.wiring (breadboard); tests/test_wiring.py checks this table -->
+
+| Wire | From | To | What |
+|---|---|---|---|
+| 1 | b26 | i19 | A15 (pin 22) → GP17 (Pico pin 22) |
+| 2 | b27 | i20 | A14 (pin 23) → GP16 (Pico pin 21) |
+| 3 | b28 | b20 | A13 (pin 24) → GP15 (Pico pin 20) |
+| 4 | b29 | b19 | A12 (pin 25) → GP14 (Pico pin 19) |
+| 5 | b30 | b17 | A11 (pin 26) → GP13 (Pico pin 17) |
+| 6 | b31 | b16 | A10 (pin 27) → GP12 (Pico pin 16) |
+| 7 | b32 | b15 | A9 (pin 28) → GP11 (Pico pin 15) |
+| 8 | b33 | b14 | A8 (pin 29) → GP10 (Pico pin 14) |
+| 9 | b34 | b10 | AD7 (pin 30) → GP7 (Pico pin 10) |
+| 10 | b35 | b9 | AD6 (pin 31) → GP6 (Pico pin 9) |
+| 11 | b36 | b7 | AD5 (pin 32) → GP5 (Pico pin 7) |
+| 12 | b37 | b6 | AD4 (pin 33) → GP4 (Pico pin 6) |
+| 13 | b38 | b5 | AD3 (pin 34) → GP3 (Pico pin 5) |
+| 14 | b39 | b4 | AD2 (pin 35) → GP2 (Pico pin 4) |
+| 15 | b40 | b2 | AD1 (pin 36) → GP1 (Pico pin 2) |
+| 16 | b41 | b1 | AD0 (pin 37) → GP0 (Pico pin 1) |
+| 17 | b42 | i15 | R/W (pin 38) → GP20 (Pico pin 26) |
+| 18 | b43 | i17 | AS (pin 39) → GP18 (Pico pin 24) |
+| 19 | b44 | i16 | E (pin 40) → GP19 (Pico pin 25) |
+| 20 | i33 | i14 | P24/TX (pin 12) → GP21 (Pico pin 27) |
+| 21 | i39 | b11 | /RES (pin 6) → GP8 (Pico pin 11) |
+| 22 | i42 | b12 | EXTAL (pin 3) → GP9 (Pico pin 12) |
+| 5V | i1 | + rail beside j (row 1) | THE 5 V JUMPER: Pico VBUS → + rail beside j. Last in, first out |
+| G1 | b3 | − rail beside a (row 3) | Pico GND → − rail beside a |
+| G2 | i3 | − rail beside j (row 3) | Pico GND → − rail beside j |
+| L+ | + rail beside a (row 50) | + rail beside j (row 50) | link the two + rails |
+| L− | − rail beside a (row 52) | − rail beside j (row 52) | link the two − rails |
+| Vcc | b25 | + rail beside a (row 25) | 6301 pin 21 Vcc → + rail beside a |
+| Vss | j44 | − rail beside j (row 44) | 6301 pin 1 Vss → − rail beside j |
+| /NMI | j41 | + rail beside j (row 41) | 6301 pin 4 /NMI → + rail beside j |
+| /IRQ1 | j40 | + rail beside j (row 40) | 6301 pin 5 /IRQ1 → + rail beside j |
+| /STBY | j38 | + rail beside j (row 38) | 6301 pin 7 /STBY → + rail beside j |
+
+| Part | From | To |
+|---|---|---|
+| 100 nF | a25 | − rail beside a (row 25) |
+| 10 µF, + leg on the + rail | + rail beside a (row 24) | − rail beside a (row 24) |
+| 470 Ω | j42 | + rail beside j (row 42) |
+| 10 kΩ | j39 | + rail beside j (row 39) |
+| 10 kΩ | j33 | + rail beside j (row 33) |
+| 10 kΩ | j37 | − rail beside j (row 37) |
+| 10 kΩ | j36 | − rail beside j (row 36) |
+| 10 kΩ | j35 | − rail beside j (row 35) |
+
+<!-- end generated -->
+
 The unused port pins (11, 13–20) are CMOS inputs left open. That is safe for short runs. If you have spare resistors, 47–100 kΩ from each to the 5 V rail keeps them quiet; never tie them straight to a rail.
 
 ## 4. Multimeter checklist (nothing powered)
@@ -190,7 +253,7 @@ If it reports that the 5 V rail is on, the jumper is in: take it out. Any other 
 
 ## 6. Fit the chip and power it
 
-1. **Unplug USB.** Fit the chip, with the notch towards the board, straddling the gap and fully seated.
+1. **Unplug USB.** Fit the chip face up, straddling the gap and fully seated. On the Pico 2 WH layout, its notch points to row 44, away from the Pico: pin 1 in h44, pin 21 in d25.
 2. Plug in USB and wait for the banner. RES is now held low and the clock is running.
 3. **Plug in the 5 V jumper.**
 

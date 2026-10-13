@@ -34,16 +34,28 @@ ICR2H	equ	$1D
 ICR2L	equ	$1E
 SelfTestMark	equ	$40
 FaultBits2	equ	$42
+TpsOpen	equ	$44
+TpsZero	equ	$45
+Load	equ	$46
+MapRaw	equ	$4A
+CoolantCorr	equ	$4D
+AdcZero	equ	$50
 Coolant	equ	$53
+AdcRef	equ	$55
 InjFlags	equ	$59
 StateFlags	equ	$5A
+ThaCorr	equ	$5E
+Tha	equ	$5F
+SecretRpmFuel	equ	$61
 RpmIndex	equ	$73
-CrankPeriod	equ	$77
+RpmWord	equ	$77
 NEperiod0	equ	$7C
 NEperiod1	equ	$7E
 NEperiod2	equ	$80
 LastNEtime	equ	$84
 InjPulse	equ	$88
+InjDeadTime	equ	$8A
+Mixture	equ	$8C
 OC1next	equ	$8D
 AdcStart	equ	$90
 OC1period	equ	$92
@@ -52,6 +64,7 @@ ModeFlags	equ	$99
 IgnEdge	equ	$9E
 IgnDelay	equ	$9F
 StartCount	equ	$A7
+IgnBase	equ	$A8
 NEtime	equ	$C0
 OC2next	equ	$C5
 EvLoad	equ	$C7
@@ -63,9 +76,8 @@ DiagFlags	equ	$CC
 ; ---- ROM
 	org	$F000
 
-; calibration tables and table descriptors, $F000-$F2BD (ingest: 45 referenced blocks)
 Tables:
-	db	$3F,$3F,$3F,$E6,$1A,$FA,$05,$F9
+	db	$3F,$3F,$3F,$E6,$1A,$FA,$05,$F9		; calibration tables and descriptors $F000-$F2BD
 	db	$07,$81,$20,$04,$40,$F8,$0A,$9A
 	db	$90,$96,$88,$02,$22,$00,$55,$01
 	db	$D5,$00,$55,$11,$09,$00
@@ -116,11 +128,15 @@ L_F037:
 	db	$24,$12,$00,$08,$32,$24,$24,$12
 	db	$24,$63,$60,$55,$7F,$84,$91,$0E
 	db	$04,$11,$55,$00,$10,$00,$44,$30
-	db	$20,$44,$62,$A2,$03,$A4,$08,$17
-	db	$23,$32,$41,$50,$5F,$6F,$80,$96
-	db	$03,$A4,$08,$13,$27,$38,$4A,$5D
-	db	$6F,$83,$97,$B1,$01,$80,$02,$66
-	db	$73,$80
+	db	$20,$44,$62,$A2
+; base fuel vs Load: $F0FF below 3200 rpm, $F10B above; header [offset word, max index], 9 sites [ROM:$FA43] LIKELY (Ross R-F03/R-F06)
+DensityMaps:
+	db	$03,$A4,$08,$17,$23,$32,$41,$50
+	db	$5F,$6F,$80,$96,$03,$A4,$08,$13
+	db	$27,$38,$4A,$5D,$6F,$83,$97,$B1
+; rpm fuel correction, active only with P34 = 0 [ROM:$F465] LIKELY (Ross R-F12)
+SecretRpmTbl:
+	db	$01,$80,$02,$66,$73,$80
 Lookup1D_a:
 	asld		; table-lookup helper family $F11D-$F16A (entered at several offsets with X = table) [xref] LIKELY
 L_F11E:
@@ -215,43 +231,60 @@ Lookup2D:
 	staa	$AC
 	ldx	#$00AB
 	bra	L_F142
+; extra fuel vs Load added to the density map, near zero except at high MAP [ROM:$FA4A] LIKELY (Ross R-F05)
+DensityBump:
 	db	$03,$A4,$08,$00,$05,$00,$00,$00
 	db	$00,$00,$00,$01,$03,$A4,$08,$0A
 	db	$0E,$1E,$13,$08,$12,$12,$05,$19
+; rpm correction below 3200 rpm [ROM:$FA66] LIKELY (Ross R-F06)
+SpeedMapLo:
 	db	$03,$00,$08,$21,$48,$59,$58,$6C
-	db	$75,$7F,$84,$AA,$08,$00,$0A,$4F
-	db	$66,$72,$68,$73,$7B,$73,$73,$70
-	db	$5F,$61,$00,$C0,$59,$00,$D0,$6B
-	db	$01,$30,$7C,$01,$60,$7C,$01,$70
-	db	$71,$FF,$FF,$66,$04,$60,$5A,$05
-	db	$A0,$51,$06,$60,$65,$07,$20,$55
-	db	$07,$A0,$6D,$08,$20,$4D,$FF,$FF
-	db	$5C,$02,$00,$0C,$04,$A4,$07,$C0
-	db	$C9,$CD,$D1,$D3,$D5,$D5,$D5,$D5
-	db	$D1,$CF,$CF,$CF,$88,$91,$AB,$A6
-	db	$B1,$C6,$CF,$CB,$C2,$C6,$D1,$CB
-	db	$D1,$6B,$84,$89,$8D,$A4,$A6,$AD
-	db	$A6,$A9,$A9,$B7,$BC,$BC,$56,$78
-	db	$81,$82,$98,$9E,$A2,$A2,$9C,$A0
-	db	$AB,$AD,$A9,$49,$60,$6C,$70,$87
-	db	$88,$8D,$97,$95,$9D,$A6,$A5,$A0
-	db	$1E,$3A,$53,$60,$73,$82,$78,$70
-	db	$68,$74,$8E,$8C,$81,$11,$3A,$4A
-	db	$4E,$64,$72,$60,$66,$5C,$66,$70
-	db	$86,$7A,$18,$32,$37,$40,$4D,$50
-	db	$49,$4B,$45,$51,$59,$66,$6F,$02
-	db	$00,$0C,$05,$A4,$06,$84,$A6,$C2
-	db	$B7,$BA,$BC,$BC,$BE,$C0,$C5,$CB
-	db	$CB,$CB,$8B,$93,$9A,$AD,$AF,$B1
-	db	$B1,$B2,$B3,$B6,$BA,$BA,$BA,$5A
-	db	$77,$81,$89,$97,$97,$97,$99,$99
-	db	$9F,$A2,$A2,$A2,$2B,$39,$4C,$59
-	db	$88,$91,$85,$85,$80,$86,$8E,$8F
-	db	$97,$21,$38,$35,$49,$6A,$77,$6D
-	db	$68,$62,$6A,$80,$8D,$8F,$11,$26
-	db	$37,$46,$4E,$58,$51,$57,$59,$62
-	db	$79,$89,$8E,$08,$11,$28,$31,$3A
-	db	$3F,$44,$51,$4F,$55,$6C,$84,$8E
+	db	$75,$7F,$84,$AA
+; rpm correction from 3200 rpm [ROM:$FA55] LIKELY (Ross R-F06)
+SpeedMapHi:
+	db	$08,$00,$0A,$4F,$66,$72,$68,$73
+	db	$7B,$73,$73
+; staircase rpm correction at low Load (no interpolation): entries [rpm word, factor] [ROM:$FA75-$FA8D] LIKELY
+StairLowLoad:
+	db	$70,$5F,$61,$00,$C0,$59,$00,$D0
+	db	$6B,$01,$30,$7C,$01,$60,$7C,$01
+	db	$70,$71
+; hard-driving staircase at high Load: sites 3500/4500/5100/5700/6100/6500 rpm [ROM:$FA81-$FA8D] LIKELY (Ross R-F09/R-F10)
+StairHighLoad:
+	db	$FF,$FF,$66,$04,$60,$5A,$05,$A0
+	db	$51,$06,$60,$65,$07,$20,$55,$07
+	db	$A0,$6D,$08,$20,$4D,$FF,$FF,$5C
+; ignition base map used with P34 = 1: 13 rpm (800-5600, step 400) x 8 Load rows; header [off $0200, max 12, off $04A4, max 7] [ROM:$FDC9] LIKELY
+IgnMapA:
+	db	$02,$00,$0C,$04,$A4,$07,$C0,$C9
+	db	$CD,$D1,$D3,$D5,$D5,$D5,$D5,$D1
+	db	$CF,$CF,$CF,$88,$91,$AB,$A6,$B1
+	db	$C6,$CF,$CB,$C2,$C6,$D1,$CB,$D1
+	db	$6B,$84,$89,$8D,$A4,$A6,$AD,$A6
+	db	$A9,$A9,$B7,$BC,$BC,$56,$78,$81
+	db	$82,$98,$9E,$A2,$A2,$9C,$A0,$AB
+	db	$AD,$A9,$49,$60,$6C,$70,$87,$88
+	db	$8D,$97,$95,$9D,$A6,$A5,$A0,$1E
+	db	$3A,$53,$60,$73,$82,$78,$70,$68
+	db	$74,$8E,$8C,$81,$11,$3A,$4A,$4E
+	db	$64,$72,$60,$66,$5C,$66,$70,$86
+	db	$7A,$18,$32,$37,$40,$4D,$50,$49
+	db	$4B,$45,$51,$59,$66,$6F
+; ignition base map used with P34 = 0 (secret mode): 13 rpm x 7 Load rows; header [off $0200, max 12, off $05A4, max 6] [ROM:$FDD2] LIKELY (Ross R-I15)
+IgnMapB:
+	db	$02,$00,$0C,$05,$A4,$06,$84,$A6
+	db	$C2,$B7,$BA,$BC,$BC,$BE,$C0,$C5
+	db	$CB,$CB,$CB,$8B,$93,$9A,$AD,$AF
+	db	$B1,$B1,$B2,$B3,$B6,$BA,$BA,$BA
+	db	$5A,$77,$81,$89,$97,$97,$97,$99
+	db	$99,$9F,$A2,$A2,$A2,$2B,$39,$4C
+	db	$59,$88,$91,$85,$85,$80,$86,$8E
+	db	$8F,$97,$21,$38,$35,$49,$6A,$77
+	db	$6D,$68,$62,$6A,$80,$8D,$8F,$11
+	db	$26,$37,$46,$4E,$58,$51,$57,$59
+	db	$62,$79,$89,$8E,$08,$11,$28,$31
+	db	$3A,$3F,$44,$51,$4F,$55,$6C,$84
+	db	$8E
 ; Reset: accept only mode 7 (single chip) or mode 2 (expanded multiplexed), else hang.
 ; Then ports, timers, SCI, optional ROM checksum ($AA55) and RAM test, RAM clear.
 Reset:
@@ -344,7 +377,7 @@ L_F344:
 	ldab	#$66
 	stab	$B8
 	ldab	#$2C
-	std	$44
+	std	TpsOpen
 	ldd	#$1750
 	std	$4B
 	ldd	#$0380
@@ -492,7 +525,7 @@ L_F43D:
 	pulx
 	jsr	$00,x
 L_F44C:
-	std	CrankPeriod
+	std	RpmWord
 	jsr	L_F9D4
 	stab	RpmIndex
 	sei
@@ -507,9 +540,9 @@ L_F45D:
 	staa	$B7
 	cli
 	ldx	#$F117
-	ldd	CrankPeriod
+	ldd	RpmWord
 	jsr	$09,x
-	staa	$61
+	staa	SecretRpmFuel
 	jsr	SvcEvents
 	ldaa	ModeFlags
 	lsra
@@ -522,7 +555,7 @@ L_F478:
 	ldd	#$1842
 	cmpa	Coolant
 	bcs	L_F497
-	cmpb	$5F
+	cmpb	Tha
 	bcs	L_F497
 	ldab	PORT1
 	bmi	L_F497
@@ -656,7 +689,7 @@ L_F550:
 L_F559:
 	clrb
 	ldaa	$00,x
-	cmpa	$4A
+	cmpa	MapRaw
 	bhi	L_F566
 	ldaa	$01,x
 	cmpa	RpmIndex
@@ -672,12 +705,12 @@ L_F566:
 	ldx	#$F0DB
 	bsr	L_F58D
 	ldab	#$03
-	cmpa	$4A
+	cmpa	MapRaw
 	bcs	L_F5C5
 	cmpb	$62
 	bne	L_F587
 	suba	#$04
-	cmpa	$4A
+	cmpa	MapRaw
 	bls	L_F5C5
 L_F587:
 	ldaa	#$B8
@@ -691,18 +724,18 @@ L_F593:
 	ldx	#$F0D2
 	bsr	L_F58D
 	ldab	#$02
-	cmpa	$4A
+	cmpa	MapRaw
 	rts
 L_F59D:
 	ldx	#$F0CE
 	bsr	L_F58D
-	cmpa	$4A
+	cmpa	MapRaw
 	bls	L_F5B2
 	ldab	$62
 	cmpb	#$02
 	beq	L_F5B9
 	suba	#$04
-	cmpa	$4A
+	cmpa	MapRaw
 	bhi	L_F5B9
 L_F5B2:
 	ldd	#$DE01
@@ -712,7 +745,7 @@ L_F5B9:
 	bsr	L_F593
 	bls	L_F5C5
 	suba	#$04
-	cmpa	$4A
+	cmpa	MapRaw
 L_F5C1:
 	bls	L_F5C5
 	ldab	#$04
@@ -736,7 +769,7 @@ L_F5D4:
 L_F5DE:
 	ldx	#$F0E2
 	ldd	#$3D05
-	cmpa	$44
+	cmpa	TpsOpen
 	bhi	L_F5E9
 	abx
 L_F5E9:
@@ -775,7 +808,7 @@ L_F610:
 L_F617:
 	ldaa	ModeFlags
 	bmi	L_F610
-	ldaa	$4A
+	ldaa	MapRaw
 	cmpa	#$85
 	bcs	L_F610
 	ldx	#$F0F2
@@ -950,7 +983,7 @@ L_F73D:
 	bra	L_F769
 L_F743:
 	ldd	#$1B6B
-	cmpb	$4A
+	cmpb	MapRaw
 	bcc	L_F73A
 	cmpa	Coolant
 	bcs	L_F73A
@@ -1056,7 +1089,7 @@ L_F7E9:
 	rts
 SvcIgnition:
 	bsr	SvcEvents		; computes the spark edge/delay $9E/$9F from the crank period [ROM:$F81B-$F84C] LIKELY
-	ldab	$A8
+	ldab	IgnBase
 	stab	$AB
 	clra
 	ldab	ModeFlags
@@ -1121,7 +1154,7 @@ SvcEvents:
 	beq	L_F886
 	clra
 	staa	EvRpm
-	ldd	CrankPeriod
+	ldd	RpmWord
 	subd	#$0090
 	bcs	L_F85E+1
 	jsr	L_F9D7
@@ -1166,7 +1199,7 @@ L_F886:
 	bsr	L_F8C2
 	psha
 	ldx	#$F099
-	ldd	$46
+	ldd	Load
 	addd	#$0010
 	subd	$48
 	bsr	L_F8CB
@@ -1175,7 +1208,7 @@ L_F886:
 	aba
 L_F8B1:
 	staa	$5D
-	ldd	$46
+	ldd	Load
 	std	$48
 	ldab	$75
 	stab	$76
@@ -1201,7 +1234,7 @@ L_F8CE:
 L_F8D9:
 	rts
 L_F8DA:
-	ldd	$46
+	ldd	Load
 	asld
 	asld
 	asld
@@ -1240,8 +1273,8 @@ L_F90A:
 	addd	$4B
 	std	$4B
 	ldx	#$F089
-	ldab	$4A
-	subb	$4D
+	ldab	MapRaw
+	subb	CoolantCorr
 	bcc	L_F918
 	clrb
 L_F918:
@@ -1397,16 +1430,16 @@ L_F9EB:
 	deca
 	bne	L_F9E5
 	rts
-L_F9F0:
-	ldab	#$0C
+DensityLookup:
+	ldab	#$0C		; X = table pair; uses the second table at rpm >= 3200 (RpmWord >= $0400); input Load [ROM:$F9F0-$FA01] LIKELY
 	pshx
-	ldx	CrankPeriod
+	ldx	RpmWord
 	cpx	#$0400
 	pulx
 	bcs	L_F9FC
 	abx
 L_F9FC:
-	ldd	$46
+	ldd	Load
 	jsr	L_F11E
 	bra	L_F9E1
 L_FA03:
@@ -1449,15 +1482,15 @@ L_FA3E:
 	std	$94
 	jsr	SvcAdc
 	ldx	#$F0FF
-	bsr	L_F9F0
+	bsr	DensityLookup
 	std	$AE
 	ldx	#$F196
-	bsr	L_F9F0
+	bsr	DensityLookup
 	bsr	L_F9DF
 	addd	$AE
 	std	$AE
 	ldx	#$F1BA
-	ldd	CrankPeriod
+	ldd	RpmWord
 	cmpa	#$04
 	bcc	L_FA69
 	asld
@@ -1471,11 +1504,11 @@ L_FA69:
 	jsr	L_F11F
 	staa	$AC
 	ldab	#$66
-	ldx	$46
+	ldx	Load
 	cpx	#$0199
 	ldx	#$F1C5
 	bls	L_FA84
-	ldx	$46
+	ldx	Load
 	cpx	#$02B8
 	bls	L_FA8F
 	ldx	#$F1D7
@@ -1484,7 +1517,7 @@ L_FA84:
 	inx
 	inx
 	ldd	$00,x
-	subd	CrankPeriod
+	subd	RpmWord
 	bls	L_FA84
 	ldab	$02,x
 L_FA8F:
@@ -1512,7 +1545,7 @@ L_FAB5:
 L_FAB7:
 	stab	InjFlags
 L_FAB9:
-	ldab	$5E
+	ldab	ThaCorr
 	bsr	L_FB28
 	ldab	ModeFlags
 	lsrb
@@ -1520,7 +1553,7 @@ L_FAB9:
 	ldd	#$1066
 	bita	PORT3
 	bne	L_FACB
-	ldab	$61
+	ldab	SecretRpmFuel
 L_FACB:
 	bsr	L_FB28
 	pulx
@@ -1534,7 +1567,7 @@ L_FACB:
 	inx
 L_FADD:
 	ldd	$00,x
-	cmpa	$4A
+	cmpa	MapRaw
 	tba
 	ldab	StateFlags
 	orab	#$10
@@ -1544,14 +1577,14 @@ L_FADD:
 	ldab	RpmIndex
 	ldx	#$F0BD
 	jsr	$6F,x
-	ldab	$8C
+	ldab	Mixture
 	subb	#$80
 	bcc	L_FAFA
 	negb
 L_FAFA:
 	mul
 	jsr	L_F9DF
-	ldx	$8C
+	ldx	Mixture
 	bmi	L_FB0D
 	pshb
 	psha
@@ -1713,7 +1746,7 @@ L_FBE6:
 	jsr	L_F9E5
 	staa	$69
 	ldd	$79
-	subd	CrankPeriod
+	subd	RpmWord
 	bcc	L_FBFC
 	clrb
 L_FBFC:
@@ -1734,7 +1767,7 @@ L_FBFC:
 	ldaa	#$80
 L_FC16:
 	std	InjFlags
-	ldd	CrankPeriod
+	ldd	RpmWord
 	std	$79
 L_FC1C:
 	ldaa	$69
@@ -1747,15 +1780,18 @@ L_FC28:
 	stab	PORT2
 	ldaa	PORT2
 	lsra
-	bcs	L_FC32
+	bcs	AdcResult
 	jmp	L_FB66
-L_FC32:
-	sei
+; ADC channels (PORT1 bits 2-4): 0 zero ref -> $50, 1 MAP -> $4A/$46, 2 throttle -> $44/$45,
+; 3 mixture (VAF) -> $8C, 4 battery -> $8A dead time, 5 coolant -> $53, 6 intake air -> $5F/$5E,
+; 7 reference -> $55. LIKELY (from the code paths and their consumers; to be confirmed in the simulator)
+AdcResult:
+	sei		; conversion done: D = ICR1 - AdcStart; A = channel (pushed by SvcAdc); dispatch per channel [ROM:$FC32-$FE35] LIKELY
 	ldd	ICRH
 	subd	AdcStart
 	cli
 	pshb
-	subb	$50
+	subb	AdcZero
 	sbca	#$00
 	bcc	L_FC41
 	clra
@@ -1766,7 +1802,7 @@ L_FC41:
 	pula
 	tsta
 	bne	L_FC4D
-	stab	$50
+	stab	AdcZero
 	jmp	L_F730
 L_FC4D:
 	cmpa	#$07
@@ -1775,12 +1811,12 @@ L_FC4D:
 	asld
 	ldx	#$F044
 	jsr	$D9,x
-	staa	$55
+	staa	AdcRef
 	rts
 L_FC5C:
 	psha
 	ldx	$AD
-	ldab	$55
+	ldab	AdcRef
 	jsr	L_FB28
 	jsr	L_F9D5
 	pula
@@ -1805,12 +1841,12 @@ L_FC8B:
 	ldaa	#$04
 L_FC8D:
 	jsr	L_F132
-	ldab	$8C
+	ldab	Mixture
 	aba
 	rora
 	adca	DDR1
 L_FC96:
-	staa	$8C
+	staa	Mixture
 	rts
 L_FC99:
 	stx	$AB
@@ -1846,28 +1882,28 @@ L_FCC0:
 L_FCCA:
 	bcc	L_FCD1
 	ldd	#$2C33
-	staa	$45
+	staa	TpsZero
 L_FCD1:
 	bcs	L_FD07
 	pshb
 	ldaa	ModeFlags
 	asra
 	bvc	L_FCF0
-	addb	$45
+	addb	TpsZero
 	rorb
-	addb	$45
+	addb	TpsZero
 	rorb
 	ldaa	StateFlags
 	bita	#$04
 	beq	L_FCEC
 	anda	#$FB
 	staa	StateFlags
-	inc	>$0045
+	inc	>TpsZero
 L_FCEC:
-	cmpb	$45
+	cmpb	TpsZero
 	bcs	L_FCF2
 L_FCF0:
-	ldab	$45
+	ldab	TpsZero
 L_FCF2:
 	cmpb	#$31
 	bcs	L_FCFC
@@ -1875,16 +1911,16 @@ L_FCF2:
 	bcc	L_FCFC
 	ldab	#$2C
 L_FCFC:
-	stab	$45
+	stab	TpsZero
 	pula
-	suba	$45
+	suba	TpsZero
 	bcc	L_FD04
 	clra
 L_FD04:
 	tab
-	suba	$44
+	suba	TpsOpen
 L_FD07:
-	stab	$44
+	stab	TpsOpen
 	psha
 	bcc	L_FD11
 L_FD0C:
@@ -1907,7 +1943,7 @@ L_FD11:
 	ldab	#$34
 	mul
 	adda	#$03
-	ldx	CrankPeriod
+	ldx	RpmWord
 	cpx	#$0320
 	bcc	L_FD3D
 	pshb
@@ -1933,7 +1969,7 @@ L_FD51:
 	pula
 	tsta
 	bpl	L_FD67
-	ldab	$44
+	ldab	TpsOpen
 	cmpb	#$3D
 	bcc	L_FD67
 	nega
@@ -1956,7 +1992,7 @@ L_FD70:
 	bpl	L_FD76
 	ldab	#$4D
 L_FD76:
-	stab	$4A
+	stab	MapRaw
 	ldd	$AB
 	ldx	$AB
 	cpx	#$023D
@@ -1967,11 +2003,11 @@ L_FD86:
 	ldx	$68
 	cpx	#$4000
 	bcs	L_FD90
-	addd	$46
+	addd	Load
 	lsrd
 L_FD90:
-	ldx	$46
-	std	$46
+	ldx	Load
+	std	Load
 	clra
 	ldab	ModeFlags
 	bpl	L_FDA6
@@ -1984,11 +2020,11 @@ L_FD90:
 L_FDA6:
 	ldab	$BF
 	incb
-	beq	L_FDAE
+	beq	IgnMapSelect
 	staa	$66
 	rts
-L_FDAE:
-	ldd	#$3A4B
+IgnMapSelect:
+	ldd	#$3A4B		; PORT3 bit 4 (P34, jumper J8) selects ignition map $F1EF (1) or $F25D (0) [ROM:$FDCF-$FDD5] LIKELY (Ross R-I15)
 	cmpb	$66
 	bcs	L_FDBE
 	cmpa	Coolant
@@ -2002,7 +2038,7 @@ L_FDBE:
 	clrb
 L_FDC3:
 	stab	$CB
-	ldx	$46
+	ldx	Load
 	stx	$AF
 	ldx	#$F1EF
 	ldab	PORT3
@@ -2010,7 +2046,7 @@ L_FDC3:
 	bne	L_FDD5
 	ldx	#$F25D
 L_FDD5:
-	ldd	CrankPeriod
+	ldd	RpmWord
 	jsr	Lookup2D
 	ldab	$72
 	bpl	L_FDE4
@@ -2034,7 +2070,7 @@ L_FDF5:
 	bcc	L_FDFD
 	clra
 L_FDFD:
-	staa	$A8
+	staa	IgnBase
 	rts
 L_FE00:
 	deca
@@ -2044,16 +2080,16 @@ L_FE00:
 	bcc	L_FE0A
 	ldab	#$79
 L_FE0A:
-	stab	$5F
+	stab	Tha
 	ldx	#$F083
 	jsr	$A3,x
-	staa	$5E
+	staa	ThaCorr
 	rts
 L_FE14:
 	ldx	#$F0A4
 	jsr	$88,x
 	jsr	L_F9DF
-	std	$8A
+	std	InjDeadTime
 	rts
 L_FE1F:
 	bcc	L_FE23
@@ -2067,7 +2103,7 @@ L_FE23:
 	ldx	#$F090
 	ldaa	#$08
 	jsr	$A2,x
-	staa	$4D
+	staa	CoolantCorr
 L_FE35:
 	rts
 ; OC2 (TCSR2 bit 6): reload OCR2 from OC2next ($C5): ignition timing.
@@ -2326,7 +2362,7 @@ SchedInj:
 	addd	OC1next
 	bra	L_FFD4
 L_FFD0:
-	addd	$8A
+	addd	InjDeadTime
 	addd	FRCH
 L_FFD4:
 	subd	FRCH

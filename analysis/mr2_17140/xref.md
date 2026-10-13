@@ -44,7 +44,7 @@ Instruction counts include code shared with other routines (fall-through tails).
 | `$F01E` | sub_F01E | 14 | SvcAdc, SvcEvents, SvcIgnition | – |
 | `$F027` | sub_F027 | 13 | SvcIgnition | – |
 | `$F11D` | Lookup1D_a | 22 | SvcAdc, SvcEvents, SvcIgnition | sub_F15B |
-| `$F11E` | Lookup1D_a+1 | 21 | sub_F9F0 | sub_F15B |
+| `$F11E` | Lookup1D_a+1 | 21 | DensityLookup | sub_F15B |
 | `$F11F` | Lookup1D_a+2 | 20 | SvcEvents, SvcIgnition | sub_F15B |
 | `$F120` | Lookup1D_a+3 | 19 | Reset | sub_F15B |
 | `$F124` | Lookup1D_a+7 | 29 | Reset | – |
@@ -66,8 +66,8 @@ Instruction counts include code shared with other routines (fall-through tails).
 | `$F70D` | sub_F70D | 23 | IRQ_OCF, Reset | – |
 | `$F716` | sub_F716 | 18 | SvcAdc, SvcEvents, SvcIgnition | – |
 | `$F717` | sub_F717 | 17 | SvcAdc, SvcEvents, SvcIgnition | – |
-| `$F7EC` | SvcIgnition | 893 | Reset | Lookup1D_a, Lookup1D_a+13, Lookup1D_a+15, Lookup1D_a+2, Lookup1D_a+9, Lookup2D, Mul16, SchedInj, SvcAdc, SvcAdc+14, SvcAdc+15, SvcAdc+5, … (+18) |
-| `$F84D` | SvcEvents | 840 | Reset, SvcIgnition | Lookup1D_a, Lookup1D_a+13, Lookup1D_a+15, Lookup1D_a+2, Lookup1D_a+9, Lookup2D, SchedInj, SvcAdc, SvcAdc+14, SvcAdc+15, SvcAdc+5, sub_F01E, … (+15) |
+| `$F7EC` | SvcIgnition | 893 | Reset | DensityLookup, Lookup1D_a, Lookup1D_a+13, Lookup1D_a+15, Lookup1D_a+2, Lookup1D_a+9, Lookup2D, Mul16, SchedInj, SvcAdc, SvcAdc+14, SvcAdc+15, … (+18) |
+| `$F84D` | SvcEvents | 840 | Reset, SvcIgnition | DensityLookup, Lookup1D_a, Lookup1D_a+13, Lookup1D_a+15, Lookup1D_a+2, Lookup1D_a+9, Lookup2D, SchedInj, SvcAdc, SvcAdc+14, SvcAdc+15, SvcAdc+5, … (+15) |
 | `$F8C2` | sub_F8C2 | 12 | SvcEvents, SvcIgnition | sub_F130 |
 | `$F8CB` | sub_F8CB | 8 | SvcEvents, SvcIgnition | sub_F130 |
 | `$F9D3` | sub_F9D3 | 8 | SvcEvents, SvcIgnition | – |
@@ -80,7 +80,7 @@ Instruction counts include code shared with other routines (fall-through tails).
 | `$F9E0` | sub_F9E0 | 5 | SvcEvents, SvcIgnition | – |
 | `$F9E4` | sub_F9E4 | 1 | Reset | – |
 | `$F9E5` | sub_F9E5 | 7 | Reset, SvcAdc, SvcEvents, SvcIgnition | – |
-| `$F9F0` | sub_F9F0 | 14 | SvcEvents, SvcIgnition | Lookup1D_a+1 |
+| `$F9F0` | DensityLookup | 14 | SvcEvents, SvcIgnition | Lookup1D_a+1 |
 | `$FB23` | SvcAdc | 495 | SvcEvents, SvcIgnition | Lookup1D_a, Lookup1D_a+15, Lookup1D_a+9, Lookup2D, SchedInj, SvcAdc+5, sub_F01E, sub_F130, sub_F132, sub_F6E6, sub_F716, sub_F717, … (+3) |
 | `$FB28` | SvcAdc+5 | 9 | SvcAdc, SvcEvents, SvcIgnition | Mul16 |
 | `$FB31` | SvcAdc+14 | 28 | SvcEvents, SvcIgnition | – |
@@ -146,24 +146,24 @@ Both kinds are counted in the summary; the sites are: `$F146`, `$F148`, `$F150`,
 | `$41` | – | 2 | sub_F6E6, sub_F70D, sub_F716, sub_F717 | Reset, sub_F6E6, sub_F70D, sub_F716, sub_F717 |
 | `$42` | FaultBits2 | 2 | Reset†, SvcAdc, SvcEvents, SvcIgnition, sub_F6E6, sub_F70D, sub_F716, sub_F717 | Reset†, sub_F6E6, sub_F70D, sub_F716, sub_F717 |
 | `$43` | – | 2 | Reset†, sub_F6E6, sub_F70D, sub_F716, sub_F717 | Reset†, sub_F6E6, sub_F70D, sub_F716, sub_F717 |
-| `$44` | – | 2 | Reset, SvcAdc, SvcEvents, SvcIgnition | Reset, SvcAdc, SvcEvents, SvcIgnition |
-| `$45` | – | 2 | SvcAdc, SvcEvents, SvcIgnition | Reset, SvcAdc, SvcEvents, SvcIgnition |
-| `$46` | – | 2 | SvcAdc, SvcEvents, SvcIgnition, sub_F9F0 | SvcAdc, SvcEvents, SvcIgnition |
-| `$47` | – | 2 | SvcAdc, SvcEvents, SvcIgnition, sub_F9F0 | SvcAdc, SvcEvents, SvcIgnition |
+| `$44` | TpsOpen | 2 | Reset, SvcAdc, SvcEvents, SvcIgnition | Reset, SvcAdc, SvcEvents, SvcIgnition |
+| `$45` | TpsZero | 2 | SvcAdc, SvcEvents, SvcIgnition | Reset, SvcAdc, SvcEvents, SvcIgnition |
+| `$46` | Load | 2 | DensityLookup, SvcAdc, SvcEvents, SvcIgnition | SvcAdc, SvcEvents, SvcIgnition |
+| `$47` | – | 2 | DensityLookup, SvcAdc, SvcEvents, SvcIgnition | SvcAdc, SvcEvents, SvcIgnition |
 | `$48` | – | 2 | SvcEvents, SvcIgnition | SvcEvents, SvcIgnition |
 | `$49` | – | 2 | SvcEvents, SvcIgnition | SvcEvents, SvcIgnition |
-| `$4A` | – | 1 | Reset, SvcAdc, SvcEvents, SvcIgnition, sub_F593 | SvcAdc, SvcEvents, SvcIgnition |
+| `$4A` | MapRaw | 1 | Reset, SvcAdc, SvcEvents, SvcIgnition, sub_F593 | SvcAdc, SvcEvents, SvcIgnition |
 | `$4B` | – | 2 | Reset, SvcAdc, SvcEvents, SvcIgnition | Reset, SvcAdc, SvcEvents, SvcIgnition |
 | `$4C` | – | 2 | Reset, SvcAdc, SvcEvents, SvcIgnition | Reset, SvcAdc, SvcEvents, SvcIgnition |
-| `$4D` | – | 1 | SvcEvents, SvcIgnition | SvcAdc, SvcEvents, SvcIgnition |
+| `$4D` | CoolantCorr | 1 | SvcEvents, SvcIgnition | SvcAdc, SvcEvents, SvcIgnition |
 | `$4E` | – | 1 | SvcEvents, SvcIgnition | SvcEvents, SvcIgnition |
 | `$4F` | – | 1 | SvcEvents, SvcIgnition | SvcEvents, SvcIgnition |
-| `$50` | – | 1 | SvcAdc, SvcEvents, SvcIgnition | SvcAdc, SvcEvents, SvcIgnition |
+| `$50` | AdcZero | 1 | SvcAdc, SvcEvents, SvcIgnition | SvcAdc, SvcEvents, SvcIgnition |
 | `$51` | – | 1 | SvcEvents, SvcIgnition | Reset |
 | `$52` | – | 1 | SvcEvents, SvcIgnition | Reset |
 | `$53` | Coolant | 2 | Lookup1D_a+13, Lookup1D_a+7, Reset, SvcAdc, SvcEvents, SvcIgnition | Reset, SvcAdc, SvcEvents, SvcIgnition |
 | `$54` | – | 2 | Reset | Reset |
-| `$55` | – | 1 | SvcAdc, SvcEvents, SvcIgnition | SvcAdc, SvcEvents, SvcIgnition |
+| `$55` | AdcRef | 1 | SvcAdc, SvcEvents, SvcIgnition | SvcAdc, SvcEvents, SvcIgnition |
 | `$56` | – | 2 | SvcEvents, SvcIgnition | Reset |
 | `$57` | – | 2 | SvcEvents, SvcIgnition | Reset |
 | `$58` | – | 1 | SvcEvents, SvcIgnition | Reset |
@@ -172,10 +172,10 @@ Both kinds are counted in the summary; the sites are: `$F146`, `$F148`, `$F150`,
 | `$5B` | – | 2 | IRQ_ICF, Reset | IRQ_ICF, Reset |
 | `$5C` | – | 2 | Reset, SvcEvents, SvcIgnition | Reset |
 | `$5D` | – | 2 | SvcEvents, SvcIgnition | SvcEvents, SvcIgnition |
-| `$5E` | – | 1 | SvcEvents, SvcIgnition | SvcAdc, SvcEvents, SvcIgnition |
-| `$5F` | – | 1 | Reset | SvcAdc, SvcEvents, SvcIgnition |
+| `$5E` | ThaCorr | 1 | SvcEvents, SvcIgnition | SvcAdc, SvcEvents, SvcIgnition |
+| `$5F` | Tha | 1 | Reset | SvcAdc, SvcEvents, SvcIgnition |
 | `$60` | – | 1 | SvcEvents, SvcIgnition | Reset, SvcEvents, SvcIgnition |
-| `$61` | – | 1 | SvcEvents, SvcIgnition | Reset |
+| `$61` | SecretRpmFuel | 1 | SvcEvents, SvcIgnition | Reset |
 | `$62` | – | 1 | Reset | Reset |
 | `$63` | – | 1 | Reset | Reset |
 | `$64` | – | 2 | Reset, SvcAdc, SvcEvents, SvcIgnition, sub_F9E5† | IRQ_ICF, Reset, sub_F9E5† |
@@ -197,8 +197,8 @@ Both kinds are counted in the summary; the sites are: `$F146`, `$F148`, `$F150`,
 | `$74` | – | 2 | SvcEvents, SvcIgnition | SvcEvents, SvcIgnition |
 | `$75` | – | 2 | Reset, SvcEvents, SvcIgnition, sub_F8C2 | SvcEvents, SvcIgnition |
 | `$76` | – | 1 | sub_F8C2 | SvcEvents, SvcIgnition |
-| `$77` | CrankPeriod | 2 | Reset, SvcAdc, SvcEvents, SvcIgnition, sub_F9F0 | Reset |
-| `$78` | – | 2 | Reset, SvcAdc, SvcEvents, SvcIgnition, sub_F9F0 | Reset |
+| `$77` | RpmWord | 2 | DensityLookup, Reset, SvcAdc, SvcEvents, SvcIgnition | Reset |
+| `$78` | – | 2 | DensityLookup, Reset, SvcAdc, SvcEvents, SvcIgnition | Reset |
 | `$79` | – | 2 | SvcAdc, SvcEvents, SvcIgnition | SvcAdc, SvcEvents, SvcIgnition |
 | `$7A` | – | 2 | SvcAdc, SvcEvents, SvcIgnition | SvcAdc, SvcEvents, SvcIgnition |
 | `$7B` | – | 1 | SvcAdc, SvcEvents, SvcIgnition | SvcAdc, SvcEvents, SvcIgnition |
@@ -214,9 +214,9 @@ Both kinds are counted in the summary; the sites are: `$F146`, `$F148`, `$F150`,
 | `$85` | – | 2 | IRQ_ICF | IRQ_ICF |
 | `$88` | InjPulse | 2 | IRQ_ICF | SvcEvents, SvcIgnition |
 | `$89` | – | 2 | IRQ_ICF | SvcEvents, SvcIgnition |
-| `$8A` | – | 2 | SchedInj | SvcAdc, SvcEvents, SvcIgnition |
+| `$8A` | InjDeadTime | 2 | SchedInj | SvcAdc, SvcEvents, SvcIgnition |
 | `$8B` | – | 2 | SchedInj | SvcAdc, SvcEvents, SvcIgnition |
-| `$8C` | – | 2 | SvcAdc, SvcEvents, SvcIgnition | SvcAdc, SvcEvents, SvcIgnition |
+| `$8C` | Mixture | 2 | SvcAdc, SvcEvents, SvcIgnition | SvcAdc, SvcEvents, SvcIgnition |
 | `$8D` | OC1next | 2 | IRQ_OCF, SchedInj, SvcEvents, SvcIgnition | SchedInj |
 | `$8E` | – | 2 | IRQ_OCF, SchedInj | SchedInj |
 | `$8F` | – | 1 | SvcAdc, SvcEvents, SvcIgnition | SvcAdc, SvcEvents, SvcIgnition |
@@ -244,7 +244,7 @@ Both kinds are counted in the summary; the sites are: `$F146`, `$F148`, `$F150`,
 | `$A5` | – | 2 | SvcAdc, SvcEvents, SvcIgnition | Reset, SvcAdc, SvcEvents, SvcIgnition |
 | `$A6` | – | 2 | SvcAdc, SvcEvents, SvcIgnition | SvcAdc, SvcEvents, SvcIgnition |
 | `$A7` | StartCount | 1 | IRQ_OCF, SchedInj | IRQ_OCF |
-| `$A8` | – | 1 | SvcIgnition | SvcAdc, SvcEvents, SvcIgnition |
+| `$A8` | IgnBase | 1 | SvcIgnition | SvcAdc, SvcEvents, SvcIgnition |
 | `$A9` | – | 1 | – | Reset |
 | `$AA` | – | 1 | – | SvcEvents, SvcIgnition |
 | `$AB` | – | 2 | Lookup2D, Lookup2D†, SvcAdc, SvcEvents, SvcIgnition, SvcIgnition† | Lookup2D, SvcAdc, SvcEvents, SvcIgnition |
@@ -401,38 +401,38 @@ X base for an indexed call). Code addresses that are only used as call or jump t
 | `$F0FA` | – | ptr/r | SvcAdc, SvcEvents, SvcIgnition, sub_F130† |
 | `$F0FB` | – | r | sub_F130† |
 | `$F0FC` | – | r | sub_F130† |
-| `$F0FF` | – | ptr/r | SvcEvents, SvcIgnition, sub_F15B† |
+| `$F0FF` | DensityMaps | ptr/r | SvcEvents, SvcIgnition, sub_F15B† |
 | `$F100` | – | r | sub_F15B† |
 | `$F101` | – | r | sub_F15B† |
 | `$F10B` | – | r | sub_F15B† |
 | `$F10C` | – | r | sub_F15B† |
 | `$F10D` | – | r | sub_F15B† |
-| `$F117` | – | ptr/r | Reset, sub_F15B† |
+| `$F117` | SecretRpmTbl | ptr/r | Reset, sub_F15B† |
 | `$F118` | – | r | sub_F15B† |
 | `$F119` | – | r | sub_F15B† |
-| `$F196` | – | ptr/r | SvcEvents, SvcIgnition, sub_F15B† |
+| `$F196` | DensityBump | ptr/r | SvcEvents, SvcIgnition, sub_F15B† |
 | `$F197` | – | r | sub_F15B† |
 | `$F198` | – | r | sub_F15B† |
 | `$F1A2` | – | r | sub_F15B† |
 | `$F1A3` | – | r | sub_F15B† |
 | `$F1A4` | – | r | sub_F15B† |
-| `$F1AE` | – | ptr/r | SvcEvents, SvcIgnition, sub_F15B† |
+| `$F1AE` | SpeedMapLo | ptr/r | SvcEvents, SvcIgnition, sub_F15B† |
 | `$F1AF` | – | r | sub_F15B† |
 | `$F1B0` | – | r | sub_F15B† |
-| `$F1BA` | – | ptr/r | SvcEvents, SvcIgnition, sub_F15B† |
+| `$F1BA` | SpeedMapHi | ptr/r | SvcEvents, SvcIgnition, sub_F15B† |
 | `$F1BB` | – | r | sub_F15B† |
 | `$F1BC` | – | r | sub_F15B† |
-| `$F1C5` | – | ptr | SvcEvents, SvcIgnition |
+| `$F1C5` | StairLowLoad | ptr | SvcEvents, SvcIgnition |
 | `$F1C8` | – | r | SvcEvents†, SvcIgnition† |
 | `$F1C9` | – | r | SvcEvents†, SvcIgnition† |
-| `$F1D7` | – | ptr | SvcEvents, SvcIgnition |
-| `$F1EF` | – | ptr/r | SvcAdc, SvcEvents, SvcIgnition, sub_F15A† |
+| `$F1D7` | StairHighLoad | ptr | SvcEvents, SvcIgnition |
+| `$F1EF` | IgnMapA | ptr/r | SvcAdc, SvcEvents, SvcIgnition, sub_F15A† |
 | `$F1F0` | – | r | sub_F15A† |
 | `$F1F1` | – | r | Lookup2D†, sub_F15A† |
 | `$F1F2` | – | r | sub_F159† |
 | `$F1F3` | – | r | sub_F159† |
 | `$F1F4` | – | r | sub_F159† |
-| `$F25D` | – | ptr/r | SvcAdc, SvcEvents, SvcIgnition, sub_F15A† |
+| `$F25D` | IgnMapB | ptr/r | SvcAdc, SvcEvents, SvcIgnition, sub_F15A† |
 | `$F25E` | – | r | sub_F15A† |
 | `$F25F` | – | r | Lookup2D†, sub_F15A† |
 | `$F260` | – | r | sub_F159† |
@@ -544,7 +544,7 @@ flowchart LR
   rF9D5["sub_F9D5<br/>$F9D5"]
   rF9DD["sub_F9DD<br/>$F9DD"]
   rF9E0["sub_F9E0<br/>$F9E0"]
-  rF9F0["sub_F9F0<br/>$F9F0"]
+  rF9F0["DensityLookup<br/>$F9F0"]
   rFB23["SvcAdc<br/>$FB23"]
   rFB28["SvcAdc+5<br/>$FB28"]
   rFB31["SvcAdc+14<br/>$FB31"]

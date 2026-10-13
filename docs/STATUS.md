@@ -179,11 +179,11 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
 | Q3 | What converts raw ignition-table values to degrees BTDC, and does VR offset matter? **Bluetop answered in simulation [EMU:sim]:** BTDC = (map + ThW_tADV + idle term) × 90/256 − 10.74° plus a fixed 256 µs lead (T terminal → 10.3°, consistent with the factory 10° but not independent of it). For the Bluetop that makes a map cell v ≈ v × 90/256 − 0.9°. Open: whether the 256 µs lead offsets a real delay, and the 17140's conversion | Bench IGT vs crank capture (P8); 17140 ROM (P4) |
 | Q4 | Can a 17030 or 17070 dump be found, to check Ross's 17030 numbers directly? No public 17030/17070/17140 dump found (web search 2026-10-10) | Open |
 | Q5 | Do NE/G inputs need a VR-style bipolar waveform from the bench simulator? | ECU input-circuit inspection (P8). IC3 (µPC177C comparator) is the likely conditioner |
-| Q6 | ~~Do the factory jumpers set a logic level or the mode pins?~~ **Answered 2026-10-09 [BENCH] for P32/P34:**<br>• **The jumpers come in pairs** per option pin: one to ground, one to node N.<br>• **P32 (pin 35):** J4 to ground (fitted), J9 to N.<br>• **P34 (pin 33):** J8 to N (fitted), J3 to ground.<br>• **Factory setting:** P32 = 0, P34 = N (LIKELY 1).<br>• These are Port 3 option bits, the prime candidates for the secret-map select (R-F12, R-I15). They are not the mode pins.<br>See [`hardware/aw11_ecu.md`](hardware/aw11_ecu.md) | Search the 17140 ROM for reads of Port 3 bits 2 and 4 (P4/P6). J6, J7, J1 and J2 are not tested yet |
+| Q6 | ~~Do the factory jumpers set a logic level or the mode pins?~~ **Answered 2026-10-09 [BENCH] for P32/P34:**<br>• **The jumpers come in pairs** per option pin: one to ground, one to node N.<br>• **P32 (pin 35):** J4 to ground (fitted), J9 to N.<br>• **P34 (pin 33):** J8 to N (fitted), J3 to ground.<br>• **Factory setting:** P32 = 0, P34 = N (LIKELY 1).<br>• These are Port 3 option bits, the prime candidates for the secret-map select (R-F12, R-I15). They are not the mode pins.<br>See [`hardware/aw11_ecu.md`](hardware/aw11_ecu.md) | **P4 (2026-10-13):** the ROM reads **P34** at `$FDCF` (ignition map `$F1EF` if 1, `$F25D` if 0) and `$FAC2` (fuel: x1.00 if 1, secret rpm correction `$F117` if 0). **P32 is not read** by any instruction found (LIKELY). PORT4 bits 2–3 select an advance trim; J6, J7, J1 and J2 are candidates for those, not tested yet |
 | Q7 | What does the 17140 ROM do with the `OX`/`VF` pins on a UK car with no O2 sensor? | ROM analysis (P4) |
 | Q8 | Does the 17140's `OX` pin carry the mixture-screw CO resistor? The 1984 VAF pin is missing from the board (Ross R-M08) | Continuity **Test B**, then the ROM ADC channel map (P4) |
 | Q9 | Is there a **1986–89 UK mk1b wiring diagram** to confirm the 17140 pinout (VISC, OX, W, ACT, FPU ...)? The 1988 repair manual is mk1b-era but **US spec** (air flow meter, O2 sensor), so it defines `V-ISC`, `FPU` and `W` but cannot say what the UK car uses | Owner: a UK/European 1986–89 EWD or repair manual supplement |
-| Q10 | What is jumper **node N**? About 750 Ω to ground, the same both ways, not connected to the main +5 V. Is it a logic-high source, such as a standby 5 V rail? This decides what P34 reads (0 or 1) with the factory J8 fitted | **Powered** measurement of N and P20–P22 in the socketed ECU with the chip out (P3). Needs the owner's confirmation at the time (CLAUDE.md hardware safety) |
+| Q10 | What is jumper **node N**? About 750 Ω to ground, the same both ways, not connected to the main +5 V. Is it a logic-high source, such as a standby 5 V rail? This decides what P34 reads (0 or 1) with the factory J8 fitted, and so **which ignition map and fuel correction the car runs stock** (P4: `$F1EF` + x1.00 if P34 = 1; secret `$F25D` + `$F117` if 0) | **Powered** measurement of N and P20–P22 in the socketed ECU with the chip out (P3). Needs the owner's confirmation at the time (CLAUDE.md hardware safety) |
 
 ### P4 tasks (MR2 17140 analysis)
 - [x] Step 1, first pass: labelled source `analysis/mr2_17140/mr2_17140.asm` (generated from `symbols.yaml` by `pcmre.symlisting`; asl round trip IDENTICAL), xref and call graph, architecture map [`mr2/architecture.md`](mr2/architecture.md). Findings:
@@ -193,7 +193,18 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
   - SCI used only for a RAM-peek link;
   - test-terminal-gated self-test.
   Most items LIKELY or GUESS; not yet reviewed by a Verifier.
-- [ ] Step 2: ADC channel map; find the fuel and ignition maps through their readers.
+- [x] Step 2, first pass ([`mr2/maps.md`](mr2/maps.md)); all LIKELY, not yet Verifier-reviewed:
+  - **ADC channel map:** 0 zero, 1 MAP, 2 throttle, 3 mixture (VAF), 4 battery, 5 coolant, 6 intake air, 7 reference.
+  - **Engine speed:** RpmWord `$77` = rpm × 0.32.
+  - **Ignition base maps** `$F1EF` (13 rpm × 8 load) and `$F25D` (13 × 7), **selected by P34 (jumper J8)**.
+  - **PORT4 bits 2–3 trim** the advance (table `$F01A`).
+  - **Fuel chain:**
+    - density maps `$F0FF`/`$F10B` (split at 3200 rpm) and high-MAP bump `$F196`/`$F1A2`;
+    - speed maps `$F1AE`/`$F1BA`;
+    - staircases `$F1C5`/`$F1D7`;
+    - THA correction `$F083`;
+    - the secret rpm correction `$F117`, used only when P34 = 0.
+  - Units (kPa, degrees, µs) still to calibrate.
 - [ ] Step 3: simulator I/O profile for this ROM; real-CPU harness cross-check.
 
 ### Bench observations to follow up (P4)

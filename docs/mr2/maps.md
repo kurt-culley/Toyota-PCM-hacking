@@ -1,0 +1,136 @@
+# MR2 89661-17140: sensor channels and maps (first pass)
+
+**Builds on:** [`architecture.md`](architecture.md).
+
+**Names:** [`analysis/mr2_17140/symbols.yaml`](../../analysis/mr2_17140/symbols.yaml).
+
+**Status:** P4 step 2, first pass. Everything here is read from the code paths and their consumers (LIKELY), not yet run in the simulator or on the real chip. Physical units for load and advance are open until the simulator and the bench calibrate them.
+
+## Sensor channels (ADC on input capture 1, channel on PORT1 bits 2–4)
+
+The ECU times each conversion: ICR1 − the start stamp `$90`. It then subtracts the channel-0 zero reading and scales the result by the channel-7 reference. Each channel has its own consumer [ROM:$FC32-$FE35].
+
+| Ch | Signal | Result | Evidence | Confidence |
+|---|---|---|---|---|
+| 0 | zero reference | `$50` AdcZero | stored raw and subtracted from every other channel [ROM:$FC45-$FC4A] | LIKELY |
+| 1 | **MAP (PIM)** | `$4A` MapRaw (8-bit), `$46` Load (16-bit, filtered) | feeds the ignition-map row and the density maps; `$4D` is substituted on a fault [ROM:$FD70-$FD92] | LIKELY |
+| 2 | **Throttle (VTA)** | `$44` TpsOpen, `$45` TpsZero | learned closed position; a fast opening triggers an extra asynchronous injection [ROM:$FCCA-$FD51] | LIKELY |
+| 3 | **Mixture adjust (VAF / CO resistor)** | `$8C` Mixture | range-checked (<$30 / >$D0 tables); `$80` on a fault; used as reading − `$80` | LIKELY (Ross R-M01) |
+| 4 | **Battery (+B)** | `$8A` InjDeadTime | table `$F0A4` → injector dead time added in SchedInj [ROM:$FE14-$FE1E, $FFD0] | LIKELY |
+| 5 | **Coolant (THW)** | `$53` Coolant | latched on an NE event; `$1E` on a fault [ROM:$FE1F-$FE33] | LIKELY |
+| 6 | **Intake air (THA)** | `$5F` Tha, `$5E` ThaCorr | table `$F083` → fuel correction; `$79` on a fault [ROM:$FE0A-$FE12] | LIKELY |
+| 7 | reference | `$55` AdcRef | table `$F044`; every other channel is multiplied by (`$55` + 410) [ROM:$FC4D-$FC64] | LIKELY |
+
+There is no O2 channel. A UK 1985–89 MR2 runs open loop, which fits.
+
+## Engine speed
+
+**`$77` RpmWord = rpm × 0.32** (LIKELY). The evidence:
+- It is the reciprocal of the NE period sum [ROM:$F41F-$F44C].
+- With that scale, the rpm sites of both staircase tables come out at round numbers (600, 650, 950, 1100, 1150; 3500, 4500, 5100, 5700, 6100, 6500).
+- `$0400` = 3200 rpm, the split between the two density and speed maps that Ross describes (R-F06).
+- The Bluetop uses the same 0.32 scale (`FullRPM`).
+
+## Ignition: two base maps, chosen by P34 (jumper J8)
+
+`IgnMapSelect` [ROM:$FDCF-$FDD5]:
+- **PORT3 bit 4 = 1** → map **A** `$F1EF` (13 × 8).
+- **PORT3 bit 4 = 0** → map **B** `$F25D` (13 × 7).
+
+That bit is **P34**, which the factory jumper **J8** ties to node N (BENCH 2026-10-09).
+
+**This is Ross's secret mode** (R-I15, R-F12): one logic level swaps the whole ignition base map and also switches the fuel chain's rpm correction (below).
+
+**Which map runs in your car depends on what P34 reads, i.e. on node N (open question Q10).**
+
+**Lookup:**
+- columns are RpmWord × 2 − `$0200` → **800 to 5600 rpm, every 400 rpm**;
+- rows are Load × 4 − `$04A4` (map A) or `$05A4` (map B), one row per 256;
+- interpolated in both directions [ROM:$F16A-$F1A0] (the `Lookup2D` helper).
+
+The result `$A8` then gets a **trim from PORT4 bits 2–3** (table `$F01A`):
+
+| PORT4 bits 2–3 | Trim (raw) |
+|---|---|
+| 00 | +9 |
+| 01 | −17 |
+| 10 | −9 |
+| 11 | 0 |
+
+That looks like an octane/fuel-grade selection, probably on the untested jumpers or a connector pin (GUESS) [ROM:$FDE4-$FDFD].
+
+Rows run from light load (row 0) to heavy load. Values are raw. Larger means more advance (LIKELY: the light-load rows are highest). **Degrees per count are not yet known.**
+
+**Map A `$F1EF`** (P34 = 1)
+
+| Load row \ rpm | 800 | 1200 | 1600 | 2000 | 2400 | 2800 | 3200 | 3600 | 4000 | 4400 | 4800 | 5200 | 5600 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 0 | 192 | 201 | 205 | 209 | 211 | 213 | 213 | 213 | 213 | 209 | 207 | 207 | 207 |
+| 1 | 136 | 145 | 171 | 166 | 177 | 198 | 207 | 203 | 194 | 198 | 209 | 203 | 209 |
+| 2 | 107 | 132 | 137 | 141 | 164 | 166 | 173 | 166 | 169 | 169 | 183 | 188 | 188 |
+| 3 | 86 | 120 | 129 | 130 | 152 | 158 | 162 | 162 | 156 | 160 | 171 | 173 | 169 |
+| 4 | 73 | 96 | 108 | 112 | 135 | 136 | 141 | 151 | 149 | 157 | 166 | 165 | 160 |
+| 5 | 30 | 58 | 83 | 96 | 115 | 130 | 120 | 112 | 104 | 116 | 142 | 140 | 129 |
+| 6 | 17 | 58 | 74 | 78 | 100 | 114 | 96 | 102 | 92 | 102 | 112 | 134 | 122 |
+| 7 | 24 | 50 | 55 | 64 | 77 | 80 | 73 | 75 | 69 | 81 | 89 | 102 | 111 |
+
+**Map B `$F25D`** (P34 = 0, secret mode; 7 load rows starting one row-step higher)
+
+| Load row \ rpm | 800 | 1200 | 1600 | 2000 | 2400 | 2800 | 3200 | 3600 | 4000 | 4400 | 4800 | 5200 | 5600 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 0 | 132 | 166 | 194 | 183 | 186 | 188 | 188 | 190 | 192 | 197 | 203 | 203 | 203 |
+| 1 | 139 | 147 | 154 | 173 | 175 | 177 | 177 | 178 | 179 | 182 | 186 | 186 | 186 |
+| 2 | 90 | 119 | 129 | 137 | 151 | 151 | 151 | 153 | 153 | 159 | 162 | 162 | 162 |
+| 3 | 43 | 57 | 76 | 89 | 136 | 145 | 133 | 133 | 128 | 134 | 142 | 143 | 151 |
+| 4 | 33 | 56 | 53 | 73 | 106 | 119 | 109 | 104 | 98 | 106 | 128 | 141 | 143 |
+| 5 | 17 | 38 | 55 | 70 | 78 | 88 | 81 | 87 | 89 | 98 | 121 | 137 | 142 |
+| 6 | 8 | 17 | 40 | 49 | 58 | 63 | 68 | 81 | 79 | 85 | 108 | 132 | 142 |
+
+## Fuel: speed-density chain
+
+```mermaid
+flowchart LR
+  MAP["Load $46 (MAP)"] --> DEN["density map<br/>$F0FF (&lt;3200 rpm) / $F10B (&ge;3200)<br/>+ high-MAP bump $F196 / $F1A2"]
+  RPM["RpmWord $77"] --> SPD["speed correction<br/>$F1AE (&lt;3200) / $F1BA (&ge;3200)"]
+  RPM --> STAIR["staircase (no interpolation)<br/>$F1C5 at low Load, $F1D7 at high Load"]
+  MAP --> STAIR
+  THA["THA ch6"] --> TC["ThaCorr $5E ($F083)"]
+  P34{"P34 (J8)"} -->|1| FIX["x 1.00 ($66)"]
+  P34 -->|0| SEC["secret rpm correction $61 ($F117)"]
+  DEN --> MUL(("x"))
+  SPD --> MUL
+  STAIR --> MUL
+  TC --> MUL
+  FIX --> MUL
+  SEC --> MUL
+  MUL --> PW["pulse, then dead time $8A (battery, ch4)"]
+```
+
+**Correction factors:** (value + 410) / 512, so **102 (`$66`) = × 1.00**. This is the `$FB28` multiply [ROM:$FB28-$FB2F].
+
+| Table | What | Ross | Confidence |
+|---|---|---|---|
+| `$F0FF` / `$F10B` | density map (base fuel vs MAP), 9 sites, below / from 3200 rpm | R-F03, R-F06 | LIKELY |
+| `$F196` / `$F1A2` | extra fuel vs MAP, near zero except at high MAP | R-F05 (high-MAP bump) | LIKELY |
+| `$F1AE` / `$F1BA` | speed (rpm) correction below / from 3200 rpm | R-F06–R-F08 | LIKELY |
+| `$F1C5` | staircase at low Load: sites 600–1150 rpm (idle/decel range) | — | LIKELY |
+| `$F1D7` | **hard-driving staircase** at high Load: 3500/4500/5100/5700/6100/6500 rpm, factors 90/81/101/85/109/77, then 92 above 6500 (−2 % to −5 % mostly) | R-F09, R-F10 (staircase confirmed; sites differ from Ross's 17030) | LIKELY |
+| `$F117` | **secret rpm correction**, used only with P34 = 0 | R-F12 | LIKELY |
+| `$F083` | THA correction | R-F11 | LIKELY |
+
+## What this means for the goals
+
+- **Secret maps (goal 2):**
+  - The selector is P34 / jumper J8.
+  - The alternative ignition map and the rpm fuel correction are located: `$F25D` and `$F117`.
+  - **The next owner step is Q10:** a powered measurement of node N, to learn which map the car runs stock.
+- **Tuning (goal 3):** the ignition maps, density maps, speed maps and staircases are now addressable, ready for a definition file and TunerPro XDF once the units are calibrated.
+
+## Next
+
+1. Simulator profile for this ROM, to calibrate the units:
+   - MAP kPa on `$46`;
+   - advance degrees per count;
+   - injector µs per count.
+2. Confirm the channel map on the real-CPU harness: feed known voltages and read the result through the RAM-peek link.
+3. Write `analysis/defs/mr2_17140.yaml` (replacing the auto-ported Bluetop file) and generate the XDF and readable tables.

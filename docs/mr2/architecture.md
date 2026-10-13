@@ -14,7 +14,7 @@ This is the P4 step-1 map: where things are and roughly what they do. Names are 
 flowchart TD
   RES["Reset $F2BE<br/>mode 7 or 2 only, else hang<br/>ports, timers, SCI<br/>ROM checksum + RAM test (test terminals only)<br/>RAM clear $44-$CB"] --> ML
   subgraph ML["MainLoop $F371 (restarts every pass)"]
-    PEEK["SerialPeek $F403<br/>SCI byte in = address, word out"] --> SPD["crank period $77, speed $73<br/>$F41F-$F44F"]
+    PEEK["SerialPeek $F403<br/>SCI byte in = address, word out"] --> SPD["engine speed RpmWord $77 (rpm × 0.32), $73<br/>$F41F-$F44F"]
     SPD --> BODY["engine-state logic, fuel/idle decisions<br/>$F45E-$F6E3"]
     BODY --> SVC["SvcIgnition $F7EC -> SvcEvents $F84D -> SvcAdc $FB23<br/>called several times per pass"]
   end
@@ -72,7 +72,7 @@ The structure matches the Bluetop's design: crank interrupts set event flags, an
 
 1. Re-initialise SP, DDRs and RAMCR every pass. This is a watchdog-style robustness measure [ROM:$F371-$F383].
 2. Answer a pending SCI RAM-peek request (`SerialPeek`).
-3. **Speed:** crank period → `$77` (CrankPeriod) → `$73` (RpmIndex), the byte compared against rpm-like thresholds (`#$64`, `#$C8`, `#$DC` …) everywhere [ROM:$F41F-$F44F].
+3. **Speed:** NE period sum → reciprocal → `$77` (RpmWord, rpm × 0.32, see [`maps.md`](maps.md)) → `$73` (RpmIndex), the byte compared against rpm-like thresholds (`#$64`, `#$C8`, `#$DC` …) everywhere [ROM:$F41F-$F44F].
 4. Engine-state and fuel decisions [ROM:$F45E-$F6E3]: start/after-start (`$53`, `$62`), idle (`$4A` against `$F0CA`–`$F0DB` limits), flags `$59`/`$5A`/`$99`, and outputs on PORT2.
 5. `SvcIgnition` → `SvcEvents` → `SvcAdc` are called several times per pass, so the crank events and ADC conversions are serviced promptly.
 

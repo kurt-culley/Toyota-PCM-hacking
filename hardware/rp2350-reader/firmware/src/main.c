@@ -518,8 +518,16 @@ static void cmd_dump(void) {
     }
     const uint32_t len = 0x10000u - ROMDUMP_START;
     const uint8_t *rom = runs[0] + 1;
-    uint mode = runs[0][0] >> 5;
-    bool same = !memcmp(runs[0], runs[1], len + 1) && !memcmp(runs[0], runs[2], len + 1);
+    // The first byte is Port 2: bits 7-5 are the latched mode, bits 4-0 are live pin levels
+    // (P20-P24), which may differ between runs. Every run must be in mode 0; only the ROM
+    // bytes have to match.
+    uint mode = 0;
+    for (uint r = 0; r < RUNS; r++)
+        mode |= runs[r][0] >> 5;
+    uint32_t differ = 0;
+    for (uint32_t i = 1; i <= len; i++)
+        differ += runs[0][i] != runs[1][i] || runs[0][i] != runs[2][i];
+    bool same = differ == 0;
     uint32_t seen = 0, agree = 0, sum = 0;
     for (uint32_t i = 0; i < len - 1; i++) {  // $FFFF: dummy cycles overwrite its snoop
         uint32_t a = ROMDUMP_START + i;
@@ -530,7 +538,8 @@ static void cmd_dump(void) {
     }
     for (uint32_t i = 0; i < len; i += 2)
         sum += (uint32_t)(rom[i] << 8 | rom[i + 1]);
-    printf("mode %u (want 0), runs identical: %s\n", mode, same ? "yes" : "NO");
+    printf("mode bits %u in any run (want 0); ROM bytes that differ between runs: %lu (want 0)\n", mode,
+           (unsigned long)differ);
     printf("snoop channel: %lu of %lu bytes seen, %lu agree with the SCI copy ($FFFF not compared)\n",
            (unsigned long)seen, (unsigned long)(len - 1), (unsigned long)agree);
     printf("word sum $%04lX (the Bluetop convention is $AA55)\n", (unsigned long)(sum & 0xFFFF));

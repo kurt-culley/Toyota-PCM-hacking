@@ -127,6 +127,18 @@ ram:
   0xca:
     name: EvEdge2
     note: event flag set on edge 2 when $B7 bit 7 [ROM:$FF5C, $F886] GUESS
+  0x82:
+    name: NEsum
+    note: 'NE period sum stored at edge 0 by IRQ_ICF; rpm ~ 15,000,000 / NEsum [ROM:$FF14-$FF1A] CONFIRMED (EMU)'
+  0x94:
+    name: RevCount
+    note: 'rev-limit pass counter: $FD below the limit, +1 per FuelPulse above it; cut at $FF [ROM:$FA2B-$FA3E] CONFIRMED (code, EMU)'
+  0x95:
+    name: FuelCut
+    note: 'bit 3 = rev-limit fuel cut; SchedInj schedules nothing while $95 is non-zero [ROM:$FA3E, $FFBD] CONFIRMED (code, EMU:tests/test_rev_limiter17140.py)'
+  0xb9:
+    name: RevLimit
+    note: 'armed rev limit as an NEsum: $07B6 (7600 rpm) or $07EB (7400 rpm) after a fast climb through 6000 rpm [ROM:$FA03-$FA29] CONFIRMED (code, EMU)'
   0xcc:
     name: DiagFlags
     note: 'bit 0 set after a serial RAM-peek reply [ROM:$F41B]; checked and cleared about once a second, and the SCI is switched off if it was clear (link keep-alive) [ROM:$F62E-$F641] CONFIRMED (code, EMU); bit 7 tested widely GUESS'
@@ -223,6 +235,9 @@ labels:
   0xf000:
     name: Tables
     note: 'calibration tables and descriptors $F000-$F2BD, except code at $F01E-$F03A (range check and clamp); $F000-$F002 = 3F 3F 3F (SWI opcodes: a stray jump to the start of the ROM traps to the reset vector) LIKELY'
+  0xfa1e:
+    name: RevLimitSel
+    note: 'rev limit: $07B6 = 7600 rpm (slow climb), $07EB at $FA26 = 7400 rpm (fast climb through 6000 rpm); value = 15e6 / rpm [ROM:$FA1E-$FA29] CONFIRMED (code, EMU)'
   0xfa03:
     name: FuelPulse
     note: 'injection pulse: density x speed x staircase (lag-filtered in $B8) x InjFlags factor x caller factor x ThaCorr x (P34 ? 1.00 : $61) x mixture term, minimum 600 counts -> InjPulse [ROM:$FA03-$FB1F]

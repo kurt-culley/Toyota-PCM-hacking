@@ -208,7 +208,7 @@ Both kinds are counted in the summary; the sites are: `$F146`, `$F148`, `$F150`,
 | `$7F` | – | 2 | NEperiodSum, SvcIgnition | – |
 | `$80` | NEperiod2 | 2 | NEperiodSum | – |
 | `$81` | – | 2 | NEperiodSum | – |
-| `$82` | – | 2 | SvcEvents, SvcIgnition | IRQ_ICF |
+| `$82` | NEsum | 2 | SvcEvents, SvcIgnition | IRQ_ICF |
 | `$83` | – | 2 | SvcEvents, SvcIgnition | IRQ_ICF |
 | `$84` | LastNEtime | 2 | IRQ_ICF | IRQ_ICF |
 | `$85` | – | 2 | IRQ_ICF | IRQ_ICF |
@@ -224,8 +224,8 @@ Both kinds are counted in the summary; the sites are: `$F146`, `$F148`, `$F150`,
 | `$91` | – | 2 | SvcAdc, SvcEvents, SvcIgnition | IRQ_OCF |
 | `$92` | OC1period | 2 | IRQ_OCF | IRQ_OCF |
 | `$93` | – | 2 | IRQ_OCF | IRQ_OCF |
-| `$94` | – | 2 | SvcEvents, SvcIgnition | SvcEvents, SvcIgnition |
-| `$95` | – | 2 | SchedInj, SvcEvents, SvcIgnition | Reset, SvcEvents, SvcIgnition |
+| `$94` | RevCount | 2 | SvcEvents, SvcIgnition | SvcEvents, SvcIgnition |
+| `$95` | FuelCut | 2 | SchedInj, SvcEvents, SvcIgnition | Reset, SvcEvents, SvcIgnition |
 | `$96` | – | 2 | IRQ_ICF | IRQ_ICF, Reset |
 | `$97` | NEcount | 2 | IRQ_ICF, SvcIgnition | IRQ_ICF, Reset |
 | `$98` | – | 2 | Reset | IRQ_ICF, Reset |
@@ -261,7 +261,7 @@ Both kinds are counted in the summary; the sites are: `$F146`, `$F148`, `$F150`,
 | `$B6` | – | 2 | Reset, SvcAdc, SvcEvents, SvcIgnition | Reset, SvcAdc, SvcEvents, SvcIgnition |
 | `$B7` | – | 1 | IRQ_ICF, Reset | IRQ_ICF, Reset |
 | `$B8` | – | 1 | SvcEvents, SvcIgnition | Reset, SvcEvents, SvcIgnition |
-| `$B9` | – | 2 | SvcEvents, SvcIgnition | SvcEvents, SvcIgnition |
+| `$B9` | RevLimit | 2 | SvcEvents, SvcIgnition | SvcEvents, SvcIgnition |
 | `$BA` | – | 2 | SvcEvents, SvcIgnition | SvcEvents, SvcIgnition |
 | `$BB` | – | 1 | SvcEvents, SvcIgnition | SvcEvents, SvcIgnition |
 | `$BC` | – | 2 | SvcEvents, SvcIgnition | SvcEvents, SvcIgnition |

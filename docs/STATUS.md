@@ -244,6 +244,13 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
   - about 130–200 words/s in the simulator, with no effect on spark or injection.
   
   Simulator host model: [`../analysis/emu/peek17140.py`](../analysis/emu/peek17140.py).
+- [x] **17140 rev limiter** ([`mr2/rev_limiter.md`](mr2/rev_limiter.md)) [ROM:$FA03-$FA3E, $FFB7] [EMU:tests/test_rev_limiter17140.py]:
+  - fuel only, after 3 calculations over the limit, no hysteresis;
+  - **7600 rpm** (`$07B6` at `$FA1F`), or **7400 rpm** (`$07EB` at `$FA27`) after a fast climb through 6000 rpm;
+  - two missing IGF echoes also stop injection;
+  - `RpmWord` saturates at about 7325 rpm, so the limiter uses the crank period `$82`.
+  
+  Not yet Verifier-reviewed.
 - [ ] Bench and car anchors: Load at key-on, engine off, over the serial link (kPa scale); what ADC ch7 measures; a timing-light reading with the test terminal shorted; PORT3 over the link (Q10).
 - [ ] Pico 2 W serial-link logger firmware and host decoder, tested against the simulator model first.
 

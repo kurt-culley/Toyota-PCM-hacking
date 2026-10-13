@@ -54,6 +54,7 @@ RpmWord	equ	$77
 NEperiod0	equ	$7C
 NEperiod1	equ	$7E
 NEperiod2	equ	$80
+NEsum	equ	$82
 LastNEtime	equ	$84
 InjPulse	equ	$88
 InjDeadTime	equ	$8A
@@ -61,12 +62,15 @@ Mixture	equ	$8C
 OC1next	equ	$8D
 AdcStart	equ	$90
 OC1period	equ	$92
+RevCount	equ	$94
+FuelCut	equ	$95
 NEcount	equ	$97
 ModeFlags	equ	$99
 IgnEdge	equ	$9E
 IgnDelay	equ	$9F
 StartCount	equ	$A7
 IgnBase	equ	$A8
+RevLimit	equ	$B9
 NEtime	equ	$C0
 OC2next	equ	$C5
 EvLoad	equ	$C7
@@ -585,7 +589,7 @@ L_F4AC:
 	tab
 	staa	$54
 	staa	$6F
-	std	$95
+	std	FuelCut
 	ldd	#$8081
 	bra	L_F4BC
 L_F4B9:
@@ -1448,7 +1452,7 @@ L_F9FC:
 FuelPulse:
 	pshx		; injection pulse: density x speed x staircase (lag-filtered in $B8) x InjFlags factor x caller factor x ThaCorr x (P34 ? 1.00 : $61) x mixture term, minimum 600 counts -> InjPulse [ROM:$FA03-$FB1F] LIKELY
 	clra
-	ldx	$82
+	ldx	NEsum
 	cpx	#$09C4
 	bcc	L_FA17
 	ldaa	$BB
@@ -1463,26 +1467,27 @@ L_FA17:
 	ldab	#$78
 	abx
 	cpx	$BC
-	ldx	#$07B6
+RevLimitSel:
+	ldx	#$07B6		; rev limit: $07B6 = 7600 rpm (slow climb), $07EB at $FA26 = 7400 rpm (fast climb through 6000 rpm); value = 15e6 / rpm [ROM:$FA1E-$FA29] CONFIRMED (code, EMU)
 	inca
 	bne	L_FA29
 	bcc	L_FA29
 	ldx	#$07EB
 L_FA29:
-	stx	$B9
+	stx	RevLimit
 L_FA2B:
-	ldx	$B9
+	ldx	RevLimit
 	ldd	#$FDF7
-	andb	$95
-	cpx	$82
+	andb	FuelCut
+	cpx	NEsum
 	bcs	L_FA3E
-	ldaa	$94
+	ldaa	RevCount
 	inca
 	bne	L_FA3E
 	orab	#$08
 	deca
 L_FA3E:
-	std	$94
+	std	RevCount
 	jsr	SvcAdc
 	ldx	#$F0FF
 	bsr	DensityLookup
@@ -2251,7 +2256,7 @@ L_FF14:
 	ldab	NEcount
 	bne	L_FF24
 	jsr	NEperiodSum
-	std	$82
+	std	NEsum
 	ldaa	$65
 	staa	$98
 	clrb
@@ -2352,7 +2357,7 @@ SchedInj:
 	pshb		; schedule the end of an injector pulse: OC1next = FRC + D (+ $22) [ROM:$FFB7-$FFE0] LIKELY
 	ldab	StartCount
 	cmpb	#$02
-	ldab	$95
+	ldab	FuelCut
 	pulb
 	bcc	L_FFED
 	bne	L_FFED

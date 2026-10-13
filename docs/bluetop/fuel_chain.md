@@ -63,7 +63,7 @@ flowchart TD
   PWR --> SUM
   IDLE --> SUM
   WU["ThW_tADV: warm-up advance from coolant<br/>(min 28; 15 when overheating)<br/>[ROM:$FC1E]"] --> SUM
-  SUM["BaseAdvance + ThW_tADV + IDLcompADV<br/>clamped to $1F–$B8 (≈11°–65°), then −$1C<br/>[ROM:$F8CD–$F8EE]"] --> US["convert to µs from the NE period<br/>(deltaNE, referenced to the NE edge at 10° BTDC)<br/>→ AdvanceinUS, Dwell<br/>[ROM:$F8F0–$F92B]"]
+  SUM["BaseAdvance + ThW_tADV + IDLcompADV<br/>clamped to $1F–$B8 (≈0.2°–54° BTDC), then −$1C<br/>[ROM:$F8CD–$F8EE]"] --> US["convert to µs from the NE period<br/>(deltaNE, referenced to the NE edge at 10° BTDC)<br/>→ AdvanceinUS, Dwell<br/>[ROM:$F8F0–$F92B]"]
   US --> IGT["OC1 → IGT"]
 ```
 

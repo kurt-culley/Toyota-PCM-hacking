@@ -121,7 +121,9 @@ def build() -> tuple[str, str]:
         "- **Cold engine:** `thw_FF0A` adds extra advance below operating temperature, and `overheat_adv` "
         "retards above 218 °F.",
         "- **`pwr_ign_trim`:** a selectable trim of 0 to a few degrees (the PWRr input), taken here as 0.",
-        "- **Limits:** the total is clamped to about 10° to 64°.",
+        "- **Limits:** the ROM clamps the advance sum to `$1F`–`$B8` [ROM:$F8E6], which is about **0.2° to 54° BTDC** "
+        "warm (before the 256 µs lead). Warm, cells 0–3 all give the floor; above 4350 rpm the T-VIS +8 lifts "
+        "the lowest reachable value to about 2°.",
         "",
         "Confidence: the conversion is CONFIRMED in the simulator [EMU:tests/test_sim.py, "
         "tests/test_readable.py]. The rpm axis and degrees rest on deltaNE = 180° of crank (LIKELY); "

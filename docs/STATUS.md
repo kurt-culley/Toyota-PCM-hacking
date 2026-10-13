@@ -31,7 +31,7 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
 | P0 | Foundations: tooling, asl round-trip, xref, emulator | ✅ done | ☑ 2026-10-09 (independent Verifier agents: xref and emulator, both after fixes) |
 | P1 | Ross claim register, figures, digitised data, diagrams | ✅ done | — |
 | P2 | Bluetop analysis + Tier-A verification | ✅ done | ☑ 2026-10-10 (independent Verifier agents: simulation, then P2 gate; PASS after fixes) |
-| P3 | Dump the MR2 89661-17140 ROM (RP2350 reader) | ☐ | ☐ |
+| P3 | Dump the MR2 89661-17140 ROM (RP2350 reader) | ✅ done 2026-10-13 | ☑ 2026-10-13 (independent Verifier agent: PASS WITH ISSUES; minor follow-ups listed under P3) |
 | P4 | MR2 analysis + Tier-B verification → **Ross verified** | ☐ | ☐ |
 | P5 | Warm-up / cold start (goal 1), blocked until the P4 gate | ☐ blocked | ☐ |
 | P6 | Secret maps (goal 2) | ☐ | ☐ |
@@ -141,7 +141,7 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
     - "43-byte" program.
   - **Accepted:** the release lags E falling by about 3 PIO clocks (~20 ns at 2 mA drive). Input-sync bypass is not used, because the RP2350 register's mapping under a GPIO base of 16 is not documented. The emulator does not model the 6301's dummy `$FFFF` cycles. No test covers PIO or core-1 timing; the hardware `listen`/`probe` steps cover it.
 - [x] Reader guide with wiring pictures, multimeter checklist, bring-up and troubleshooting ([`hardware/rp2350_reader_guide.md`](hardware/rp2350_reader_guide.md)); its tables are generated from `pins.h` and checked by `tests/test_wiring.py`.
-- [ ] Carrier PCB (KiCad, factory-assembled).
+- [ ] Carrier PCB (KiCad, factory-assembled): deferred; the breadboard rig stays as the P4 real-CPU harness.
 - [x] Chip removed from the spare ECU, socket fitted (owner, 2026-10-12).
 - [x] Reader firmware flashed to the Pico 2 W; banner correct on macOS [BENCH:owner report 2026-10-13].
 - [x] Breadboard wired (Pico 2 W layout), multimeter checklist all six checks OK, `rigcheck` PASS [BENCH:owner report 2026-10-13]. The first `rigcheck` correctly refused to run with the 5 V jumper only half removed.
@@ -158,7 +158,7 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
 - [x] New firmware (address sampled ~107 ns after AS): two `listen` runs, both PASS and identical cycle for cycle; cycle 0 reads `$FFFE`; all 64 addresses agree with the instruction flow [BENCH:owner logs 2026-10-13].
 - [x] At E = 125 kHz: `clock` PASS (124,993 Hz, 50 %), `listen` PASS, **`probe` PASS** (vector served, `$C0C0` fetched, late cycles 0) [BENCH:owner report 2026-10-13]. At E = 250 kHz the first `probe` failed safe: core 1 was late on the back-to-back `$FFFF` cycle, so it stopped driving; no contention.
 - [x] **17140 ROM dumped** (2026-10-13): three runs identical (4096 ROM bytes, 0 differ), mode bits 000 in every run, snoop channel agrees on 4095/4095 bytes, word sum `$AA55`, vectors RES/SWI/NMI/IRQ1/TOF/SCI `$F2BE`, OCF `$FE36`, ICF `$FEB4` [BENCH:analysis/captures/89661-17140_dump_2026-10-13.txt]. SHA-256 `0cfc1fdd36fc4514cf0693e18ef7e4b47594a4b78f72beadd30766a36f271f6e`. Saved as `AW11 MR2 PCM/89661-17140.bin`. The first dump attempt failed only because the run comparison included the Port 2 pin byte (P22 read 0 in one run and 1 in two); fixed in firmware v4.
-- [ ] `size` (confirm 4 KB: `$E000`–`$EFFF` should be floating bus).
+- [x] `size`: `$E000`–`$EFFF` echoes the address on all 4096 bytes (floating bus, not ROM); `$F000`–`$FFFF` is identical across runs (internal ROM). **The 17140 ROM is 4 KB** [BENCH:owner report 2026-10-13].
 - [x] **Dump Verifier (independent agent, 2026-10-13): PASS WITH ISSUES.**
   - **Image:** the .bin equals the captured HEX, re-parsed with two parsers; SHA-256 matches.
   - **Self-check:** the ROM's own reset code verifies the word sum against `$AA55` [ROM:$F2FE], and the image passes it.

@@ -7,7 +7,7 @@
 ;   Y        = snoop delay after E rises (2 PIO clocks per pass), loaded once at start.
 ;
 ; Words to the CPU, tagged by bit 31:
-;   address sample, bit 31 = 0: the 21 bus pins at AS falling;
+;   address sample, bit 31 = 0: the 21 bus pins ~0.2 us after AS falls;
 ;   snoop sample,   bit 31 = 1: 0xFFFFFF00 | AD0-7 read while E is high (bit 8 set);
 ;   early-release marker: 0xFFFFFE00 (E fell before the snoop delay ended).
 ; Words from the CPU: bits 0-7 data, bits 8-15 pin directions (0xFF = drive). The CPU
@@ -28,7 +28,10 @@ cycle:
 .wrap_target
     wait 1 pin 18           ; AS high: a new cycle begins
     pull noblock            ; discard any stale answer
-    wait 0 pin 18           ; AS falls: AD0-7 hold the low address byte
+    wait 0 pin 18 [31]      ; AS falls; sample ~0.2 us later (32 PIO clocks). On the first cycle
+                            ; after reset AD0 was seen still settling at the edge itself; the
+                            ; address then stays on AD0-7 (driven, then held by the floating
+                            ; bus) until E rises ~0.8 us after AS falls at E = 250 kHz
     in pins, 21
     push noblock
     mov x, null             ; default answer: listen

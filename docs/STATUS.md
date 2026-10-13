@@ -154,7 +154,8 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
   - the first proposal of 32 clocks risked core 1's answer deadline, so it was cut to 16 as the Verifier advised;
   - the AS-to-E time is an estimate until measured; check `late cycles` = 0 in `probe`;
   - confirm the first-cycle settling across several `listen` runs.
-- [ ] `res`, `probe` (late cycles must be 0), `dump` ×3, `size`.
+- [x] `res`: RES (pin 6) reads ≥ 4.5 V while released [BENCH:owner report 2026-10-13].
+- [ ] `probe` (late cycles must be 0), `dump` ×3, `size`.
 - [ ] Dump ×3, verified; Verifier sign-off.
 
 ## Open questions

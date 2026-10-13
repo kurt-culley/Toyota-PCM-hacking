@@ -86,6 +86,24 @@ flowchart LR
 
 - **Levels:** the ECU's input threshold is 2.0 V, so the Pico's 3.3 V output drives it directly. The ECU's 5 V output may only reach the Pico while the Pico is powered (CLAUDE.md rule 1). Power the Pico first, and fit a series resistor so an unpowered Pico is not back-fed.
 - **Where to connect:** **open (Q11).** Pins 11 and 12 must be traced on the ECU board to see whether they reach a connector pin or a test pad. On the spare ECU the new socket makes fly-leads on the solder side easy.
+
+### The pins double as outputs when the link is off
+
+Both pins are ordinary Port 2 outputs whenever the SCI is off. The main loop writes DDR2 = `$FE` every pass [ROM:$F371-$F383]:
+- **Pin 12 (P24)** is driven by the fault-code flasher [ROM:$F769-$F7E9] CONFIRMED (code). That routine:
+  - builds a flash pattern from the stored fault bits `$40`/`$42`;
+  - switches to a test-terminal mode when P30 is set;
+  - drives PORT2 bit 4 from the sign of `$A1`.
+
+  This is almost certainly the **check-engine lamp (`W`)** driver, which the 1984 EWD also routes to the check connector as `DG` LIKELY. In the simulator, with the key on and the engine stopped, the line toggles in a slow pattern [EMU:sim].
+- **Pin 11 (P23)** is set or cleared by a timer compare against `$A6`, which is 8 with a stored fault and 0 without [ROM:$FC1C-$FC28]. It is another diagnostic output. The `VF` service-connector pin is a candidate, GUESS.
+
+**What this means for the engine-bay connector:**
+- **ECU → tool:** the reply bytes leave on pin 12, the same line as the lamp. If `W`/`DG` reaches the check connector, the data comes out there, but through the lamp driver: 12 V levels, probably inverted, and only as fast as that transistor switches. Readable with a divider or clamp, LIKELY.
+- **Tool → ECU:** pin 11 must be **held low at key-on** and then receive bytes. If its net leaves the ECU through a driver transistor, as an output pin would, nothing outside can drive it. A plain series resistor would allow it.
+- **At every key-on**, pin 11's level depends on what the board's circuit presents while it is still an input. If that level is low, the link switches itself on for about 1 s and then off again with no request.
+
+So a full link through the existing connector is only possible if the board traces allow it. The likely answer is "receive yes, send no". In that case the minimum change is one wire from pin 11 (plus ground) to a spare connector pin or a small socket inside the case.
 - **Firmware:** a small Pico program: hold TX low (break) while waiting for the ECU's power, release it, then poll a variable list in a loop and stream the values over USB or Wi-Fi. Every hardware step needs the owner's confirmation before power is applied.
 
 ## Next

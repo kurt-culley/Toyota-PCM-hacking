@@ -185,6 +185,17 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
 | Q9 | Is there a **1986–89 UK mk1b wiring diagram** to confirm the 17140 pinout (VISC, OX, W, ACT, FPU ...)? The 1988 repair manual is mk1b-era but **US spec** (air flow meter, O2 sensor), so it defines `V-ISC`, `FPU` and `W` but cannot say what the UK car uses | Owner: a UK/European 1986–89 EWD or repair manual supplement |
 | Q10 | What is jumper **node N**? About 750 Ω to ground, the same both ways, not connected to the main +5 V. Is it a logic-high source, such as a standby 5 V rail? This decides what P34 reads (0 or 1) with the factory J8 fitted | **Powered** measurement of N and P20–P22 in the socketed ECU with the chip out (P3). Needs the owner's confirmation at the time (CLAUDE.md hardware safety) |
 
+### P4 tasks (MR2 17140 analysis)
+- [x] Step 1, first pass: labelled source `analysis/mr2_17140/mr2_17140.asm` (generated from `symbols.yaml` by `pcmre.symlisting`; asl round trip IDENTICAL), xref and call graph, architecture map [`mr2/architecture.md`](mr2/architecture.md). Findings:
+  - NE on input capture 2 (6 edges, G on PORT3 bit 5);
+  - ignition on output compare 2;
+  - a timed ADC on input capture 1 with channel select on PORT1 bits 2–4;
+  - SCI used only for a RAM-peek link;
+  - test-terminal-gated self-test.
+  Most items LIKELY or GUESS; not yet reviewed by a Verifier.
+- [ ] Step 2: ADC channel map; find the fuel and ignition maps through their readers.
+- [ ] Step 3: simulator I/O profile for this ROM; real-CPU harness cross-check.
+
 ### Bench observations to follow up (P4)
 - **Day-one ingest** ([`../analysis/mr2_17140/ingest.md`](../analysis/mr2_17140/ingest.md)):
   - Only 4 % of the Bluetop's instructions align, so this is a different program, and **none of the 19 Bluetop maps port automatically**.

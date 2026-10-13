@@ -1,0 +1,76 @@
+# Names and notes for the MR2 89661-17140 ROM. The single hand-maintained record of what we
+# know about this program; `python -m pcmre.symlisting mr2_17140 --write` regenerates the
+# labelled source and the cross-reference report from it. Tag every note with its evidence
+# and confidence. First pass (P4 step 1): names are working names, not conclusions.
+title: "MR2 AW11 ECU 89661-17140 (D151801-7110), $F000-$FFFF"
+rom:
+  file: AW11 MR2 PCM/89661-17140.bin
+ram:
+  0x40: {name: SelfTestMark, note: "RAM/ROM self-test result word $40/$41; also fault-code bits (oraa $40) [ROM:$F330, $F71D] LIKELY"}
+  0x42: {name: FaultBits2, note: "second fault-bit word, set with $40 [ROM:$F72A] GUESS"}
+  0x53: {name: Coolant, note: "compared with #$1B/#$23/#$2D, set from table $F090 [ROM:$FE2C] GUESS: coolant index"}
+  0x59: {name: InjFlags, note: "bit 7/6 flags around injection [ROM:$F4BC, $FC0C] GUESS"}
+  0x5A: {name: StateFlags, note: "status bits; bit 3 mirrors PORT3 bit 3 changes [ROM:$FBD0] GUESS"}
+  0x73: {name: RpmIndex, note: "byte from the crank period ($77 -> sub_F9D4) [ROM:$F44F]; compared with #$64/#$C8/#$DC LIKELY: engine speed"}
+  0x77: {name: CrankPeriod, note: "scaled sum of the three NE half-periods $7C+$7E+$80 [ROM:$F41F-$F44C] LIKELY"}
+  0x7C: {name: NEperiod0, note: "NE edge interval x/2, written by IRQ_ICF for even edge counts [ROM:$FF24-$FF35] CONFIRMED (code)"}
+  0x7E: {name: NEperiod1, note: "see NEperiod0"}
+  0x80: {name: NEperiod2, note: "see NEperiod0"}
+  0x84: {name: LastNEtime, note: "ICR2 at the previous counted NE edge [ROM:$FF33]"}
+  0x88: {name: InjPulse, note: "injection pulse length handed to sub_FFB7 [ROM:$FF07-$FF11] LIKELY"}
+  0x8D: {name: OC1next, note: "next output-compare-1 time (OCR1) [ROM:$FE7A, $FFE0] CONFIRMED (code)"}
+  0x90: {name: AdcStart, note: "FRC when the ADC measurement started at OC1 [ROM:$FE8F]; ICR1 - AdcStart = conversion time [ROM:$FC33] LIKELY"}
+  0x92: {name: OC1period, note: "periodic OC1 schedule, += 1000 or 4000 us [ROM:$FE83-$FE99] LIKELY"}
+  0x97: {name: NEcount, note: "NE edge counter 0..5, reset when PORT3 bit 5 (G) is seen [ROM:$FEC7-$FEDF] LIKELY"}
+  0x99: {name: ModeFlags, note: "engine-state bits (bit 7, bit 1 used everywhere) [ROM:$F604] GUESS"}
+  0x9E: {name: IgnEdge, note: "NE edge (0..5) on which the spark is scheduled [ROM:$F848, $FF5E] LIKELY"}
+  0x9F: {name: IgnDelay, note: "delay from that edge to the spark/dwell (us) [ROM:$F848, $FF61] LIKELY"}
+  0xA7: {name: StartCount, note: "counts OC2 events up to 4 [ROM:$FE54-$FE6B] GUESS"}
+  0xC0: {name: NEtime, note: "ICR2 at the latest NE edge [ROM:$FEC2]"}
+  0xC5: {name: OC2next, note: "next output-compare-2 time (ignition) [ROM:$FE3F, $FF8C] LIKELY"}
+  0xC7: {name: EvLoad, note: "event flag set by IRQ_ICF, handled in sub_F84D [ROM:$FF4C, $F8BB] LIKELY"}
+  0xC8: {name: EvRpm, note: "event flag set by IRQ_ICF on edge 1, handled in sub_F84D [ROM:$FF53, $F84D] LIKELY"}
+  0xC9: {name: EvCoolant, note: "event flag set on edge 2 [ROM:$FF5E] GUESS"}
+  0xCA: {name: EvEdge2, note: "event flag set on edge 2 when $B7 bit 7 [ROM:$FF5C, $F886] GUESS"}
+  0xCC: {name: DiagFlags, note: "bit 0 set after a serial RAM-peek reply [ROM:$F41B]; bit 7 tested widely GUESS"}
+labels:
+  0xF11D: {name: Lookup1D_a, note: "table-lookup helper family $F11D-$F16A (entered at several offsets with X = table) [xref] LIKELY"}
+  0xF16A: {name: Lookup2D, note: "lookup with two inputs (calls $F13D/$F159/$F15A) [xref] GUESS"}
+  0xF2BE:
+    name: Reset
+    note: "reset vector (also SWI, NMI, IRQ1, TOF, SCI) [ROM:$FFF0-$FFFF]"
+    block: |
+      Reset: accept only mode 7 (single chip) or mode 2 (expanded multiplexed), else hang.
+      Then ports, timers, SCI, optional ROM checksum ($AA55) and RAM test, RAM clear.
+  0xF371:
+    name: MainLoop
+    note: "main loop: re-initialises SP, DDRs and RAMCR every pass [ROM:$F371-$F6E3] LIKELY"
+  0xF3E4: {name: NEperiodSum, note: "D = $7C + $7E + $80, saturating [ROM:$F3E4-$F3F1] CONFIRMED (code)"}
+  0xF403:
+    name: SerialPeek
+    note: "RAM peek: a byte received on the SCI is an address; the word there is sent back [ROM:$F403-$F41E] LIKELY"
+    block: |
+      Diagnostic link: same idea as the Bluetop's SerialDebug ($F40D). A 3-wire SCI tap gives live
+      ECU variables (RE_PLAN P8 note).
+  0xF7EC: {name: SvcIgnition, note: "computes the spark edge/delay $9E/$9F from the crank period [ROM:$F81B-$F84C] LIKELY"}
+  0xF84D: {name: SvcEvents, note: "handles the edge-event flags $C8/$CA/$C7 set by IRQ_ICF, then falls into SvcAdc [ROM:$F84D-$F8BF] LIKELY"}
+  0xFB23: {name: SvcAdc, note: "when TCSR ICF (bit 7) is set: read the finished conversion, select the next channel on PORT1 bits 2-4 [ROM:$FB5F-$FB96] LIKELY"}
+  0xFB33: {name: Mul16, note: "16 x 16 multiply, saturating at $FFFF; result in X [ROM:$FB33-$FB5E] LIKELY"}
+  0xFE36:
+    name: IRQ_OCF
+    note: "output-compare interrupt [ROM:$FFF4]"
+    block: |
+      OC2 (TCSR2 bit 6): reload OCR2 from OC2next ($C5): ignition timing.
+      OC1 (TCSR bit 6): ADC start (clear PORT1 bits 5-7, stamp FRC in $90), periodic OC1 schedule,
+      and the injector pulse on Tout1 (P21) via $8D. LIKELY
+  0xFEB4:
+    name: IRQ_ICF
+    note: "input-capture interrupt [ROM:$FFF6]"
+    block: |
+      IC2 (TCSR2 flags): NE crank edge. Counts edges 0..5 in $97 (G seen on PORT3 bit 5 resets it),
+      stores half-periods in $7C/$7E/$80, sets the event flags $C7-$CA, schedules injection
+      (sub_FFB7) and the spark (OCR2 = edge time + $C3 + $9C). LIKELY
+  0xFFB7: {name: SchedInj, note: "schedule the end of an injector pulse: OC1next = FRC + D (+ $22) [ROM:$FFB7-$FFE0] LIKELY"}
+data:
+  - {start: 0xF000, end: 0xF2BD, name: Tables, note: "calibration tables and table descriptors, $F000-$F2BD (ingest: 45 referenced blocks)"}
+  - {start: 0xFFEE, end: 0xFFFF, kind: word, name: Vectors, note: "$FFEE: checksum balance word; then SCI, TOF, OCF, ICF, IRQ1, SWI, NMI, RES"}

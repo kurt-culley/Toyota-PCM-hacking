@@ -656,7 +656,8 @@ def render(x: Xref, listing: Listing, title: str) -> str:
     ]
     for site, entry, m in sorted(x.indirect):
         ins = x.instrs[site]
-        out.append(f"| `${site:04X}` | {x.routine_name(entry)} | `{m} ${ins.operand:02X},x` |")
+        text = f"{m} ${ins.operand:02X},x" if ins.operand is not None else m  # e.g. RTS after a stack rewrite
+        out.append(f"| `${site:04X}` | {x.routine_name(entry)} | `{text}` |")
     out.append("")
 
     # Coverage

@@ -169,7 +169,8 @@ One tested arrangement of the tables above, hole by hole.
 - **The Pico** sits face up across the centre gap in columns **c and h**, USB off the row-1 end, so its pin 1 (GP0) is in **c1**. That leaves holes a–b and i–j free in each of its rows.
 - **The chip** (step 6 only) sits face up in columns **d and h**, rows 25–44, with its **notch towards row 44**. Its pin 1 is **h44** and pin 21 is **d25**. It is turned this way round so its bus pins face the Pico's GP0–15 side. Until step 6, wire its holes.
 - **Rails:**
-  - The + and − strips are the ones marked red and blue on your board.
+  - The + and − strips are the ones marked red and blue on your board. The picture follows the common layout: on the left the + strip is outermost, with the − strip beside column a; on the right the + strip is beside column j, with the − strip outermost. If your board differs, go by the red and blue markings, not the position.
+  - Dots in the picture mark the holes a wire or part plugs into. Where a wire crosses a strip without a dot, it just passes over it.
   - Some 830-point boards break each rail strip halfway. Beep a rail from row 1 to row 63; if it is split, bridge the break with a short wire.
   - The two + rails become the switched 5 V rail. They are fed only by the **5 V jumper** from the Pico's VBUS.
 
@@ -205,7 +206,7 @@ One tested arrangement of the tables above, hole by hole.
 | L+ | + rail beside a (row 50) | + rail beside j (row 50) | link the two + rails |
 | L− | − rail beside a (row 52) | − rail beside j (row 52) | link the two − rails |
 | Vcc | b25 | + rail beside a (row 25) | 6301 pin 21 Vcc → + rail beside a |
-| Vss | j44 | − rail beside j (row 44) | 6301 pin 1 Vss → − rail beside j |
+| Vss | i44 | − rail beside j (row 44) | 6301 pin 1 Vss → − rail beside j |
 | /NMI | j41 | + rail beside j (row 41) | 6301 pin 4 /NMI → + rail beside j |
 | /IRQ1 | j40 | + rail beside j (row 40) | 6301 pin 5 /IRQ1 → + rail beside j |
 | /STBY | j38 | + rail beside j (row 38) | 6301 pin 7 /STBY → + rail beside j |
@@ -214,8 +215,8 @@ One tested arrangement of the tables above, hole by hole.
 |---|---|---|
 | 100 nF (or 47 nF '473'), either way round | + rail beside a (row 26) | − rail beside a (row 26) |
 | 10 µF, + leg on the + rail | + rail beside a (row 24) | − rail beside a (row 24) |
-| 330 Ω, EXTAL pull-up part 1 | j42 | j47 |
-| 220 Ω, EXTAL pull-up part 2 | i47 | + rail beside j (row 47) |
+| 330 Ω, EXTAL pull-up part 1 | j42 | j45 |
+| 220 Ω, EXTAL pull-up part 2 | i45 | + rail beside j (row 45) |
 | 10 kΩ | j39 | + rail beside j (row 39) |
 | 10 kΩ | j33 | + rail beside j (row 33) |
 | 10 kΩ | j37 | − rail beside j (row 37) |

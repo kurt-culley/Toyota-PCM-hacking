@@ -175,7 +175,7 @@ def draw(board: str, out: Path) -> None:
 COLS = "abcdefghij"
 CHIP_ROW0 = 25
 RAIL_LINK_ROWS = {"+": 50, "-": 52}
-EXTAL_JOIN_ROW = 47  # free f-j strip joining the two EXTAL pull-up resistors
+EXTAL_JOIN_ROW = 45  # free f-j strip joining the two EXTAL pull-up resistors
 
 
 def pico_hole(pin: int) -> tuple[str, int]:
@@ -230,7 +230,7 @@ def breadboard() -> tuple[list[tuple[str, str, str, str]], list[tuple[str, str, 
         ("L+", _rail("a+", RAIL_LINK_ROWS["+"]), _rail("j+", RAIL_LINK_ROWS["+"]), "link the two + rails"),
         ("L−", _rail("a-", RAIL_LINK_ROWS["-"]), _rail("j-", RAIL_LINK_ROWS["-"]), "link the two − rails"),
         ("Vcc", *to_rail(_free(chip_hole(21), 1), "a+"), "6301 pin 21 Vcc → + rail beside a"),
-        ("Vss", *to_rail(_free(chip_hole(1), 1), "j-"), "6301 pin 1 Vss → − rail beside j"),
+        ("Vss", *to_rail(_free(chip_hole(1), 0), "j-"), "6301 pin 1 Vss → − rail beside j"),
     ]
     wires += [(DIP[p], *to_rail(_free(chip_hole(p), 1), "j+"), f"6301 pin {p} {DIP[p]} → + rail beside j")
               for p in (4, 5, 7)]  # fmt: skip
@@ -267,7 +267,11 @@ def breadboard_table() -> str:
 
 
 def draw_breadboard(out: Path) -> None:
-    """A top view, row 1 on the left: on a real board that puts column j at the top and a at the bottom."""
+    """A top view in portrait, as the common 830-point board is printed: row 1 at the top, a-e on the left.
+
+    Rail order follows that board: on the left the + strip is outermost and the - strip sits beside
+    column a; on the right the + strip sits beside column j and the - strip is outermost.
+    """
     from PIL import Image, ImageDraw, ImageFont
 
     def font(size: int, bold: bool = False):
@@ -277,123 +281,128 @@ def draw_breadboard(out: Path) -> None:
             return ImageFont.load_default()
 
     wires, parts = breadboard()
-    p, x0, top = 26, 70, 150  # pitch and origin, px
-    # lane (y) of each hole column and rail, in pitches; the centre gap is 3 pitches (e to f = 0.3")
-    lane = {"j-": 0, "j+": 1, **{c: 3 + i for i, c in enumerate("jihgf")}, **{c: 10 + i for i, c in enumerate("edcba")},
-            "a+": 16, "a-": 17}  # fmt: skip
-    f10, f13b, f15, f15b, f24b = font(10), font(13, True), font(15), font(15, True), font(24, True)
-    img = Image.new("RGB", (x0 + 64 * p + 40, 1200), "white")
+    p, left, top = 26, 160, 220  # pitch and origin, px
+    # x lane of each hole column and rail strip, in pitches; the centre gap is 3 pitches (e to f = 0.3")
+    lane = {"a+": 0, "a-": 1, **{c: 3 + i for i, c in enumerate("abcde")}, **{c: 10 + i for i, c in enumerate("fghij")},
+            "j+": 16, "j-": 17}  # fmt: skip
+    f10, f12, f13b, f15, f15b, f22b = font(10), font(12), font(13, True), font(15), font(15, True), font(22, True)
+    board_w = 18 * p
+    img = Image.new("RGB", (left + board_w + 960, top + 64 * p + 40), "white")
     d = ImageDraw.Draw(img)
 
     def xy(hole: str) -> tuple[int, int]:
         key = hole.split("@")[0] if is_rail(hole) else hole[0]
-        return x0 + _row(hole) * p, top + lane[key] * p
-
-    def vlabel(text: str, cx: int, cy: int, colour) -> None:
-        t = Image.new("RGBA", (int(d.textlength(text, font=f10)) + 4, 16), (0, 0, 0, 0))
-        ImageDraw.Draw(t).text((2, 0), text, fill=colour, font=f10)
-        t = t.rotate(90, expand=True)
-        img.paste(t, (cx - t.width // 2, cy - t.height // 2), t)
+        return left + lane[key] * p, top + _row(hole) * p
 
     head = [
-        ("HD6301 / D151801 ROM reader: breadboard layout (Raspberry Pi Pico 2 WH, 830-point board)", f24b, "black"),
-        ("Top view, row 1 on the left. Generated from pins.h (python -m pcmre.wiring --png). Same number = one wire.",
+        ("HD6301 / D151801 ROM reader: breadboard layout (Raspberry Pi Pico 2 W, 830-point board)", f22b, "black"),
+        ("Top view, row 1 at the top, as the board is printed. Generated from pins.h (python -m pcmre.wiring --png).",
          f15, "black"),
-        ("Chip NOTCH points to row 44, away from the Pico. Pink wire = the 5 V jumper: last in, first out.",
-         f15b, (190, 0, 0)),
+        ("Same number = one wire. Chip NOTCH points DOWN (towards row 44), away from the Pico.", f15b, (190, 0, 0)),
+        ("Pink wire = the 5 V jumper: last in, first out.", f15b, (190, 0, 0)),
+        ("Dots = the holes a wire or part plugs into. It just passes over anything in between.", f15, "black"),
     ]  # fmt: skip
     for i, (t, fnt, c) in enumerate(head):
-        d.text((30, 20 + i * 30), t, fill=c, font=fnt)
-    # the board, its holes and rails
-    d.rounded_rectangle([x0 - 25, top - 30, x0 + 64 * p, top + 18 * p + 15], 10, fill=(245, 243, 236), outline="grey")
-    d.rectangle([x0, top + 7 * p + 6, x0 + 63 * p, top + 10 * p - 6], fill=(225, 222, 212))
-    for name in ("j-", "j+", "a+", "a-"):
-        y = top + lane[name] * p
-        c = (200, 0, 0) if "+" in name else (0, 90, 200)
-        dy = -12 if name in ("j-", "a+") else 12
-        d.line([x0 + p // 2, y + dy, x0 + 63 * p, y + dy], fill=c, width=2)
-        d.text((x0 - 15, y), "+" if "+" in name else "−", fill=c, font=f13b, anchor="mm")
-    for key, y_lane in lane.items():
-        y = top + y_lane * p
+        d.text((20, 15 + i * 30), t, fill=c, font=fnt)
+    # board, rails, holes, labels
+    d.rounded_rectangle(
+        [left - 22, top - 30, left + board_w - 4, top + 64 * p], 10, fill=(245, 243, 236), outline="grey"
+    )
+    d.rectangle([left + 7 * p + 6, top, left + 10 * p - 6, top + 63 * p], fill=(225, 222, 212))
+    for name in ("a+", "a-", "j+", "j-"):
+        x = left + lane[name] * p
+        c = (200, 0, 0) if "+" in name else (0, 150, 210)
+        dx = -12 if name in ("a+", "j+") else 12
+        if name == "j+":
+            dx = -12
+        if name == "a-":
+            dx = 12
+        d.line([x + dx, top + p // 2, x + dx, top + 63 * p], fill=c, width=2)
+        for y in (top - 16, top + 63 * p + 14):
+            d.text((x, y), "+" if "+" in name else "−", fill=c, font=f13b, anchor="mm")
+    for key, x_lane in lane.items():
+        x = left + x_lane * p
         if len(key) == 1:
-            d.text((x0 - 15, y), key, fill="black", font=f13b, anchor="mm")
+            for y in (top - 16, top + 63 * p + 14):
+                d.text((x, y), key, fill="black", font=f13b, anchor="mm")
         for r in range(1, 64):
-            d.rectangle([x0 + r * p - 3, y - 3, x0 + r * p + 3, y + 3], fill=(150, 150, 150))
+            d.rectangle([x - 3, top + r * p - 3, x + 3, top + r * p + 3], fill=(150, 150, 150))
     for r in [1, *range(5, 64, 5)]:
-        d.text((x0 + r * p, top - 20), str(r), fill="black", font=f10, anchor="mm")
-        d.text((x0 + r * p, top + 18 * p + 2), str(r), fill="black", font=f10, anchor="mm")
-    # Pico 2 WH, face up, USB off the row-1 end
-    yh, yc = top + lane["h"] * p, top + lane["c"] * p
-    d.rectangle([x0 + p // 2 - 4, yh - 12, x0 + 20 * p + p // 2, yc + 12], fill=(30, 110, 60), outline="black")
-    d.rectangle([x0 - 22, (yc + yh) // 2 - 22, x0 + 8, (yc + yh) // 2 + 22], fill=(190, 190, 190), outline="black")
-    d.text((x0 - 7, (yc + yh) // 2), "USB", fill="black", font=f10, anchor="mm")
-    d.text((x0 + 10 * p + p // 2, (yc + yh) // 2), "Pico 2 WH (face up)", fill="white", font=f15, anchor="mm")
+        for x in (left + 2 * p, left + 15 * p):
+            d.text((x, top + r * p), str(r), fill="black", font=f10, anchor="mm")
+    # Pico 2 W, face up, USB off the row-1 end (top)
+    xc, xh = left + lane["c"] * p, left + lane["h"] * p
+    d.rectangle([xc - 12, top + p // 2 - 4, xh + 12, top + 20 * p + p // 2], fill=(30, 110, 60), outline="black")
+    d.rectangle([(xc + xh) // 2 - 22, top - 26, (xc + xh) // 2 + 22, top + 6], fill=(190, 190, 190), outline="black")
+    d.text(((xc + xh) // 2, top - 10), "USB", fill="black", font=f10, anchor="mm")
+    d.text(((xc + xh) // 2, top + 11 * p), "Pico 2 W\n(face up)", fill="white", font=f15, anchor="mm", align="center")
     for pin, label in PICO.items():
         col, r = pico_hole(pin)
-        x, y = x0 + r * p, top + lane[col] * p
+        x, y = left + lane[col] * p, top + r * p
         d.ellipse([x - 5, y - 5, x + 5, y + 5], fill=(230, 190, 60), outline="black")
         short = {"3V3(OUT)": "3V3", "ADC_VREF": "VREF", "3V3_EN": "EN"}.get(label, label)
-        vlabel(f"{pin} {short}", x, y + (34 if col == "h" else -34), "white")
-    # 6301, face up, notch towards row 44
-    yd = top + lane["d"] * p
-    xa, xb = x0 + CHIP_ROW0 * p - p // 2, x0 + (CHIP_ROW0 + 19) * p + p // 2
-    d.rectangle([xa, yh - 12, xb, yd + 12], fill=(40, 40, 40), outline="black")
-    d.pieslice([xb - 18, (yd + yh) // 2 - 18, xb + 18, (yd + yh) // 2 + 18], 90, 270, fill=(245, 243, 236))
-    d.text(((xa + xb) // 2, (yd + yh) // 2), "D151801 (face up)   notch →", fill="white", font=f15, anchor="mm")
+        d.text((x + 9, y) if col == "c" else (x - 9, y), f"{pin} {short}", fill="white", font=f10,
+               anchor="lm" if col == "c" else "rm")  # fmt: skip
+    # 6301, face up, notch towards row 44 (down)
+    xd = left + lane["d"] * p
+    ya, yb = top + CHIP_ROW0 * p - p // 2, top + (CHIP_ROW0 + 19) * p + p // 2
+    d.rectangle([xd - 12, ya, xh + 12, yb], fill=(40, 40, 40), outline="black")
+    d.pieslice([(xd + xh) // 2 - 18, yb - 18, (xd + xh) // 2 + 18, yb + 18], 180, 360, fill=(245, 243, 236))
+    d.text(((xd + xh) // 2, (ya + yb) // 2), "D151801\n(face up)\nnotch ↓", fill="white", font=f15, anchor="mm",
+           align="center")  # fmt: skip
     for pin, name in DIP.items():
         col, r = chip_hole(pin)
-        x, y = x0 + r * p, top + lane[col] * p
+        x, y = left + lane[col] * p, top + r * p
         d.ellipse([x - 5, y - 5, x + 5, y + 5], fill=(200, 200, 200), outline="black")
-        vlabel(f"{pin} {name}", x, y + (36 if col == "h" else -36), "white")
-    # parts: drawn from the hole to the rail, label turned along the part
+        d.text((x + 9, y) if col == "d" else (x - 9, y), f"{pin} {name}", fill="white", font=f10,
+               anchor="lm" if col == "d" else "rm")  # fmt: skip
+    # parts
     for part, a, b in parts:
-        (xa_, ya), (xb_, yb) = xy(a), xy(b)
-        d.line([xa_, ya, xb_, yb], fill=(90, 90, 90), width=2)
-        mx, my = (xa_ + xb_) // 2, (ya + yb) // 2
-        if "F" in part:  # capacitor across the two rail strips: legs marked, label beside
-            for x, y in ((xa_, ya), (xb_, yb)):
+        (xa_, ya_), (xb_, yb_) = xy(a), xy(b)
+        mx, my = (xa_ + xb_) // 2, (ya_ + yb_) // 2
+        d.line([xa_, ya_, xb_, yb_], fill=(90, 90, 90), width=2)
+        if "F" in part:  # capacitor across the two rail strips
+            for x, y in ((xa_, ya_), (xb_, yb_)):
                 d.ellipse([x - 4, y - 4, x + 4, y + 4], fill="black")
             d.rectangle([mx - 6, my - 6, mx + 6, my + 6], fill=(60, 120, 220) if "µ" in part else (230, 160, 40),
                         outline="black")  # fmt: skip
             label = "10 µF (+ leg on +)" if "µ" in part else "47–100 nF"
-            dx = -10 if "µ" in part else 10  # labels either side, so the two neighbours do not overlap
-            ty = top + 18 * p + 26
-            d.text((mx + dx, ty), label, fill="black", font=f10, anchor="rm" if dx < 0 else "lm")
-            d.line([mx, my + 7, mx + dx // 2, ty], fill=(120, 120, 120), width=1)
+            d.text((left - 26, my), label, fill="black", font=f10, anchor="rm")
+            d.line([left - 24, my, xa_ - 5, my], fill=(150, 150, 150), width=1)
             continue
-        elif ya == yb:  # resistor lying along a row strip
-            d.rectangle([mx - 9, my - 4, mx + 9, my + 4], fill=(225, 200, 150), outline="black")
-            d.text((mx, my - 12), part.split(",")[0], fill="black", font=f10, anchor="mb")
-            continue
-        else:
+        for x, y in ((xa_, ya_), (xb_, yb_)):  # leg holes
+            d.ellipse([x - 4, y - 4, x + 4, y + 4], fill="black")
+        if xa_ == xb_:  # resistor lying along a column (between two rows)
             d.rectangle([mx - 4, my - 9, mx + 4, my + 9], fill=(225, 200, 150), outline="black")
-        vlabel(part.split(",")[0], mx + 12, my, "black")
-    # wires: short ones to a rail drawn in full, signal ones as numbered tags at both ends
+        else:
+            d.rectangle([mx - 9, my - 4, mx + 9, my + 4], fill=(225, 200, 150), outline="black")
+        d.text((mx + 6, my - 7), part.split(",")[0], fill="black", font=f10, anchor="lb")
+    # wires
     sig_colour = {"AD": (0, 110, 200), "A": (0, 140, 70), "ctl": (200, 90, 0)}
     for tag, a, b, what in wires:
-        (xa_, ya), (xb_, yb) = xy(a), xy(b)
+        (xa_, ya_), (xb_, yb_) = xy(a), xy(b)
         if is_rail(b):
-            colour = (230, 0, 160) if tag == "5V" else (200, 0, 0) if "+" in b else (0, 90, 200)
-            d.line([xa_, ya, xb_, yb], fill=colour, width=4)
+            colour = (230, 0, 160) if tag == "5V" else (200, 0, 0) if "+" in b else (0, 150, 210)
+            d.line([xa_, ya_, xb_, yb_], fill=colour, width=4)
+            for x, y in ((xa_, ya_), (xb_, yb_)):  # the two holes it plugs into; anything between is jumped over
+                d.ellipse([x - 5, y - 5, x + 5, y + 5], fill=colour, outline="black")
             continue
         kind = "AD" if what.startswith("AD") else "A" if re.match(r"A\d", what) else "ctl"
-        for x, y in ((xa_, ya), (xb_, yb)):
+        for x, y in ((xa_, ya_), (xb_, yb_)):
             d.ellipse([x - 10, y - 10, x + 10, y + 10], fill=sig_colour[kind], outline="black")
             d.text((x, y), tag, fill="white", font=f10, anchor="mm")
-    # key
-    ky = top + 18 * p + 40
-    d.text((30, ky), "Signal wires", fill="black", font=f15b)
+    # key, to the right of the board
+    kx, ky = left + board_w + 40, top
+    d.text((kx, ky), "Signal wires", fill="black", font=f15b)
     sig = [w for w in wires if not is_rail(w[2])]
     for i, (tag, a, b, what) in enumerate(sig):
-        col, row = divmod(i, 8)
-        d.text((30 + col * 560, ky + 28 + row * 22), f"{tag:>2}: {a} ↔ {b}   {what}", fill="black", font=f15)
-    ky2 = ky + 28 + 8 * 22 + 20
-    d.text((30, ky2), "Power, ground and parts", fill="black", font=f15b)
+        d.text((kx, ky + 28 + i * 22), f"{tag:>2}: {a} ↔ {b}   {what}", fill="black", font=f15)
+    ky2 = ky + 28 + len(sig) * 22 + 30
+    d.text((kx, ky2), "Power, ground and parts", fill="black", font=f15b)
     lines = [f"{w}: {hole_name(a)} ↔ {hole_name(b)}" for _, a, b, w in wires if is_rail(b)]
     lines += [f"{part}: {hole_name(a)} ↔ {hole_name(b)}" for part, a, b in parts]
     for i, t in enumerate(lines):
-        col, row = divmod(i, 10)
-        d.text((30 + col * 860, ky2 + 28 + row * 22), t, fill="black", font=f15)
+        d.text((kx, ky2 + 28 + i * 22), t, fill="black", font=f12 if len(t) > 95 else f15)
     out.parent.mkdir(parents=True, exist_ok=True)
     img.save(out, optimize=True)
 

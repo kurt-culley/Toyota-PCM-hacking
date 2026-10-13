@@ -156,7 +156,8 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
   - confirm the first-cycle settling across several `listen` runs.
 - [x] `res`: RES (pin 6) reads ≥ 4.5 V while released [BENCH:owner report 2026-10-13].
 - [x] New firmware (address sampled ~107 ns after AS): two `listen` runs, both PASS and identical cycle for cycle; cycle 0 reads `$FFFE`; all 64 addresses agree with the instruction flow [BENCH:owner logs 2026-10-13].
-- [ ] `probe` (late cycles must be 0), `dump` ×3, `size`.
+- [x] At E = 125 kHz: `clock` PASS (124,993 Hz, 50 %), `listen` PASS, **`probe` PASS** (vector served, `$C0C0` fetched, late cycles 0) [BENCH:owner report 2026-10-13]. At E = 250 kHz the first `probe` failed safe: core 1 was late on the back-to-back `$FFFF` cycle, so it stopped driving; no contention.
+- [ ] `dump` ×3, `size`.
 - [ ] Dump ×3, verified; Verifier sign-off.
 
 ## Open questions

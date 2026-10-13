@@ -121,7 +121,7 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
 - [x] Clock: E = 0.1–1.0 MHz, so EXTAL 0.4–4 MHz; not static. The reader runs EXTAL at 1 MHz [handbook p.128, p.188].
 - [x] ROM size method: the reader's `size` run sends `$E000`–`$FFFF`; a 4 KB block counts as ROM only if three runs agree and it does not echo the address bus. 4 KB at `$F000` is expected, as on the D151801 Bluetops.
 - [x] Self-test plan: multimeter checklist, `rigcheck`, `clock`, `listen`, `probe`, then `dump` ([`hardware/rp2350_reader_guide.md`](hardware/rp2350_reader_guide.md)).
-- [ ] Owner orders [`../hardware/BOM.md`](../hardware/BOM.md) section A.
+- [x] Owner orders [`../hardware/BOM.md`](../hardware/BOM.md) section A. (A first "Pico WH" turned out to be the RP2040 board: not 5 V tolerant, not used; replaced by a Pico 2 W with headers.)
 - [x] 6301 dump program ([`../hardware/rp2350-reader/6301/`](../hardware/rp2350-reader/6301/)): in the emulator against `cap.bin` it sends the mode byte then the ROM exactly, with no stack use, no contention and no TDRE violation [EMU:tests/test_romdump.py].
 - [x] RP2350 reader firmware ([`../hardware/rp2350-reader/firmware/`](../hardware/rp2350-reader/firmware/)): builds warning-free for the BB48R and the Pico 2 W(H) (pico-sdk 2.1.1); CI uploads both UF2s. Its decode rule matches the Python model [EMU:tests/test_reader_decode_c.py]. Not yet run on hardware.
 - [x] Host capture tool `analysis/pcmre/romcapture.py` [EMU:tests/test_romcapture.py].
@@ -142,7 +142,9 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
   - **Accepted:** the release lags E falling by about 3 PIO clocks (~20 ns at 2 mA drive). Input-sync bypass is not used, because the RP2350 register's mapping under a GPIO base of 16 is not documented. The emulator does not model the 6301's dummy `$FFFF` cycles. No test covers PIO or core-1 timing; the hardware `listen`/`probe` steps cover it.
 - [x] Reader guide with wiring pictures, multimeter checklist, bring-up and troubleshooting ([`hardware/rp2350_reader_guide.md`](hardware/rp2350_reader_guide.md)); its tables are generated from `pins.h` and checked by `tests/test_wiring.py`.
 - [ ] Carrier PCB (KiCad, factory-assembled).
-- [ ] Chip removed from the spare ECU, socket fitted.
+- [x] Chip removed from the spare ECU, socket fitted (owner, 2026-10-12).
+- [x] Reader firmware flashed to the Pico 2 W; banner correct on macOS [BENCH:owner report 2026-10-13].
+- [ ] Breadboard wired (Pico 2 W layout), multimeter checklist, `rigcheck`.
 - [ ] Dump ×3, verified; Verifier sign-off.
 
 ## Open questions

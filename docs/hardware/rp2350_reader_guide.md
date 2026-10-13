@@ -171,7 +171,7 @@ One tested arrangement of the tables above, hole by hole.
 - **Rails:**
   - The + and − strips are the ones marked red and blue on your board. The picture follows the common layout: on the left the + strip is outermost, with the − strip beside column a; on the right the + strip is beside column j, with the − strip outermost. If your board differs, go by the red and blue markings, not the position.
   - Dots in the picture mark the holes a wire or part plugs into. Where a wire crosses a strip without a dot, it just passes over it.
-  - Some 830-point boards break each rail strip halfway. Beep a rail from row 1 to row 63; if it is split, bridge the break with a short wire.
+  - Many 830-point boards break each rail strip near the middle (about rows 30–32), even when the printed line looks continuous. The layout bridges all four strips with a short wire from row 28 to row 34 (wires B…). Check each strip beeps from row 1 to row 63.
   - The two + rails become the switched 5 V rail. They are fed only by the **5 V jumper** from the Pico's VBUS.
 
 <!-- generated: python -m pcmre.wiring (breadboard); tests/test_wiring.py checks this table -->
@@ -205,6 +205,10 @@ One tested arrangement of the tables above, hole by hole.
 | G2 | i3 | − rail beside j (row 3) | Pico GND → − rail beside j |
 | L+ | + rail beside a (row 50) | + rail beside j (row 50) | link the two + rails |
 | L− | − rail beside a (row 52) | − rail beside j (row 52) | link the two − rails |
+| Ba+ | + rail beside a (row 28) | + rail beside a (row 34) | bridge the mid-board break: + rail beside a |
+| Ba- | − rail beside a (row 28) | − rail beside a (row 34) | bridge the mid-board break: − rail beside a |
+| Bj+ | + rail beside j (row 28) | + rail beside j (row 34) | bridge the mid-board break: + rail beside j |
+| Bj- | − rail beside j (row 28) | − rail beside j (row 34) | bridge the mid-board break: − rail beside j |
 | Vcc | b25 | + rail beside a (row 25) | 6301 pin 21 Vcc → + rail beside a |
 | Vss | i44 | − rail beside j (row 44) | 6301 pin 1 Vss → − rail beside j |
 | /NMI | j41 | + rail beside j (row 41) | 6301 pin 4 /NMI → + rail beside j |

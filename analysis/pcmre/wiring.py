@@ -175,6 +175,9 @@ def draw(board: str, out: Path) -> None:
 COLS = "abcdefghij"
 CHIP_ROW0 = 25
 RAIL_LINK_ROWS = {"+": 50, "-": 52}
+# Many 830-point boards break every rail strip near the middle (about rows 30-32). A short jumper on
+# each strip, from row 28 to row 34, bridges that break; no other rail connection uses these rows.
+RAIL_BRIDGE_ROWS = (28, 34)
 EXTAL_JOIN_ROW = 45  # free f-j strip joining the two EXTAL pull-up resistors
 
 
@@ -229,6 +232,15 @@ def breadboard() -> tuple[list[tuple[str, str, str, str]], list[tuple[str, str, 
         ("G2", *to_rail(_free(pico_hole(38)), "j-"), "Pico GND → − rail beside j"),
         ("L+", _rail("a+", RAIL_LINK_ROWS["+"]), _rail("j+", RAIL_LINK_ROWS["+"]), "link the two + rails"),
         ("L−", _rail("a-", RAIL_LINK_ROWS["-"]), _rail("j-", RAIL_LINK_ROWS["-"]), "link the two − rails"),
+        *[
+            (f"B{r}", _rail(r, RAIL_BRIDGE_ROWS[0]), _rail(r, RAIL_BRIDGE_ROWS[1]), f"bridge the mid-board break: {n}")
+            for r, n in (
+                ("a+", "+ rail beside a"),
+                ("a-", "− rail beside a"),
+                ("j+", "+ rail beside j"),
+                ("j-", "− rail beside j"),
+            )
+        ],
         ("Vcc", *to_rail(_free(chip_hole(21), 1), "a+"), "6301 pin 21 Vcc → + rail beside a"),
         ("Vss", *to_rail(_free(chip_hole(1), 0), "j-"), "6301 pin 1 Vss → − rail beside j"),
     ]
@@ -281,7 +293,7 @@ def draw_breadboard(out: Path) -> None:
             return ImageFont.load_default()
 
     wires, parts = breadboard()
-    p, left, top = 26, 160, 220  # pitch and origin, px
+    p, left, top = 26, 160, 250  # pitch and origin, px
     # x lane of each hole column and rail strip, in pitches; the centre gap is 3 pitches (e to f = 0.3")
     lane = {"a+": 0, "a-": 1, **{c: 3 + i for i, c in enumerate("abcde")}, **{c: 10 + i for i, c in enumerate("fghij")},
             "j+": 16, "j-": 17}  # fmt: skip
@@ -301,6 +313,8 @@ def draw_breadboard(out: Path) -> None:
         ("Same number = one wire. Chip NOTCH points DOWN (towards row 44), away from the Pico.", f15b, (190, 0, 0)),
         ("Pink wire = the 5 V jumper: last in, first out.", f15b, (190, 0, 0)),
         ("Dots = the holes a wire or part plugs into. It just passes over anything in between.", f15, "black"),
+        ("Rail strips often break near rows 30-32 (marked ✕): the short wires from row 28 to 34 bridge them.", f15b,
+         (190, 0, 0)),
     ]  # fmt: skip
     for i, (t, fnt, c) in enumerate(head):
         d.text((20, 15 + i * 30), t, fill=c, font=fnt)
@@ -327,6 +341,10 @@ def draw_breadboard(out: Path) -> None:
                 d.text((x, y), key, fill="black", font=f13b, anchor="mm")
         for r in range(1, 64):
             d.rectangle([x - 3, top + r * p - 3, x + 3, top + r * p + 3], fill=(150, 150, 150))
+    for name in ("a+", "a-", "j+", "j-"):  # typical mid-board break in each rail strip
+        x, y = left + lane[name] * p, top + 31 * p + p // 2
+        d.line([x - 6, y - 6, x + 6, y + 6], fill="black", width=2)
+        d.line([x - 6, y + 6, x + 6, y - 6], fill="black", width=2)
     for r in [1, *range(5, 64, 5)]:
         for x in (left + 2 * p, left + 15 * p):
             d.text((x, top + r * p), str(r), fill="black", font=f10, anchor="mm")
@@ -381,6 +399,13 @@ def draw_breadboard(out: Path) -> None:
     sig_colour = {"AD": (0, 110, 200), "A": (0, 140, 70), "ctl": (200, 90, 0)}
     for tag, a, b, what in wires:
         (xa_, ya_), (xb_, yb_) = xy(a), xy(b)
+        if is_rail(a) and is_rail(b) and a.split("@")[0] == b.split("@")[0]:  # bridge along one strip
+            colour = (200, 0, 0) if "+" in b else (0, 150, 210)
+            off = -9 if a.startswith("a") else 9  # bow outwards so it does not hide the strip
+            d.line([(xa_, ya_), (xa_ + off, ya_ + 8), (xb_ + off, yb_ - 8), (xb_, yb_)], fill=colour, width=4)
+            for x, y in ((xa_, ya_), (xb_, yb_)):
+                d.ellipse([x - 5, y - 5, x + 5, y + 5], fill=colour, outline="black")
+            continue
         if is_rail(b):
             colour = (230, 0, 160) if tag == "5V" else (200, 0, 0) if "+" in b else (0, 150, 210)
             d.line([xa_, ya_, xb_, yb_], fill=colour, width=4)

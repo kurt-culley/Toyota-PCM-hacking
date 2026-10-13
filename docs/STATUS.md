@@ -157,7 +157,9 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
 - [x] `res`: RES (pin 6) reads ≥ 4.5 V while released [BENCH:owner report 2026-10-13].
 - [x] New firmware (address sampled ~107 ns after AS): two `listen` runs, both PASS and identical cycle for cycle; cycle 0 reads `$FFFE`; all 64 addresses agree with the instruction flow [BENCH:owner logs 2026-10-13].
 - [x] At E = 125 kHz: `clock` PASS (124,993 Hz, 50 %), `listen` PASS, **`probe` PASS** (vector served, `$C0C0` fetched, late cycles 0) [BENCH:owner report 2026-10-13]. At E = 250 kHz the first `probe` failed safe: core 1 was late on the back-to-back `$FFFF` cycle, so it stopped driving; no contention.
-- [ ] `dump` ×3, `size`.
+- [x] **17140 ROM dumped** (2026-10-13): three runs identical (4096 ROM bytes, 0 differ), mode bits 000 in every run, snoop channel agrees on 4095/4095 bytes, word sum `$AA55`, vectors RES/SWI/NMI/IRQ1/TOF/SCI `$F2BE`, OCF `$FE36`, ICF `$FEB4` [BENCH:analysis/captures/89661-17140_dump_2026-10-13.txt]. SHA-256 `0cfc1fdd36fc4514cf0693e18ef7e4b47594a4b78f72beadd30766a36f271f6e`. Saved as `AW11 MR2 PCM/89661-17140.bin`. The first dump attempt failed only because the run comparison included the Port 2 pin byte (P22 read 0 in one run and 1 in two); fixed in firmware v4.
+- [ ] `size` (confirm 4 KB: `$E000`–`$EFFF` should be floating bus).
+- [ ] Verifier sign-off on the dump (P3 gate).
 - [ ] Dump ×3, verified; Verifier sign-off.
 
 ## Open questions
@@ -176,6 +178,12 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
 | Q10 | What is jumper **node N**? About 750 Ω to ground, the same both ways, not connected to the main +5 V. Is it a logic-high source, such as a standby 5 V rail? This decides what P34 reads (0 or 1) with the factory J8 fitted | **Powered** measurement of N and P20–P22 in the socketed ECU with the chip out (P3). Needs the owner's confirmation at the time (CLAUDE.md hardware safety) |
 
 ### Bench observations to follow up (P4)
+- **Day-one ingest** ([`../analysis/mr2_17140/ingest.md`](../analysis/mr2_17140/ingest.md)):
+  - Only 4 % of the Bluetop's instructions align, so this is a different program, and **none of the 19 Bluetop maps port automatically**.
+  - The data tables sit at the **start** of the ROM (`$F000`–`$F2BD`), not the end.
+  - Ross's 17030 ignition table is not present byte for byte (mean difference 44 counts).
+  - The candidate tables `$F1AE`/`$F1BA`/`$F1EF` correlate with his density and speed curves (shape only).
+- **The 17140 reset code accepts mode 2 as well as mode 7** (LIKELY): `$F2BE LDAB $03 / ANDB #$E0 / CMPB #$E0 / BEQ +4 / CMPB #$40 / BNE *` hangs unless the latched mode is 7 (single chip) or 2 (expanded multiplexed). It looks like a built-in development mode, and is directly relevant to the P7 external-memory plan (no mode-test patch needed).
 - **17140 reset vector is probably `$F2BE`** (LIKELY): an RTS with the stack on ROM pulled `$F2`/`$BE` from `$FFFE`/`$FFFF`; the logged jump to `$F0BE` is the A8/A9 fault. Mode check at `$F2BE`: `LDAB $03 / ANDB #$E0 / CMPB #$E0 / BEQ`, read Port 2 = `$18` (mode 0) [BENCH:listen].
 - **Bus-cycle counts look 6801-like, not HD6301:** LSRB, CLRA show 2 bus cycles and ABX, LSRD 3, where the HD6301V1 handbook gives 1 (GUESS until checked against the handbook and more logs). If confirmed, the emulator's cycle counts for the D151801 need a 6801 timing table; it affects main-loop pacing, not the ROM arithmetic.
 

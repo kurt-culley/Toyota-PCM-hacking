@@ -1,0 +1,35 @@
+# Map definitions for 89661-17140.bin, AUTO-PORTED from analysis/defs/bluetop.yaml by
+# `python -m pcmre.ingest`. A starting point for P4: review every map before trusting it,
+# then curate this file by hand (it is not regenerated once curation starts).
+# Not ported (see the ingest report): ign_base (not found); thw_linearise (not found); tha_corr (not found); inj_dead_time (not found); dwell_battery (not found); se056_max (not found); accel_enrich (not found); overheat_adv (not found); pwr_ign_trim (not found); pwr_o2_trim (not found); decel_cut_rpm (not found); rpm_reciprocal (not found); thw_FEAF (not found); thw_FEB6 (not found); thw_FEBD (not found); thw_FEC4 (not found); thw_FECB (not found); thw_FED2 (not found); thw_FF0A (not found)
+rom: mr2_17140
+file: AW11 MR2 PCM/89661-17140.bin
+base: 0xF000
+sha256: 0cfc1fdd36fc4514cf0693e18ef7e4b47594a4b78f72beadd30766a36f271f6e
+variables:
+  RPMish:
+    addr: 0x0064
+    unit: rpm index
+    to_physical: rpm ~= (RPMish + 32) * 25 below RPMish 160 (4800 rpm); rpm ~= (RPMish - 64) * 50 above
+    evidence: '[ROM:$F4B8 staa RPMish] [EMU:sweep of CalcRPM $F446 with deltaNE = 30e6/rpm]'
+    confidence: LIKELY (assumes rpm = 30,000,000 / deltaNE, from the ROM's 7400 rpm rev-limit constant $0FD6)
+  Load:
+    addr: 0x007F
+    unit: us (air-temperature-corrected airflow delay)
+    to_physical: Load = Calc72(SE056plstime) = 3/4 x + x*ThAcorr/512, x = SE056 delay after the NE edge in us; mass-flow
+      meaning unknown until the SE056 is measured
+    evidence: '[ROM:$F550-$F556, $F6FC-$F709] [EMU:tests/test_fuel_chain.py, tests/test_sim.py]'
+    confidence: LIKELY (formula and unit); GUESS (airflow per stroke)
+  ADC_ThW:
+    addr: 0x0057
+    unit: degF (after the $FEF0 linearisation)
+    to_physical: degC = (raw - 32) / 1.8
+    evidence: '[ROM:$FAD3 ldx #$FEF0 / jsr $38,x; bounded to 241] [cap.asm comments ''water temp in fahrenheit'']'
+    confidence: LIKELY
+  ADC_12V:
+    addr: 0x0055
+    unit: raw ADC
+    to_physical: volts = raw * 25 / 255 (+B1 divided by 5, 5 V reference)
+    evidence: '[ROM:$FC8F-$FCAF] [cap.asm comment ''+B1 terminal divided by 5'']'
+    confidence: LIKELY
+maps: []

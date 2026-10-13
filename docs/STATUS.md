@@ -144,7 +144,8 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
 - [ ] Carrier PCB (KiCad, factory-assembled).
 - [x] Chip removed from the spare ECU, socket fitted (owner, 2026-10-12).
 - [x] Reader firmware flashed to the Pico 2 W; banner correct on macOS [BENCH:owner report 2026-10-13].
-- [ ] Breadboard wired (Pico 2 W layout), multimeter checklist, `rigcheck`.
+- [x] Breadboard wired (Pico 2 W layout), multimeter checklist all six checks OK, `rigcheck` PASS [BENCH:owner report 2026-10-13]. The first `rigcheck` correctly refused to run with the 5 V jumper only half removed.
+- [ ] Chip fitted; `clock`, `listen`, `res`, `probe`, `dump` ×3, `size`.
 - [ ] Dump ×3, verified; Verifier sign-off.
 
 ## Open questions

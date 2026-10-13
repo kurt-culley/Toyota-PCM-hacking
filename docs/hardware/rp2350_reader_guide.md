@@ -251,7 +251,7 @@ Plug in USB and type `rigcheck`. It pulls every bus line up gently, then pulls e
 rigcheck: PASS (no stuck or shorted lines)
 ```
 
-If it reports that the 5 V rail is on, the jumper is in: take it out. Any other failure names the 6301 pins involved; fix the wiring and repeat.
+If it reports that the 5 V rail is on, the jumper is in: take it out. "Out" means **both ends out of the board**. A jumper with one end still plugged in can touch the rail or the strip and keep the rail powered. Any other failure names the 6301 pins involved; fix the wiring and repeat.
 
 ## 6. Fit the chip and power it
 

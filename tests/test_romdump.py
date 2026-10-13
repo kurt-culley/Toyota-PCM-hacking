@@ -145,11 +145,11 @@ def test_ends_asleep_at_done(dump):
     assert dump.cpu.sleeping and page[(pc - 1) & 0xFF] == 0x1A  # just past an SLP
 
 
-def test_run_time_at_250khz():
-    """4097 characters at 15,625 baud: about 2.6 s, so a triple dump is under 10 s."""
+def test_run_time_at_125khz():
+    """4097 characters at 7,812.5 baud: about 5.2 s, so a triple dump is under 20 s."""
     chip = run_dump("romdump")
-    seconds = chip.cpu.cycles / 250_000
-    assert 4097 * 640e-6 <= seconds < 3.0
+    seconds = chip.cpu.cycles / 125_000
+    assert 4097 * 1280e-6 <= seconds < 6.0
 
 
 def test_romsize_is_listen_only_above_c0xx():

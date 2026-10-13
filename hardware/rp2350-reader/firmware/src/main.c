@@ -31,10 +31,12 @@
 #include "reader.pio.h"
 #include "romdump.h"
 
-#define EXTAL_HZ 1000000u
+#define EXTAL_HZ 500000u  // E = 125 kHz: doubles the bus phases core 1 must answer within
+                           // (EXTAL 1 MHz left too little margin on back-to-back vector cycles);
+                           // spec minimum is 0.4 MHz
 #define E_HZ (EXTAL_HZ / 4u)
 #define SCI_BAUD (E_HZ / 16u)  // RMCR = $04: E/16
-#define SNOOP_DELAY_NS 1200u   // sample AD 1.2 us into the ~2 us E-high phase
+#define SNOOP_DELAY_NS (300000000u / E_HZ)  // 60 % into the E-high phase (2.4 us at 125 kHz)
 #define LOG_N 64u
 #define RUNS 3u
 #define MAX_STREAM (1u + 0x2000u)  // mode byte + $E000-$FFFF

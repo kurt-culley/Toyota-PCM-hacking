@@ -5,7 +5,7 @@
 ; after RES rises in which the vectors are still external. Everything else the program
 ; touches is internal to the chip, and the reader only listens to it.
 ;
-; Output on P24/TX, NRZ 8N1 at E/16 (15,625 baud with E = 250 kHz):
+; Output on P24/TX, NRZ 8N1 at E/16 (7,812.5 baud with E = 125 kHz):
 ;   byte 0      Port 2 data register. Bits 7-5 are the latched mode (PC2-PC0) and
 ;               must read 000; the host rejects the run otherwise.
 ;   bytes 1..   every byte from START to $FFFF (4096 bytes for START = $F000)

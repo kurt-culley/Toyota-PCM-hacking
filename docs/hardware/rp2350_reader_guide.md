@@ -267,7 +267,7 @@ If it reports that the 5 V rail is on, the jumper is in: take it out. "Out" mean
 ### `clock`
 
 ```
-E: 250000 Hz, high 50% of the time (want 250000 Hz, about 50%)
+E: 125000 Hz, high 50% of the time (want 125000 Hz, about 50%)
 clock: PASS
 ```
 
@@ -310,7 +310,7 @@ Run it through the capture tool, so the result is saved and checked (close the s
 PYTHONPATH=analysis uv run --with pyserial python -m pcmre.romcapture <port>
 ```
 
-The reader runs the dump **three times** (about 3 s each). It checks four things before printing the ROM:
+The reader runs the dump **three times** (about 5 s each). It checks four things before printing the ROM:
 - the latched mode is 0;
 - all three runs are identical;
 - how much of the snoop channel agrees (`$FFFF` is not compared: the 6301's dummy cycles read it too);

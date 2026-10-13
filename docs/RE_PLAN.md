@@ -292,7 +292,7 @@ The RP2350 **is** the MCU's external memory and clock. The D151801 runs in **mod
 
 ```mermaid
 flowchart LR
-  RP[RP2350 board<br/>USB to PC] -->|EXTAL 1 MHz open-drain, RES open-drain<br/>pull-ups to the 6301 5 V rail| MCU[D151801 / HD6301<br/>on breadboard, mode 0]
+  RP[RP2350 board<br/>USB to PC] -->|EXTAL 0.5 MHz open-drain, RES open-drain<br/>pull-ups to the 6301 5 V rail| MCU[D151801 / HD6301<br/>on breadboard, mode 0]
   MCU <-->|AD0-7 multiplexed bus<br/>direct, 5 V-tolerant pads| RP
   MCU -->|A8-15, AS, E, R/W, SCI TX| RP
   RP <-->|USB serial| PC[romcapture.py<br/>3 dumps compared, SHA-256]
@@ -309,7 +309,7 @@ sequenceDiagram
   M->>R: fetch dump program from $C0xx
   loop 4096 bytes
     M->>M: LDAB 0,X from internal ROM (data also appears on the bus)
-    M->>R: SCI TX byte at 15,625 baud
+    M->>R: SCI TX byte at 7,812.5 baud
   end
   M->>M: SLP
 ```

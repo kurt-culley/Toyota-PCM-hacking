@@ -118,7 +118,7 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
 
 ### P3 tasks (ROM dump, RP2350 reader)
 - [x] Mode for the dump: **mode 0** (P22/P21/P20 = L/L/L, pins 10/9/8), "Multiplexed Test": internal ROM on, reset vector external for 3–4 cycles after RES rises [handbook Table 2-1-1].
-- [x] Clock: E = 0.1–1.0 MHz, so EXTAL 0.4–4 MHz; not static. The reader runs EXTAL at 1 MHz [handbook p.128, p.188].
+- [x] Clock: E = 0.1–1.0 MHz, so EXTAL 0.4–4 MHz; not static. The reader runs EXTAL at 0.5 MHz (E = 125 kHz); it started at 1 MHz, but `probe` showed core 1 too slow for back-to-back vector cycles there [handbook p.128, p.188] [BENCH:probe 2026-10-13].
 - [x] ROM size method: the reader's `size` run sends `$E000`–`$FFFF`; a 4 KB block counts as ROM only if three runs agree and it does not echo the address bus. 4 KB at `$F000` is expected, as on the D151801 Bluetops.
 - [x] Self-test plan: multimeter checklist, `rigcheck`, `clock`, `listen`, `probe`, then `dump` ([`hardware/rp2350_reader_guide.md`](hardware/rp2350_reader_guide.md)).
 - [x] Owner orders [`../hardware/BOM.md`](../hardware/BOM.md) section A. (A first "Pico WH" turned out to be the RP2040 board: not 5 V tolerant, not used; replaced by a Pico 2 W with headers.)

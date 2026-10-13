@@ -23,10 +23,10 @@ ram:
     note: manifold pressure, 16-bit, filtered (ADC ch1, normalised by ch7) [ROM:$FD76-$FD92] LIKELY; kPa scaling still to measure
   0x4a:
     name: MapRaw
-    note: manifold pressure, 8-bit (ADC ch1); $4D substituted on a sensor fault [ROM:$FD70-$FD76] LIKELY
+    note: 'manifold pressure, 8-bit (ADC ch1); on a sensor fault the immediate value #$4D is used [ROM:$FD70-$FD76] LIKELY'
   0x4d:
     name: CoolantCorr
-    note: from table $F090 on the coolant reading [ROM:$FE2C-$FE33] GUESS
+    note: written by the ch5 coolant handler from table $F090 [ROM:$FE2C-$FE33]; meaning GUESS
   0x50:
     name: AdcZero
     note: ADC ch0 conversion time, subtracted from every other channel [ROM:$FC32-$FC4A] LIKELY
@@ -44,7 +44,8 @@ ram:
     note: intake air temperature reading (ADC ch6); $79 on a fault [ROM:$FE0A] LIKELY
   0x61:
     name: SecretRpmFuel
-    note: rpm fuel correction from table $F117, used only when PORT3 bit 4 (P34) = 0; otherwise the fixed $66 (x1.00) [ROM:$F465-$F46C, $FAC2-$FACB] LIKELY (Ross R-F12)
+    note: rpm fuel correction from table $F117, used only when PORT3 bit 4 (P34) = 0; otherwise the fixed $66 (x1.00) [ROM:$F465-$F46C, $FAC2-$FACB] LIKELY (Ross R-F12); $F117 = 3 sites 1200/2000/2800 rpm
+      -> x1.00/1.025/1.05
   0x8a:
     name: InjDeadTime
     note: battery-voltage injector dead time from table $F0A4 (ADC ch4) [ROM:$FE14-$FE1E] LIKELY
@@ -102,7 +103,9 @@ ram:
     note: delay from that edge to the spark/dwell (us) [ROM:$F848, $FF61] LIKELY
   0xa8:
     name: IgnBase
-    note: base advance from the 2D map $F1EF (P34=1) or $F25D (P34=0) over RpmWord x Load, then the PORT4 bits 2-3 trim from $F01A [ROM:$FDAE-$FDFD] LIKELY
+    note: base advance from the 2D map $F1EF (P34=1) or $F25D (P34=0) over RpmWord x Load; when ModeFlags bit 7 is set, from the 1-D rpm table $F0FA instead [ROM:$FD96-$FDA3]; +13 when $72 bit 7 [ROM:$FDDA];
+      then the PORT4 bits 2-3 trim from $F01A. SvcIgnition copies it to $AB and sums $A8+$A9+$AA+$AB, so it counts twice [ROM:$F7F0, $F806]. Larger = more advance (delay = $05AA - sum) [ROM:$F81B-$F824]
+      CONFIRMED (code)
   0xa7:
     name: StartCount
     note: counts OC2 events up to 4 [ROM:$FE54-$FE6B] GUESS
@@ -133,7 +136,7 @@ labels:
     note: table-lookup helper family $F11D-$F16A (entered at several offsets with X = table) [xref] LIKELY
   0xf16a:
     name: Lookup2D
-    note: lookup with two inputs (calls $F13D/$F159/$F15A) [xref] GUESS
+    note: '2D lookup: header [off1 word, max1, off2 word, max2], then rows; interpolates both ways [ROM:$F16A-$F195] LIKELY'
   0xf2be:
     name: Reset
     note: reset vector (also SWI, NMI, IRQ1, TOF, SCI) [ROM:$FFF0-$FFFF]
@@ -207,7 +210,14 @@ labels:
     note: PORT3 bit 4 (P34, jumper J8) selects ignition map $F1EF (1) or $F25D (0) [ROM:$FDCF-$FDD5] LIKELY (Ross R-I15)
   0xf000:
     name: Tables
-    note: calibration tables and descriptors $F000-$F2BD
+    note: calibration tables and descriptors $F000-$F2BD, except code at $F01E-$F03A (range check and clamp)
+  0xfa03:
+    name: FuelPulse
+    note: 'injection pulse: density x speed x staircase (lag-filtered in $B8) x InjFlags factor x caller factor x ThaCorr x (P34 ? 1.00 : $61) x mixture term, minimum 600 counts -> InjPulse [ROM:$FA03-$FB1F]
+      LIKELY'
+  0xf7f6:
+    name: IgnFixedTest
+    note: 'PORT3 bit 0 set: the spark sum is the fixed $00AA instead of the maps (test-terminal fixed timing, GUESS) [ROM:$F7F6-$F7FF]'
 data:
 - start: 0xf0ff
   end: 0xf116
@@ -219,24 +229,24 @@ data:
   note: rpm fuel correction, active only with P34 = 0 [ROM:$F465] LIKELY (Ross R-F12)
 - start: 0xf196
   end: 0xf1ad
-  name: DensityBump
-  note: extra fuel vs Load added to the density map, near zero except at high MAP [ROM:$FA4A] LIKELY (Ross R-F05)
+  name: DensityFine
+  note: 'added to the density map at 1/32 of a base count (base >>3, this >>8): a fine-resolution extension, not a high-MAP bump [ROM:$FA43-$FA52] GUESS'
 - start: 0xf1ae
   end: 0xf1b9
   name: SpeedMapLo
   note: rpm correction below 3200 rpm [ROM:$FA66] LIKELY (Ross R-F06)
 - start: 0xf1ba
-  end: 0xf1c4
+  end: 0xf1c7
   name: SpeedMapHi
-  note: rpm correction from 3200 rpm [ROM:$FA55] LIKELY (Ross R-F06)
-- start: 0xf1c5
+  note: 'rpm correction from 3200 rpm: 11 sites 3200-7200 rpm (header max 10) [ROM:$FA55] LIKELY (Ross R-F06)'
+- start: 0xf1c8
   end: 0xf1d6
   name: StairLowLoad
-  note: 'staircase rpm correction at low Load (no interpolation): entries [rpm word, factor] [ROM:$FA75-$FA8D] LIKELY'
+  note: 'staircase rpm correction at low Load (no interpolation): entries [rpm word, factor]; the walk is based at $F1C5 and steps 3 before reading [ROM:$FA75-$FA8D] LIKELY'
 - start: 0xf1d7
   end: 0xf1ee
   name: StairHighLoad
-  note: 'hard-driving staircase at high Load: sites 3500/4500/5100/5700/6100/6500 rpm [ROM:$FA81-$FA8D] LIKELY (Ross R-F09/R-F10)'
+  note: 'hard-driving staircase at high Load: walk based at $F1D7, entries from $F1DA, sites 3500/4500/5100/5700/6100/6500 rpm [ROM:$FA81-$FA8D] LIKELY (Ross R-F09/R-F10)'
 - start: 0xf1ef
   end: 0xf25c
   name: IgnMapA
@@ -244,7 +254,7 @@ data:
 - start: 0xf25d
   end: 0xf2bd
   name: IgnMapB
-  note: 'ignition base map used with P34 = 0 (secret mode): 13 rpm x 7 Load rows; header [off $0200, max 12, off $05A4, max 6] [ROM:$FDD2] LIKELY (Ross R-I15)'
+  note: 'ignition base map used with P34 = 0 (secret mode if, as likely, the stock P34 is 1; Q10): 13 rpm x 7 Load rows [ROM:$FDD2] LIKELY (Ross R-I15)'
 - start: 0xffee
   end: 0xffff
   kind: word

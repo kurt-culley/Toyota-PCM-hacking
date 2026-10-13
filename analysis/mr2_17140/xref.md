@@ -410,7 +410,7 @@ X base for an indexed call). Code addresses that are only used as call or jump t
 | `$F117` | SecretRpmTbl | ptr/r | Reset, sub_F15B† |
 | `$F118` | – | r | sub_F15B† |
 | `$F119` | – | r | sub_F15B† |
-| `$F196` | DensityBump | ptr/r | SvcEvents, SvcIgnition, sub_F15B† |
+| `$F196` | DensityFine | ptr/r | SvcEvents, SvcIgnition, sub_F15B† |
 | `$F197` | – | r | sub_F15B† |
 | `$F198` | – | r | sub_F15B† |
 | `$F1A2` | – | r | sub_F15B† |
@@ -422,8 +422,8 @@ X base for an indexed call). Code addresses that are only used as call or jump t
 | `$F1BA` | SpeedMapHi | ptr/r | SvcEvents, SvcIgnition, sub_F15B† |
 | `$F1BB` | – | r | sub_F15B† |
 | `$F1BC` | – | r | sub_F15B† |
-| `$F1C5` | StairLowLoad | ptr | SvcEvents, SvcIgnition |
-| `$F1C8` | – | r | SvcEvents†, SvcIgnition† |
+| `$F1C5` | – | ptr | SvcEvents, SvcIgnition |
+| `$F1C8` | StairLowLoad | r | SvcEvents†, SvcIgnition† |
 | `$F1C9` | – | r | SvcEvents†, SvcIgnition† |
 | `$F1D7` | StairHighLoad | ptr | SvcEvents, SvcIgnition |
 | `$F1EF` | IgnMapA | ptr/r | SvcAdc, SvcEvents, SvcIgnition, sub_F15A† |

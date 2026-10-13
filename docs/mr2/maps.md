@@ -13,11 +13,11 @@ The ECU times each conversion: ICR1 − the start stamp `$90`. It then subtracts
 | Ch | Signal | Result | Evidence | Confidence |
 |---|---|---|---|---|
 | 0 | zero reference | `$50` AdcZero | stored raw and subtracted from every other channel [ROM:$FC45-$FC4A] | LIKELY |
-| 1 | **MAP (PIM)** | `$4A` MapRaw (8-bit), `$46` Load (16-bit, filtered) | feeds the ignition-map row and the density maps; `$4D` is substituted on a fault [ROM:$FD70-$FD92] | LIKELY |
+| 1 | **MAP (PIM)** | `$4A` MapRaw (8-bit), `$46` Load (16-bit, filtered) | feeds the ignition-map row and the density maps; the immediate value `#$4D` is used on a fault [ROM:$FD70-$FD92] | LIKELY |
 | 2 | **Throttle (VTA)** | `$44` TpsOpen, `$45` TpsZero | learned closed position; a fast opening triggers an extra asynchronous injection [ROM:$FCCA-$FD51] | LIKELY |
 | 3 | **Mixture adjust (VAF / CO resistor)** | `$8C` Mixture | range-checked (<$30 / >$D0 tables); `$80` on a fault; used as reading − `$80` | LIKELY (Ross R-M01) |
 | 4 | **Battery (+B)** | `$8A` InjDeadTime | table `$F0A4` → injector dead time added in SchedInj [ROM:$FE14-$FE1E, $FFD0] | LIKELY |
-| 5 | **Coolant (THW)** | `$53` Coolant | latched on an NE event; `$1E` on a fault [ROM:$FE1F-$FE33] | LIKELY |
+| 5 | **Coolant (THW)** | `$53` Coolant; also `$4D` via table `$F090` | latched on an NE event; `$1E` on a fault [ROM:$FE1F-$FE33] | LIKELY |
 | 6 | **Intake air (THA)** | `$5F` Tha, `$5E` ThaCorr | table `$F083` → fuel correction; `$79` on a fault [ROM:$FE0A-$FE12] | LIKELY |
 | 7 | reference | `$55` AdcRef | table `$F044`; every other channel is multiplied by (`$55` + 410) [ROM:$FC4D-$FC64] | LIKELY |
 
@@ -39,7 +39,7 @@ There is no O2 channel. A UK 1985–89 MR2 runs open loop, which fits.
 
 That bit is **P34**, which the factory jumper **J8** ties to node N (BENCH 2026-10-09).
 
-**This is Ross's secret mode** (R-I15, R-F12): one logic level swaps the whole ignition base map and also switches the fuel chain's rpm correction (below).
+**This is Ross's secret mode mechanism** (R-I15, R-F12): one logic level swaps the whole ignition base map and also switches the fuel chain's rpm correction (below). Calling map B the *secret* one assumes the stock P34 level is 1; Q10 settles that.
 
 **Which map runs in your car depends on what P34 reads, i.e. on node N (open question Q10).**
 
@@ -59,7 +59,13 @@ The result `$A8` then gets a **trim from PORT4 bits 2–3** (table `$F01A`):
 
 That looks like an octane/fuel-grade selection, probably on the untested jumpers or a connector pin (GUESS) [ROM:$FDE4-$FDFD].
 
-Rows run from light load (row 0) to heavy load. Values are raw. Larger means more advance (LIKELY: the light-load rows are highest). **Degrees per count are not yet known.**
+Rows run from light load (row 0) to heavy load. Values are raw. **Larger means more advance** (CONFIRMED in code: the spark delay is `$05AA` − the sum [ROM:$F81B-$F824]). **Degrees per count are not yet known.**
+
+**Other ignition paths** (the base value `$A8` is not always the map):
+- With `ModeFlags` bit 7 set, the base comes from a 1-D rpm table `$F0FA` instead of the maps [ROM:$FD96-$FDA3].
+- With PORT3 bit 0 set, the spark sum is a fixed `$00AA`, probably the fixed timing for the test terminal (GUESS) [ROM:$F7F6-$F7FF].
+- +13 is added when `$72` bit 7 is set [ROM:$FDDA].
+- `SvcIgnition` sums `$A8` + `$A9` + `$AA` + `$AB`, with `$AB` a copy of `$A8`, so **the map value counts twice** in the advance. This matters when calibrating degrees per count [ROM:$F7F0, $F806].
 
 **Map A `$F1EF`** (P34 = 1)
 
@@ -74,7 +80,7 @@ Rows run from light load (row 0) to heavy load. Values are raw. Larger means mor
 | 6 | 17 | 58 | 74 | 78 | 100 | 114 | 96 | 102 | 92 | 102 | 112 | 134 | 122 |
 | 7 | 24 | 50 | 55 | 64 | 77 | 80 | 73 | 75 | 69 | 81 | 89 | 102 | 111 |
 
-**Map B `$F25D`** (P34 = 0, secret mode; 7 load rows starting one row-step higher)
+**Map B `$F25D`** (P34 = 0; 7 load rows, starting one row-step higher)
 
 | Load row \ rpm | 800 | 1200 | 1600 | 2000 | 2400 | 2800 | 3200 | 3600 | 4000 | 4400 | 4800 | 5200 | 5600 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -90,7 +96,7 @@ Rows run from light load (row 0) to heavy load. Values are raw. Larger means mor
 
 ```mermaid
 flowchart LR
-  MAP["Load $46 (MAP)"] --> DEN["density map<br/>$F0FF (&lt;3200 rpm) / $F10B (&ge;3200)<br/>+ high-MAP bump $F196 / $F1A2"]
+  MAP["Load $46 (MAP)"] --> DEN["density map<br/>$F0FF (&lt;3200 rpm) / $F10B (&ge;3200)<br/>+ fine bits $F196 / $F1A2"]
   RPM["RpmWord $77"] --> SPD["speed correction<br/>$F1AE (&lt;3200) / $F1BA (&ge;3200)"]
   RPM --> STAIR["staircase (no interpolation)<br/>$F1C5 at low Load, $F1D7 at high Load"]
   MAP --> STAIR
@@ -108,14 +114,22 @@ flowchart LR
 
 **Correction factors:** (value + 410) / 512, so **102 (`$66`) = × 1.00**. This is the `$FB28` multiply [ROM:$FB28-$FB2F].
 
+**Also in `FuelPulse` (`$FA03`), not shown in the diagram:**
+- the staircase factor is lag-filtered in `$B8`;
+- the mid-load band (Load `$0199`–`$02B8`) uses a fixed ×1.00;
+- an `InjFlags` factor [ROM:$FAA5];
+- a factor passed in by the caller [ROM:$FACD];
+- the mixture term [ROM:$FAEE-$FB0F];
+- a 600-count minimum on the pulse.
+
 | Table | What | Ross | Confidence |
 |---|---|---|---|
 | `$F0FF` / `$F10B` | density map (base fuel vs MAP), 9 sites, below / from 3200 rpm | R-F03, R-F06 | LIKELY |
-| `$F196` / `$F1A2` | extra fuel vs MAP, near zero except at high MAP | R-F05 (high-MAP bump) | LIKELY |
-| `$F1AE` / `$F1BA` | speed (rpm) correction below / from 3200 rpm | R-F06–R-F08 | LIKELY |
-| `$F1C5` | staircase at low Load: sites 600–1150 rpm (idle/decel range) | — | LIKELY |
-| `$F1D7` | **hard-driving staircase** at high Load: 3500/4500/5100/5700/6100/6500 rpm, factors 90/81/101/85/109/77, then 92 above 6500 (−2 % to −5 % mostly) | R-F09, R-F10 (staircase confirmed; sites differ from Ross's 17030) | LIKELY |
-| `$F117` | **secret rpm correction**, used only with P34 = 0 | R-F12 | LIKELY |
+| `$F196` / `$F1A2` | added at 1/32 of a base count (base >> 3, this >> 8): a fine-resolution extension of the density map | — | GUESS |
+| `$F1AE` / `$F1BA` | speed (rpm) correction below / from 3200 rpm; `$F1BA` has 11 sites, 3200–7200 rpm (it ends at `$F1C7`) | R-F06–R-F08 | LIKELY |
+| `$F1C8` (walk based at `$F1C5`) | staircase at low Load: sites 600–1150 rpm (idle/decel range) | — | LIKELY |
+| `$F1DA` (walk based at `$F1D7`) | **hard-driving staircase** at high Load: 3500/4500/5100/5700/6100/6500 rpm, factors 90/81/101/85/109/77, then 92 above 6500 (−2 % to −5 % mostly) | R-F09, R-F10 (staircase confirmed; sites differ from Ross's 17030) | LIKELY |
+| `$F117` | **secret rpm correction**, used only with P34 = 0: 3 sites, 1200/2000/2800 rpm → ×1.00/1.025/1.05 | R-F12 | LIKELY |
 | `$F083` | THA correction | R-F11 | LIKELY |
 
 ## What this means for the goals

@@ -205,6 +205,17 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
     - THA correction `$F083`;
     - the secret rpm correction `$F117`, used only when P34 = 0.
   - Units (kPa, degrees, µs) still to calibrate.
+  - **Verifier (independent agent, 2026-10-13): PASS WITH ISSUES.**
+    - **Confirmed:** the ADC dispatch (no off-by-one), the ignition table format, P34 selection and trim, "larger = more advance", the staircase walk, and the factor scaling.
+    - **Fixed:**
+      - `$F1BA` has 11 sites (ends at `$F1C7`);
+      - `$F196`/`$F1A2` is a fine-resolution extension, not a high-MAP bump (R-F05 link dropped);
+      - map A counts twice in the spark sum;
+      - the other ignition paths are now documented (`$F0FA` table, fixed `$00AA`, +13);
+      - the `FuelPulse` terms are listed;
+      - the `#$4D` fault value is distinguished from the `$4D` RAM variable;
+      - code at `$F01E`–`$F03A` is noted;
+      - "secret" map B is conditional on Q10.
 - [ ] Step 3: simulator I/O profile for this ROM; real-CPU harness cross-check.
 
 ### Bench observations to follow up (P4)

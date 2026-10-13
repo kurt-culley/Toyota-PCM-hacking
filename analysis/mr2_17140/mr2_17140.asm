@@ -77,7 +77,7 @@ DiagFlags	equ	$CC
 	org	$F000
 
 Tables:
-	db	$3F,$3F,$3F,$E6,$1A,$FA,$05,$F9		; calibration tables and descriptors $F000-$F2BD
+	db	$3F,$3F,$3F,$E6,$1A,$FA,$05,$F9		; calibration tables and descriptors $F000-$F2BD, except code at $F01E-$F03A (range check and clamp)
 	db	$07,$81,$20,$04,$40,$F8,$0A,$9A
 	db	$90,$96,$88,$02,$22,$00,$55,$01
 	db	$D5,$00,$55,$11,$09,$00
@@ -205,7 +205,7 @@ L_F168:
 	inx
 	rts
 Lookup2D:
-	bsr	L_F15A		; lookup with two inputs (calls $F13D/$F159/$F15A) [xref] GUESS
+	bsr	L_F15A		; 2D lookup: header [off1 word, max1, off2 word, max2], then rows; interpolates both ways [ROM:$F16A-$F195] LIKELY
 	std	$AD
 	ldab	$01,x
 	incb
@@ -231,8 +231,8 @@ Lookup2D:
 	staa	$AC
 	ldx	#$00AB
 	bra	L_F142
-; extra fuel vs Load added to the density map, near zero except at high MAP [ROM:$FA4A] LIKELY (Ross R-F05)
-DensityBump:
+; added to the density map at 1/32 of a base count (base >>3, this >>8): a fine-resolution extension, not a high-MAP bump [ROM:$FA43-$FA52] GUESS
+DensityFine:
 	db	$03,$A4,$08,$00,$05,$00,$00,$00
 	db	$00,$00,$00,$01,$03,$A4,$08,$0A
 	db	$0E,$1E,$13,$08,$12,$12,$05,$19
@@ -240,16 +240,15 @@ DensityBump:
 SpeedMapLo:
 	db	$03,$00,$08,$21,$48,$59,$58,$6C
 	db	$75,$7F,$84,$AA
-; rpm correction from 3200 rpm [ROM:$FA55] LIKELY (Ross R-F06)
+; rpm correction from 3200 rpm: 11 sites 3200-7200 rpm (header max 10) [ROM:$FA55] LIKELY (Ross R-F06)
 SpeedMapHi:
 	db	$08,$00,$0A,$4F,$66,$72,$68,$73
-	db	$7B,$73,$73
-; staircase rpm correction at low Load (no interpolation): entries [rpm word, factor] [ROM:$FA75-$FA8D] LIKELY
+	db	$7B,$73,$73,$70,$5F,$61
+; staircase rpm correction at low Load (no interpolation): entries [rpm word, factor]; the walk is based at $F1C5 and steps 3 before reading [ROM:$FA75-$FA8D] LIKELY
 StairLowLoad:
-	db	$70,$5F,$61,$00,$C0,$59,$00,$D0
-	db	$6B,$01,$30,$7C,$01,$60,$7C,$01
-	db	$70,$71
-; hard-driving staircase at high Load: sites 3500/4500/5100/5700/6100/6500 rpm [ROM:$FA81-$FA8D] LIKELY (Ross R-F09/R-F10)
+	db	$00,$C0,$59,$00,$D0,$6B,$01,$30
+	db	$7C,$01,$60,$7C,$01,$70,$71
+; hard-driving staircase at high Load: walk based at $F1D7, entries from $F1DA, sites 3500/4500/5100/5700/6100/6500 rpm [ROM:$FA81-$FA8D] LIKELY (Ross R-F09/R-F10)
 StairHighLoad:
 	db	$FF,$FF,$66,$04,$60,$5A,$05,$A0
 	db	$51,$06,$60,$65,$07,$20,$55,$07
@@ -270,7 +269,7 @@ IgnMapA:
 	db	$64,$72,$60,$66,$5C,$66,$70,$86
 	db	$7A,$18,$32,$37,$40,$4D,$50,$49
 	db	$4B,$45,$51,$59,$66,$6F
-; ignition base map used with P34 = 0 (secret mode): 13 rpm x 7 Load rows; header [off $0200, max 12, off $05A4, max 6] [ROM:$FDD2] LIKELY (Ross R-I15)
+; ignition base map used with P34 = 0 (secret mode if, as likely, the stock P34 is 1; Q10): 13 rpm x 7 Load rows [ROM:$FDD2] LIKELY (Ross R-I15)
 IgnMapB:
 	db	$02,$00,$0C,$05,$A4,$06,$84,$A6
 	db	$C2,$B7,$BA,$BC,$BC,$BE,$C0,$C5
@@ -1384,7 +1383,7 @@ L_F9AD:
 L_F9BF:
 	ldaa	ModeFlags
 	lsra
-	bcc	L_FA03
+	bcc	FuelPulse
 	ldx	#$F05F
 	jsr	$CB,x
 	bcs	L_F9CC
@@ -1442,8 +1441,8 @@ L_F9FC:
 	ldd	Load
 	jsr	L_F11E
 	bra	L_F9E1
-L_FA03:
-	pshx
+FuelPulse:
+	pshx		; injection pulse: density x speed x staircase (lag-filtered in $B8) x InjFlags factor x caller factor x ThaCorr x (P34 ? 1.00 : $61) x mixture term, minimum 600 counts -> InjPulse [ROM:$FA03-$FB1F] LIKELY
 	clra
 	ldx	$82
 	cpx	#$09C4

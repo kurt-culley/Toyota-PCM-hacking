@@ -129,7 +129,13 @@ ram:
     note: event flag set on edge 2 when $B7 bit 7 [ROM:$FF5C, $F886] GUESS
   0xcc:
     name: DiagFlags
-    note: bit 0 set after a serial RAM-peek reply [ROM:$F41B]; bit 7 tested widely GUESS
+    note: 'bit 0 set after a serial RAM-peek reply [ROM:$F41B]; checked and cleared about once a second, and the SCI is switched off if it was clear (link keep-alive) [ROM:$F62E-$F641] CONFIRMED (code, EMU); bit 7 tested widely GUESS'
+  0x64:
+    name: Counters
+    note: '8 saturating up-counters $64-$6B, all incremented together at $FBC8 [ROM:$FBC8-$FBCD] CONFIRMED (code); $6A is the link keep-alive timer'
+  0x6a:
+    name: LinkTimer
+    note: 'keep-alive timer for the serial link: every time it reaches $FA (about 1.0 s in the simulator) the link is checked [ROM:$F62E-$F641] CONFIRMED (code, EMU:tests/test_peek17140.py)'
 labels:
   0xf11d:
     name: Lookup1D_a
@@ -153,12 +159,18 @@ labels:
     note: D = $7C + $7E + $80, saturating [ROM:$F3E4-$F3F1] CONFIRMED (code)
   0xf403:
     name: SerialPeek
-    note: 'RAM peek: a byte received on the SCI is an address; the word there is sent back [ROM:$F403-$F41E] LIKELY'
-    block: 'Diagnostic link: same idea as the Bluetop''s SerialDebug ($F40D). A 3-wire SCI tap gives live
+    note: 'RAM peek: a byte received on the SCI is an address $00-$FF (X = 0 here); the word there is sent back, high byte first; overrun/framing errors are ignored [ROM:$F403-$F41E] CONFIRMED (code, EMU)'
+    block: 'Diagnostic link (docs/mr2/serial_link.md): enabled at reset only if P23 (SCI RX, pin 11) is low,
 
-      ECU variables (RE_PLAN P8 note).
+      7812.5 baud (E/128), read-only, page zero only, switched off after about 1 s without a request.
 
       '
+  0xf33b:
+    name: LinkEnable
+    note: 'TRCSR = RE+TE (SCI on, no interrupts) only if PORT2 bit 3 (P23 = SCI RX, chip pin 11) reads low at reset [ROM:$F33B-$F343] CONFIRMED (code, EMU)'
+  0xf62e:
+    name: LinkKeepAlive
+    note: 'every $FA counts of LinkTimer: if no peek was answered (DiagFlags bit 0 clear) switch the SCI off until the next reset [ROM:$F62E-$F641] CONFIRMED (code, EMU)'
   0xf7ec:
     name: SvcIgnition
     note: computes the spark edge/delay $9E/$9F from the crank period [ROM:$F81B-$F84C] LIKELY
@@ -210,7 +222,7 @@ labels:
     note: PORT3 bit 4 (P34, jumper J8) selects ignition map $F1EF (1) or $F25D (0) [ROM:$FDCF-$FDD5] LIKELY (Ross R-I15)
   0xf000:
     name: Tables
-    note: calibration tables and descriptors $F000-$F2BD, except code at $F01E-$F03A (range check and clamp)
+    note: 'calibration tables and descriptors $F000-$F2BD, except code at $F01E-$F03A (range check and clamp); $F000-$F002 = 3F 3F 3F (SWI opcodes: a stray jump to the start of the ROM traps to the reset vector) LIKELY'
   0xfa03:
     name: FuelPulse
     note: 'injection pulse: density x speed x staircase (lag-filtered in $B8) x InjFlags factor x caller factor x ThaCorr x (P34 ? 1.00 : $61) x mixture term, minimum 600 counts -> InjPulse [ROM:$FA03-$FB1F]
@@ -246,7 +258,7 @@ data:
 - start: 0xf1d7
   end: 0xf1ee
   name: StairHighLoad
-  note: 'hard-driving staircase at high Load: walk based at $F1D7, entries from $F1DA, sites 3500/4500/5100/5700/6100/6500 rpm [ROM:$FA81-$FA8D] LIKELY (Ross R-F09/R-F10)'
+  note: 'hard-driving staircase at high Load (> $2B8): walk based at $F1D7, entries from $F1DA, sites 3500/4500/5100/5700/6100/6500 rpm [ROM:$FA81-$FA8D] LIKELY (Ross R-F09/R-F10). Never read in the simulator: Load $2B8 is about 120 kPa on the current scale (STATUS conflicts log)'
 - start: 0xf1ef
   end: 0xf25c
   name: IgnMapA

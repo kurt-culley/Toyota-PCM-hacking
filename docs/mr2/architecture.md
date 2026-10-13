@@ -43,12 +43,13 @@ The structure matches the Bluetop's design: crank interrupts set event flags, an
 | PORT1 bits 2–4 | ADC channel select (8 channels) | [ROM:$FB5F-$FB96] | LIKELY |
 | PORT1 bit 5 | set when a channel is selected; bits 5–7 cleared at the OC1 tick that starts a conversion | [ROM:$FB8D-$FB96, $FE8B-$FE8F] | GUESS |
 | PORT1 bit 7 | read as a test/diagnostic input (`ldx PORT1 / bmi`) before the self-test and fault logging | [ROM:$F2FA, $F717] | GUESS |
+| PORT2 bit 3 (P23, SCI RX, pin 11) | read once at reset: **low enables the serial diagnostic link** ([`serial_link.md`](serial_link.md)) | [ROM:$F33B-$F343] | CONFIRMED (code) |
 | PORT2 bit 1 (P21, Tout1) | timer-1 output-compare pin, driven by OC1 | [ROM:$FE9B-$FEB0] | LIKELY |
 | PORT2 bits 2–4 | outputs set and cleared in the main loop (bit 2 near the start logic, bit 3 by an idle-related compare, bit 4 at $F7DF) | [ROM:$F497-$F49F, $FC1C-$FC28, $F7DF-$F7E9] | GUESS |
 | PORT3 bit 5 | G (cam reference): resets the NE edge count | [ROM:$FED2] | LIKELY |
 | PORT3 bits 0, 3, 6, 7 | switch inputs (bit 0 tested before the self-test and the fault logic; bit 3 counted as edges into $B5) | [ROM:$F2F5, $F70D, $FBD0-$FBE3] | GUESS |
 | PORT4 bits 0–1, 2–3 | outputs bits 0–1 (set from an rpm compare); inputs bits 2–3 select an offset table at $F01A | [ROM:$FB9E-$FBB6, $FDE6-$FDF8] | GUESS |
-| SCI | RAM-peek diagnostic link only (not the ADC) | [ROM:$F403-$F41E] | LIKELY |
+| SCI | RAM-peek diagnostic link only (not the ADC): 7812.5 baud, read-only, `$00`–`$FF`, off after about 1 s without a request ([`serial_link.md`](serial_link.md)) | [ROM:$F403-$F41E, $F62E-$F641] [EMU:tests/test_peek17140.py] | CONFIRMED |
 
 ## Interrupts
 
@@ -71,7 +72,7 @@ The structure matches the Bluetop's design: crank interrupts set event flags, an
 ## Main loop `$F371`
 
 1. Re-initialise SP, DDRs and RAMCR every pass. This is a watchdog-style robustness measure [ROM:$F371-$F383].
-2. Answer a pending SCI RAM-peek request (`SerialPeek`).
+2. Answer a pending SCI RAM-peek request (`SerialPeek`, [`serial_link.md`](serial_link.md)).
 3. **Speed:** NE period sum → reciprocal → `$77` (RpmWord, rpm × 0.32, see [`maps.md`](maps.md)) → `$73` (RpmIndex), the byte compared against rpm-like thresholds (`#$64`, `#$C8`, `#$DC` …) everywhere [ROM:$F41F-$F44F].
 4. Engine-state and fuel decisions [ROM:$F45E-$F6E3]: start/after-start (`$53`, `$62`), idle (`$4A` against `$F0CA`–`$F0DB` limits), flags `$59`/`$5A`/`$99`, and outputs on PORT2.
 5. `SvcIgnition` → `SvcEvents` → `SvcAdc` are called several times per pass, so the crank events and ADC conversions are serviced promptly.
@@ -94,6 +95,23 @@ The structure matches the Bluetop's design: crank interrupts set event flags, an
 - **Self-test:** the ROM checksum and RAM test run only when PORT3 and PORT1 test inputs say so, probably the check connector's test terminals [ROM:$F2F2-$F2FB] (LIKELY).
 - **Mode check:** reset hangs unless the chip latched mode 7 or **mode 2**. Mode 2 is the expanded mode a P7 external-memory board would use [ROM:$F2BE-$F2C8] (CONFIRMED, code).
 - **Tables at the start of the ROM** (`$F000`–`$F2BD`), not the end.
+
+## Coverage and option behaviours
+
+**No hidden code.** Tracing every path from the vectors reaches every code byte from `$F2BE` to `$FFED` except `$F9D2` (`$3D`), a padding byte between two helpers [xref] CONFIRMED. There are no dead routines or extra programs in the ROM. Everything below is existing code chosen by inputs.
+
+| Behaviour | Selected by | Evidence |
+|---|---|---|
+| Serial diagnostic link ([`serial_link.md`](serial_link.md)) | P23 low at reset, then a request at least once a second | [ROM:$F33B, $F403, $F62E] [EMU] CONFIRMED |
+| Ignition map A or B, and the rpm fuel correction `$F117` | P34 (jumper J8) | [ROM:$FDCF, $FAC2] [EMU] CONFIRMED |
+| Fixed spark sum `$00AA` (setting the base timing) | P30 high (test terminal, GUESS) | [ROM:$F7F6-$F7FF] CONFIRMED (code) |
+| Advance trim +9 / −17 / −9 / 0 counts (≈ +2.1° / −4.0° / −2.1° / 0°) | PORT4 bits 2–3 (jumpers or connector pins, Q12) | [ROM:$FDE4-$FDFD] code CONFIRMED, wiring GUESS |
+| ROM checksum and RAM test at reset | PORT3 bits 0/6 and PORT1 bit 7 test inputs | [ROM:$F2F2-$F2FB] LIKELY |
+| Mode 2 (external memory) accepted besides mode 7 | mode pins | [ROM:$F2BE-$F2C8] CONFIRMED (code) |
+| P32 (jumpers J4/J9) | not read by any instruction | [xref] CONFIRMED |
+| `$F000`–`$F002` = `3F 3F 3F` (SWI) | — a stray jump to the start of the ROM traps to the reset vector | [ROM:$F000] LIKELY intent |
+
+Table bytes that the simulator sweep never read (across rpm, pressure, both P34 levels, coolant, throttle, air temperature, battery and mixture): the high-load staircase `$F1DA`–`$F1EE` (see [`maps.md`](maps.md)), the top rows of both ignition maps, part of the reference table `$F047`–`$F054`, `$F095`–`$F09D` (an event path the sweep did not trigger) and the high range of the mixture table `$F0B1`–`$F0B8` [EMU:sweep].
 
 ## Next (P4 steps 2–3)
 

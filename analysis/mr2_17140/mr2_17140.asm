@@ -47,6 +47,8 @@ StateFlags	equ	$5A
 ThaCorr	equ	$5E
 Tha	equ	$5F
 SecretRpmFuel	equ	$61
+Counters	equ	$64
+LinkTimer	equ	$6A
 RpmIndex	equ	$73
 RpmWord	equ	$77
 NEperiod0	equ	$7C
@@ -77,7 +79,7 @@ DiagFlags	equ	$CC
 	org	$F000
 
 Tables:
-	db	$3F,$3F,$3F,$E6,$1A,$FA,$05,$F9		; calibration tables and descriptors $F000-$F2BD, except code at $F01E-$F03A (range check and clamp)
+	db	$3F,$3F,$3F,$E6,$1A,$FA,$05,$F9		; calibration tables and descriptors $F000-$F2BD, except code at $F01E-$F03A (range check and clamp); $F000-$F002 = 3F 3F 3F (SWI opcodes: a stray jump to the start of the ROM traps to the reset vector) LIKELY
 	db	$07,$81,$20,$04,$40,$F8,$0A,$9A
 	db	$90,$96,$88,$02,$22,$00,$55,$01
 	db	$D5,$00,$55,$11,$09,$00
@@ -248,7 +250,7 @@ SpeedMapHi:
 StairLowLoad:
 	db	$00,$C0,$59,$00,$D0,$6B,$01,$30
 	db	$7C,$01,$60,$7C,$01,$70,$71
-; hard-driving staircase at high Load: walk based at $F1D7, entries from $F1DA, sites 3500/4500/5100/5700/6100/6500 rpm [ROM:$FA81-$FA8D] LIKELY (Ross R-F09/R-F10)
+; hard-driving staircase at high Load (> $2B8): walk based at $F1D7, entries from $F1DA, sites 3500/4500/5100/5700/6100/6500 rpm [ROM:$FA81-$FA8D] LIKELY (Ross R-F09/R-F10). Never read in the simulator: Load $2B8 is about 120 kPa on the current scale (STATUS conflicts log)
 StairHighLoad:
 	db	$FF,$FF,$66,$04,$60,$5A,$05,$A0
 	db	$51,$06,$60,$65,$07,$20,$55,$07
@@ -362,7 +364,8 @@ L_F336:
 	clr	$43,x
 	dex
 	bne	L_F336
-	ldd	#$080A
+LinkEnable:
+	ldd	#$080A		; TRCSR = RE+TE (SCI on, no interrupts) only if PORT2 bit 3 (P23 = SCI RX, chip pin 11) reads low at reset [ROM:$F33B-$F343] CONFIRMED (code, EMU)
 	bita	PORT2
 	bne	L_F344
 	stab	TRCSR
@@ -370,7 +373,7 @@ L_F344:
 	ldd	#$FF20
 	staa	$A5
 	staa	$71
-	std	$64
+	std	Counters
 	stab	PORT1
 	stab	$B4
 	ldab	#$66
@@ -398,7 +401,7 @@ MainLoop:
 	staa	P3CSR
 	std	DDR3
 	ldaa	#$0D
-	cmpa	$64
+	cmpa	Counters
 	bcc	L_F394
 	ldd	#$4B02
 	cmpa	$6B
@@ -407,7 +410,7 @@ MainLoop:
 	stab	StateFlags
 L_F394:
 	ldd	#$FFF3
-	cmpa	$64
+	cmpa	Counters
 	bne	L_F3A2
 	stab	TCSR2
 	std	NEcount
@@ -478,10 +481,10 @@ L_F3F8:
 	bne	L_F3F8
 	ldd	#$5AA5
 	std	SelfTestMark
-; Diagnostic link: same idea as the Bluetop's SerialDebug ($F40D). A 3-wire SCI tap gives live
-; ECU variables (RE_PLAN P8 note).
+; Diagnostic link (docs/mr2/serial_link.md): enabled at reset only if P23 (SCI RX, pin 11) is low,
+; 7812.5 baud (E/128), read-only, page zero only, switched off after about 1 s without a request.
 SerialPeek:
-	ldaa	TRCSR		; RAM peek: a byte received on the SCI is an address; the word there is sent back [ROM:$F403-$F41E] LIKELY
+	ldaa	TRCSR		; RAM peek: a byte received on the SCI is an address $00-$FF (X = 0 here); the word there is sent back, high byte first; overrun/framing errors are ignored [ROM:$F403-$F41E] CONFIRMED (code, EMU)
 	ldab	RDR
 	asla
 	bcc	L_F41F
@@ -816,10 +819,11 @@ L_F617:
 L_F629:
 	staa	$A9
 	jsr	SvcIgnition
-	ldaa	$6A
+LinkKeepAlive:
+	ldaa	LinkTimer		; every $FA counts of LinkTimer: if no peek was answered (DiagFlags bit 0 clear) switch the SCI off until the next reset [ROM:$F62E-$F641] CONFIRMED (code, EMU)
 	suba	#$FA
 	bcs	L_F675
-	staa	$6A
+	staa	LinkTimer
 	ldaa	DiagFlags
 	lsra
 	bcs	L_F63E
@@ -906,7 +910,7 @@ L_F6CF:
 	ldd	#$280C
 	cmpa	RpmIndex
 	bhi	L_F6E3
-	cmpb	$64
+	cmpb	Counters
 	bcc	L_F6E3
 L_F6DE:
 	ldab	#$10
@@ -1932,7 +1936,7 @@ L_FD11:
 	ldab	ModeFlags
 	asrb
 	bvs	L_FD0C
-	ldab	$64
+	ldab	Counters
 	incb
 	beq	L_FD0C
 	ldab	$BE
@@ -2195,7 +2199,7 @@ IRQ_ICF:
 	jmp	IRQ_OCF
 L_FEBF:
 	clra
-	staa	$64
+	staa	Counters
 	ldd	ICR2H
 	std	NEtime
 	ldab	NEcount

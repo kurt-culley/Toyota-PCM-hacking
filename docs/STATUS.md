@@ -2,8 +2,13 @@
 
 The Lead agent updates this file at the end of every session. The plan is in [`RE_PLAN.md`](RE_PLAN.md).
 
-**Last updated:** 2026-10-10:
-- **P3 hardware is now RP2350-based** (RE_PLAN §6): an Olimex RP2350-PICO2-BB48R plus a Raspberry Pi Pico 2 WH, wired straight to the D151801 on a breadboard (no level shifters), with the chip in mode 0. Next: order BOM section A. The dump program, reader firmware and host tool are written and tested off-hardware; the guide and carrier PCB are in progress.
+**Last updated:** 2026-10-13:
+- **P3 is done and signed off**: the 17140 ROM is dumped (4 KB, SHA-256 `0cfc1fdd…6f271f6e`).
+- **P4 steps 1–3 first pass** are done: labelled source, channel map, ignition and fuel maps, simulator units.
+- **Code sweep:** there is no hidden code, but the 17140 has a **serial diagnostic link** ([`mr2/serial_link.md`](mr2/serial_link.md)). It is a read-only live-data port that can answer Q10 and the kPa-scale doubt in the car.
+- **Next:**
+  - owner: trace chip pins 11/12 (Q11) and the PORT4 jumpers (Q12), both unpowered;
+  - agents: Verifier review of P4 steps 1–3, then the Ross Tier-B pass.
 
 Earlier:
 - **P2 is complete and signed off** (independent Verifier PASS, 2026-10-10).
@@ -183,7 +188,9 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
 | Q7 | What does the 17140 ROM do with the `OX`/`VF` pins on a UK car with no O2 sensor? | ROM analysis (P4) |
 | Q8 | Does the 17140's `OX` pin carry the mixture-screw CO resistor? The 1984 VAF pin is missing from the board (Ross R-M08) | Continuity **Test B**, then the ROM ADC channel map (P4) |
 | Q9 | Is there a **1986–89 UK mk1b wiring diagram** to confirm the 17140 pinout (VISC, OX, W, ACT, FPU ...)? The 1988 repair manual is mk1b-era but **US spec** (air flow meter, O2 sensor), so it defines `V-ISC`, `FPU` and `W` but cannot say what the UK car uses | Owner: a UK/European 1986–89 EWD or repair manual supplement |
-| Q10 | What is jumper **node N**? About 750 Ω to ground, the same both ways, not connected to the main +5 V. Is it a logic-high source, such as a standby 5 V rail? This decides what P34 reads (0 or 1) with the factory J8 fitted, and so **which ignition map and fuel correction the car runs stock** (P4: `$F1EF` + x1.00 if P34 = 1; secret `$F25D` + `$F117` if 0) | **Powered** measurement of N and P20–P22 in the socketed ECU with the chip out (P3). Needs the owner's confirmation at the time (CLAUDE.md hardware safety) |
+| Q11 | Where do chip **pins 11 (P23, SCI RX) and 12 (P24, SCI TX)** go on the 17140 board: a connector pin, a test pad, or nowhere? This decides how the serial link ([`mr2/serial_link.md`](mr2/serial_link.md)) is reached in the car | Owner: unpowered continuity from the socket pins to the connector and pads |
+| Q12 | Which jumpers or pins drive **PORT4 bits 2–3** (P42/P43, chip pins 27 and 26)? They select the advance trim +9/−17/−9/0 counts [ROM:$FDE4-$FDFD]. Candidates: J1/J2/J6/J7 | Owner: unpowered continuity |
+| Q10 | What is jumper **node N**? About 750 Ω to ground, the same both ways, not connected to the main +5 V. Is it a logic-high source, such as a standby 5 V rail? This decides what P34 reads (0 or 1) with the factory J8 fitted, and so **which ignition map and fuel correction the car runs stock** (P4: `$F1EF` + x1.00 if P34 = 1; secret `$F25D` + `$F117` if 0) | **Powered** measurement of N and P20–P22 in the socketed ECU with the chip out (P3). Needs the owner's confirmation at the time (CLAUDE.md hardware safety). Alternative: read PORT3 over the serial link in the car (bit 4 = P34) |
 
 ### P4 tasks (MR2 17140 analysis)
 - [x] Step 1, first pass: labelled source `analysis/mr2_17140/mr2_17140.asm` (generated from `symbols.yaml` by `pcmre.symlisting`; asl round trip IDENTICAL), xref and call graph, architecture map [`mr2/architecture.md`](mr2/architecture.md). Findings:
@@ -224,7 +231,21 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
   - **absolute advance ≈ v × 15/64° BTDC when warm**, GUESS: anchored on the fixed-sum timing being 10° BTDC.
 
   Readable maps: [`mr2/ignition_maps.md`](mr2/ignition_maps.md).
-- [ ] Bench and car anchors: what ADC ch7 measures, and a timing-light reading with the test terminal shorted. Real-CPU harness cross-check of the channel map through the RAM-peek link.
+- [x] Code and table sweep, first pass ([`mr2/architecture.md`](mr2/architecture.md) "Coverage and option behaviours"); not yet Verifier-reviewed:
+  - **coverage:** every code byte is reached except the padding byte `$F9D2`, so there is no hidden code;
+  - **table bytes the simulator never reads**, notably the high-load staircase `$F1DA` (see the kPa conflict below);
+  - **option behaviours:** P34 map select, test-terminal fixed timing, PORT4 trims, the self-test gate, mode 2 accepted, P32 unused.
+- [x] **Serial diagnostic link** ([`mr2/serial_link.md`](mr2/serial_link.md)) [ROM:$F33B, $F403, $F62E] [EMU:tests/test_peek17140.py]:
+  - enabled only if P23 (pin 11, SCI RX) is low at reset;
+  - 7812.5 baud;
+  - one address byte in, the word at `$00`–`$FF` out, high byte first;
+  - read-only;
+  - switched off after about 1 s without a request;
+  - about 130–200 words/s in the simulator, with no effect on spark or injection.
+  
+  Simulator host model: [`../analysis/emu/peek17140.py`](../analysis/emu/peek17140.py).
+- [ ] Bench and car anchors: Load at key-on, engine off, over the serial link (kPa scale); what ADC ch7 measures; a timing-light reading with the test terminal shorted; PORT3 over the link (Q10).
+- [ ] Pico 2 W serial-link logger firmware and host decoder, tested against the simulator model first.
 
 ### Bench observations to follow up (P4)
 - **Day-one ingest** ([`../analysis/mr2_17140/ingest.md`](../analysis/mr2_17140/ingest.md)):
@@ -244,6 +265,7 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
 | 2026-10-09 | Injector harness grouping and impedance | 1984 EWD: #10 = No.1+3, #20 = No.2+4; injectors 1.5–3.0 Ω | 1988 RM: No.10 = No.3+4, No.20 = No.1+2; injectors about 13.8 Ω | Era/market difference. The grouping matters only if the ECU does not join #10/#20 (R-F22). Measure the UK car's injectors before P8 |
 | 2026-10-10 | T-VIS ignition step direction (R-I09) | Earlier P2 note: +8 raw "while T-VIS is shut/off", so less advance with T-VIS open, opposite to Ross | ROM: +8 when `TVIScounter` ≥ 0, the state above 4350 rpm [ROM:$FC47–$FC6D] [EMU:test_readable]. EWD p25: S/TH switches at 4350 rpm, where T-VIS opens | **Resolved:** the old note confused the VSV output being off with the valves being shut. +2.8° applies with T-VIS **open**, agreeing with Ross. Fixed in claims.md, bluetop.yaml, simulation.md, and (2026-10-13) the fuel_chain.md ignition diagram |
 | 2026-10-13 | Ignition clamp in degrees | ignition_table.md said "about 10° to 64°", fuel_chain.md "≈11°–65°": the raw sum × 90/256 without the conversion offset | ROM: sum clamped to `$1F`–`$B8` [ROM:$F8E6]; the ROM's own conversion gives 0.2°–54° BTDC warm, before the 256 µs lead [EMU:pcmre.readable.degrees, simulation.md formula] | **Resolved:** the two docs left out the −10.74° offset. Both corrected |
+| 2026-10-13 | 17140 load (kPa) scale | Simulator scale Load ≈ 4.98 × kPa + 98.6, resting on the EWD PIM curve and ADC ch7 = 5 V (GUESS) | ROM: the high-load staircase `$F1DA` is used only above Load `$2B8` [ROM:$FA81-$FA8D], about 120 kPa on that scale, unreachable without boost; the top ignition-map rows likewise [EMU:sweep] | **Open.** Probably the scale is about 20–25 % low (ch7 not 5 V). Settle with Load at key-on, engine off, over the serial link, or a ch7 measurement. Until then the kPa labels in `mr2/ignition_maps.md` are GUESS |
 | 2026-10-09 | HD6301 DAA V flag | Handbook table 3-2-1 (PDF p.190): V affected | Handbook instruction details (PDF p.89): V not affected | Open. The core clears V, as MAME does. The Bluetop never executes DAA; check the 17140 ROM for DAA before relying on it |
 | 2026-10-09 | Bluetop IDL input polarity | cap.asm comment: P4-2 IDL "active low" (throttle closed = 0) | ROM behaviour: idle state (`byte_95` negative) builds while P4-2 is **high**, and three idle-only uses agree (idle advance, 800 µs airflow fallback, tip-in pulse below 2500 rpm); a second cap.asm comment at $F7F1 also says P4-2 is high when IDL is closed [ROM:$F9F7–$FA39, $F814, $F1E0, $FA19] | ROM wins (truth order): P4-2 high = throttle closed at the CPU pin, LIKELY (the input buffer presumably inverts). The simulation uses the ROM's polarity |
 | 2026-10-09 | Bluetop cranking spark | Assumption that the CPU makes every spark | ROM: in start mode (`byte_C6` > 0) /IGT is held high, yet missing IGF still cuts fuel [ROM:$F24A, $F370, $F92D, $F420] | The cranking spark must come from outside the CPU (LIKELY the SE056 from NE). Modelled as such; confirm on the bench (P8) and in the 17140 ROM (P4) |

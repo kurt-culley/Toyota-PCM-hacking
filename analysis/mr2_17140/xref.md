@@ -178,13 +178,13 @@ Both kinds are counted in the summary; the sites are: `$F146`, `$F148`, `$F150`,
 | `$61` | SecretRpmFuel | 1 | SvcEvents, SvcIgnition | Reset |
 | `$62` | – | 1 | Reset | Reset |
 | `$63` | – | 1 | Reset | Reset |
-| `$64` | – | 2 | Reset, SvcAdc, SvcEvents, SvcIgnition, sub_F9E5† | IRQ_ICF, Reset, sub_F9E5† |
+| `$64` | Counters | 2 | Reset, SvcAdc, SvcEvents, SvcIgnition, sub_F9E5† | IRQ_ICF, Reset, sub_F9E5† |
 | `$65` | – | 2 | IRQ_ICF | IRQ_ICF, Reset |
 | `$66` | – | 1 | SvcAdc, SvcEvents, SvcIgnition | SvcAdc, SvcEvents, SvcIgnition |
 | `$67` | – | 1 | Reset | Reset |
 | `$68` | – | 2 | SvcAdc, SvcEvents, SvcIgnition | SvcAdc, SvcEvents, SvcIgnition |
 | `$69` | – | 2 | SvcAdc, SvcEvents, SvcIgnition | SvcAdc, SvcEvents, SvcIgnition |
-| `$6A` | – | 1 | Reset | Reset |
+| `$6A` | LinkTimer | 1 | Reset | Reset |
 | `$6B` | – | 1 | IRQ_OCF, Reset | – |
 | `$6C` | – | 1 | Reset, sub_F9E5† | IRQ_ICF, Reset, sub_F9E5† |
 | `$6D` | – | 2 | sub_F6E6 | sub_F6E6 |

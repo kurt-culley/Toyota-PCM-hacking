@@ -145,7 +145,8 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
 - [x] Chip removed from the spare ECU, socket fitted (owner, 2026-10-12).
 - [x] Reader firmware flashed to the Pico 2 W; banner correct on macOS [BENCH:owner report 2026-10-13].
 - [x] Breadboard wired (Pico 2 W layout), multimeter checklist all six checks OK, `rigcheck` PASS [BENCH:owner report 2026-10-13]. The first `rigcheck` correctly refused to run with the 5 V jumper only half removed.
-- [ ] Chip fitted; `clock`, `listen`, `res`, `probe`, `dump` ×3, `size`.
+- [x] Chip fitted (rail strips found split mid-board and bridged); `clock` PASS: E = 249,981 Hz, 49 % duty [BENCH:owner report 2026-10-13].
+- [ ] `listen`, `res`, `probe`, `dump` ×3, `size`.
 - [ ] Dump ×3, verified; Verifier sign-off.
 
 ## Open questions

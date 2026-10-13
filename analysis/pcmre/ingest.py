@@ -41,7 +41,8 @@ from .idalisting import parse
 from .roundtrip import ROOT
 
 ROSS = ROOT / "docs/ross/figures"
-VECTORS = ["balance word", "SCI", "TOF", "OCF", "ICF", "IRQ1", "SWI", "NMI", "RES"]  # from $FFEE; $FFEE is the checksum balance word, not a vector
+# from $FFEE; $FFEE is the checksum balance word, not a vector
+VECTORS = ["balance word", "SCI", "TOF", "OCF", "ICF", "IRQ1", "SWI", "NMI", "RES"]
 RDR = 0x12  # SCI receive data: the serial ADC replies here
 
 

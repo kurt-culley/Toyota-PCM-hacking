@@ -21,7 +21,7 @@ from .checksum import rom_sum
 from .roundtrip import ROOT
 
 OUT = ROOT / "AW11 MR2 PCM/89661-17140.bin"
-VECTORS = ["TRAP (balance)", "SCI", "TOF", "OCF", "ICF", "IRQ1", "SWI", "NMI", "RES"]  # from $FFEE
+VECTORS = ["balance word", "SCI", "TOF", "OCF", "ICF", "IRQ1", "SWI", "NMI", "RES"]  # from $FFEE; $FFEE is the checksum balance word, not a vector
 
 
 def parse_intel_hex(lines: list[str]) -> tuple[int, bytes]:

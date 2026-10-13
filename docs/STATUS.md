@@ -159,8 +159,16 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
 - [x] At E = 125 kHz: `clock` PASS (124,993 Hz, 50 %), `listen` PASS, **`probe` PASS** (vector served, `$C0C0` fetched, late cycles 0) [BENCH:owner report 2026-10-13]. At E = 250 kHz the first `probe` failed safe: core 1 was late on the back-to-back `$FFFF` cycle, so it stopped driving; no contention.
 - [x] **17140 ROM dumped** (2026-10-13): three runs identical (4096 ROM bytes, 0 differ), mode bits 000 in every run, snoop channel agrees on 4095/4095 bytes, word sum `$AA55`, vectors RES/SWI/NMI/IRQ1/TOF/SCI `$F2BE`, OCF `$FE36`, ICF `$FEB4` [BENCH:analysis/captures/89661-17140_dump_2026-10-13.txt]. SHA-256 `0cfc1fdd36fc4514cf0693e18ef7e4b47594a4b78f72beadd30766a36f271f6e`. Saved as `AW11 MR2 PCM/89661-17140.bin`. The first dump attempt failed only because the run comparison included the Port 2 pin byte (P22 read 0 in one run and 1 in two); fixed in firmware v4.
 - [ ] `size` (confirm 4 KB: `$E000`–`$EFFF` should be floating bus).
-- [ ] Verifier sign-off on the dump (P3 gate).
-- [ ] Dump ×3, verified; Verifier sign-off.
+- [x] **Dump Verifier (independent agent, 2026-10-13): PASS WITH ISSUES.**
+  - **Image:** the .bin equals the captured HEX, re-parsed with two parsers; SHA-256 matches.
+  - **Self-check:** the ROM's own reset code verifies the word sum against `$AA55` [ROM:$F2FE], and the image passes it.
+  - **Code:** the reset handler (mode 7 or mode 2 check, then `LDS #$00FF` and register setup) and both timer handlers (ending in RTI) decode cleanly.
+  - **Data:** no stuck bits, no floating-bus patterns.
+  - **Follow-ups:**
+    - `size` run still to do;
+    - print the firmware version in the banner, and record it with each capture;
+    - make snoop agreement a condition of `DONE OK`;
+    - `$FFEE` is the balance word, not a vector (fixed in ingest and romcapture).
 
 ## Open questions
 

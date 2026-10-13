@@ -147,7 +147,7 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
 - [x] Breadboard wired (Pico 2 W layout), multimeter checklist all six checks OK, `rigcheck` PASS [BENCH:owner report 2026-10-13]. The first `rigcheck` correctly refused to run with the 5 V jumper only half removed.
 - [x] Chip fitted (rail strips found split mid-board and bridged); `clock` PASS: E = 249,981 Hz, 49 % duty [BENCH:owner report 2026-10-13].
 - [x] `listen` PASS: cycles 0-1 read the vector from the floating bus ($FE, $FF), cycle 4 reads $FFFF internally ($BE), so the vector is external only in the window [BENCH:owner listen.txt 2026-10-13]. The firmware check that first reported STOP had matched a later stack pull (RTS from $FFFE/$FFFF); it now only looks at the first cycles.
-- [ ] **Fault to clear before `probe`:** A8 and A9 read as wired-AND whenever they differ ($FE→$FC at cycle 2, $01→$00 at cycles 40-41, $F2→$F0 after the RTS). Every other bit agrees with the instruction flow. Likely chip pins 28/29 (rows d32/d33) bent together or sharing a hole, since the unpowered checks passed before the chip went in.
+- [x] **Fault found and cleared (owner, 2026-10-13):** a sliver of copper or solder left from the desoldering bridged chip pins 28/29. Found by beeping GP10–GP11 with the chip in and out. Re-check with `listen` pending. Original symptom: A8 and A9 read as wired-AND whenever they differ ($FE→$FC at cycle 2, $01→$00 at cycles 40-41, $F2→$F0 after the RTS). Every other bit agrees with the instruction flow. Likely chip pins 28/29 (rows d32/d33) bent together or sharing a hole, since the unpowered checks passed before the chip went in.
 - [ ] `res`, `probe`, `dump` ×3, `size`.
 - [ ] Dump ×3, verified; Verifier sign-off.
 

@@ -47,7 +47,8 @@ The agent asks for your go-ahead before each powered step (CLAUDE.md, hardware s
    - run Chip Quik low-melt alloy along both rows, keeping them molten, and lift the chip evenly;
    - then remove **all** the low-melt alloy from the pads with braid and fresh solder before fitting the socket. Leftover low-melt alloy makes weak joints.
 6. **Fit the turned-pin DIP-40 socket** with its notch at the same end as the chip's was, and solder it. Check with the meter that socket hole 1 beeps to the ECU ground and hole 21 to the ECU's +5 V.
-7. Put the chip in anti-static foam or foil, with pin 1 marked.
+7. **Check the chip for bridges:** beep every neighbouring pair of legs (1–2, 2–3 … 39–40). All must read open. A tiny sliver of solder or copper left between two legs after desoldering connects two bus lines, and `listen` then shows those two address bits reading 0 whenever they differ.
+8. Put the chip in anti-static foam or foil, with pin 1 marked.
 
 **Optional measurement (open question Q10):** with the chip out, node N and pins 8–10 can be measured in the **powered** ECU. This is done only with your confirmation at the time; the agent will walk you through it.
 

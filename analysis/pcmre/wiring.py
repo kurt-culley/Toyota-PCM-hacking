@@ -175,6 +175,7 @@ def draw(board: str, out: Path) -> None:
 COLS = "abcdefghij"
 CHIP_ROW0 = 25
 RAIL_LINK_ROWS = {"+": 50, "-": 52}
+EXTAL_JOIN_ROW = 47  # free f-j strip joining the two EXTAL pull-up resistors
 
 
 def pico_hole(pin: int) -> tuple[str, int]:
@@ -237,7 +238,10 @@ def breadboard() -> tuple[list[tuple[str, str, str, str]], list[tuple[str, str, 
     parts = [
         ("100 nF", *to_rail(_free(chip_hole(21), 2), "a-")),
         ("10 µF, + leg on the + rail", _rail("a+", beside_vcc), _rail("a-", beside_vcc)),
-        ("470 Ω", *to_rail(_free(chip_hole(dip["EXTAL"]), 1), "j+")),
+        # EXTAL pull-up: 470 Ω, here built as 330 Ω + 220 Ω in series (550 Ω, within 470 Ω-2.2 kΩ),
+        # joined in the free row EXTAL_JOIN_ROW. A single 470 Ω straight from j42 to the rail also works.
+        ("330 Ω, EXTAL pull-up part 1", _free(chip_hole(dip["EXTAL"]), 1), f"j{EXTAL_JOIN_ROW}"),
+        ("220 Ω, EXTAL pull-up part 2", f"i{EXTAL_JOIN_ROW}", _rail("j+", EXTAL_JOIN_ROW)),
         ("10 kΩ", *to_rail(_free(chip_hole(dip["/RES"]), 1), "j+")),
         ("10 kΩ", *to_rail(_free(chip_hole(dip["P24/TX"]), 1), "j+")),
         *[("10 kΩ", *to_rail(_free(chip_hole(dip[s]), 1), "j-")) for s in ("P20", "P21", "P22")],
@@ -346,6 +350,10 @@ def draw_breadboard(out: Path) -> None:
         mx, my = (xa_ + xb_) // 2, (ya + yb) // 2
         if "F" in part:  # capacitor
             d.rectangle([mx - 7, my - 5, mx + 7, my + 5], fill=(60, 120, 220) if "µ" in part else (230, 160, 40))
+        elif ya == yb:  # resistor lying along a row strip
+            d.rectangle([mx - 9, my - 4, mx + 9, my + 4], fill=(225, 200, 150), outline="black")
+            d.text((mx, my - 12), part.split(",")[0], fill="black", font=f10, anchor="mb")
+            continue
         else:
             d.rectangle([mx - 4, my - 9, mx + 4, my + 9], fill=(225, 200, 150), outline="black")
         vlabel(part.split(",")[0], mx + 12, my, "black")

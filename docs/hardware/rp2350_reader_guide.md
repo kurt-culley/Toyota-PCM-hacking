@@ -214,7 +214,8 @@ One tested arrangement of the tables above, hole by hole.
 |---|---|---|
 | 100 nF | a25 | − rail beside a (row 25) |
 | 10 µF, + leg on the + rail | + rail beside a (row 24) | − rail beside a (row 24) |
-| 470 Ω | j42 | + rail beside j (row 42) |
+| 330 Ω, EXTAL pull-up part 1 | j42 | j47 |
+| 220 Ω, EXTAL pull-up part 2 | i47 | + rail beside j (row 47) |
 | 10 kΩ | j39 | + rail beside j (row 39) |
 | 10 kΩ | j33 | + rail beside j (row 33) |
 | 10 kΩ | j37 | − rail beside j (row 37) |
@@ -232,7 +233,7 @@ The agent goes through this with you **one line at a time**. Report each reading
 1. **Every signal wire:** beep from the chip hole to the board pin, for each row of the board table (22 rows).
 2. **Neighbours:** no beep between adjacent chip holes on each side (1–2, 2–3 … 39–40). A beep means a short.
 3. **Resistors:**
-   - chip hole 3 to the 5 V rail: 470 Ω;
+   - chip hole 3 to the 5 V rail: 470 Ω (550 Ω with the 330 Ω + 220 Ω pair of the breadboard layout);
    - holes 6 and 12 to the rail: 10 kΩ;
    - holes 8, 9 and 10 to GND: 10 kΩ each.
 4. **Rail straps:** holes 21, 7, 4 and 5 beep to the 5 V rail; hole 1 beeps to GND.

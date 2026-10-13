@@ -212,7 +212,7 @@ One tested arrangement of the tables above, hole by hole.
 
 | Part | From | To |
 |---|---|---|
-| 100 nF | a25 | − rail beside a (row 25) |
+| 100 nF (or 47 nF '473'), either way round | + rail beside a (row 26) | − rail beside a (row 26) |
 | 10 µF, + leg on the + rail | + rail beside a (row 24) | − rail beside a (row 24) |
 | 330 Ω, EXTAL pull-up part 1 | j42 | j47 |
 | 220 Ω, EXTAL pull-up part 2 | i47 | + rail beside j (row 47) |

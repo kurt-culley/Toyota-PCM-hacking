@@ -236,7 +236,9 @@ def breadboard() -> tuple[list[tuple[str, str, str, str]], list[tuple[str, str, 
               for p in (4, 5, 7)]  # fmt: skip
     beside_vcc = chip_hole(21)[1] - 1
     parts = [
-        ("100 nF", *to_rail(_free(chip_hole(21), 2), "a-")),
+        # both decoupling capacitors plug straight across the two rail strips beside column a,
+        # either side of the Vcc wire (b25), so neither has to cross a strip
+        ("100 nF (or 47 nF '473'), either way round", _rail("a+", beside_vcc + 2), _rail("a-", beside_vcc + 2)),
         ("10 µF, + leg on the + rail", _rail("a+", beside_vcc), _rail("a-", beside_vcc)),
         # EXTAL pull-up: 470 Ω, here built as 330 Ω + 220 Ω in series (550 Ω, within 470 Ω-2.2 kΩ),
         # joined in the free row EXTAL_JOIN_ROW. A single 470 Ω straight from j42 to the rail also works.
@@ -348,8 +350,17 @@ def draw_breadboard(out: Path) -> None:
         (xa_, ya), (xb_, yb) = xy(a), xy(b)
         d.line([xa_, ya, xb_, yb], fill=(90, 90, 90), width=2)
         mx, my = (xa_ + xb_) // 2, (ya + yb) // 2
-        if "F" in part:  # capacitor
-            d.rectangle([mx - 7, my - 5, mx + 7, my + 5], fill=(60, 120, 220) if "µ" in part else (230, 160, 40))
+        if "F" in part:  # capacitor across the two rail strips: legs marked, label beside
+            for x, y in ((xa_, ya), (xb_, yb)):
+                d.ellipse([x - 4, y - 4, x + 4, y + 4], fill="black")
+            d.rectangle([mx - 6, my - 6, mx + 6, my + 6], fill=(60, 120, 220) if "µ" in part else (230, 160, 40),
+                        outline="black")  # fmt: skip
+            label = "10 µF (+ leg on +)" if "µ" in part else "47–100 nF"
+            dx = -10 if "µ" in part else 10  # labels either side, so the two neighbours do not overlap
+            ty = top + 18 * p + 26
+            d.text((mx + dx, ty), label, fill="black", font=f10, anchor="rm" if dx < 0 else "lm")
+            d.line([mx, my + 7, mx + dx // 2, ty], fill=(120, 120, 120), width=1)
+            continue
         elif ya == yb:  # resistor lying along a row strip
             d.rectangle([mx - 9, my - 4, mx + 9, my + 4], fill=(225, 200, 150), outline="black")
             d.text((mx, my - 12), part.split(",")[0], fill="black", font=f10, anchor="mb")

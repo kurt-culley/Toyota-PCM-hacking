@@ -46,6 +46,7 @@ class Simulation:
         inputs: EngineInputs | None = None,
         extra: dict[int, bytes] | None = None,
         profile: EcuProfile = BLUETOP,
+        engine: type = Engine,
     ):
         """``extra`` maps addresses to code or data outside the ROM (external memory, as on the P7 board)."""
         self.rom = rom if rom is not None else BLUETOP_ROM.read_bytes()
@@ -54,7 +55,7 @@ class Simulation:
         for addr, data in (extra or {}).items():
             self.periph.mem[addr : addr + len(data)] = data
         self.cpu = HD6301(self.periph)
-        self.engine = Engine(self.periph, self.rom, inputs, profile)
+        self.engine = engine(self.periph, self.rom, inputs, profile)
         self.inputs = self.engine.inputs
         self.irq_counts: dict[int, int] = {}
         self.cpu.reset()

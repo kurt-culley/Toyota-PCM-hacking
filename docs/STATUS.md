@@ -216,7 +216,15 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
       - the `#$4D` fault value is distinguished from the `$4D` RAM variable;
       - code at `$F01E`–`$F03A` is noted;
       - "secret" map B is conditional on Q10.
-- [ ] Step 3: simulator I/O profile for this ROM; real-CPU harness cross-check.
+- [x] Step 3, first pass: the 17140 runs in the whole-ROM simulator. Its own I/O model is [`../analysis/emu/engine17140.py`](../analysis/emu/engine17140.py): NE on IC2 at 30°/edge, G on P3-5, a timed ADC on IC1, spark on P1-1, injector on Tout1. Units [EMU:tests/test_sim17140.py]:
+  - **RpmWord = rpm × 0.32** CONFIRMED;
+  - **15/64° per ignition-map count** CONFIRMED;
+  - **injector pulse = InjPulse + dead time** in µs, CONFIRMED;
+  - **Load ≈ 4.98 × kPa + 98.6** LIKELY, resting on the PIM curve and ADC ch7 = 5 V (GUESS);
+  - **absolute advance ≈ v × 15/64° BTDC when warm**, GUESS: anchored on the fixed-sum timing being 10° BTDC.
+
+  Readable maps: [`mr2/ignition_maps.md`](mr2/ignition_maps.md).
+- [ ] Bench and car anchors: what ADC ch7 measures, and a timing-light reading with the test terminal shorted. Real-CPU harness cross-check of the channel map through the RAM-peek link.
 
 ### Bench observations to follow up (P4)
 - **Day-one ingest** ([`../analysis/mr2_17140/ingest.md`](../analysis/mr2_17140/ingest.md)):

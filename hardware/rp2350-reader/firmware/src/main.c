@@ -417,15 +417,19 @@ static void cmd_listen(void) {
     // With nothing driving, the vector reads float and echo the address low byte
     // ($FE, $FF). Real data there means the chip drove its vector internally, so the
     // reader must not serve it: probe and dump would collide with the chip.
+    // Only the first cycles after RES rises can be the vector fetch: later $FFFE/$FFFF reads
+    // are stack pulls (the stack pointer starts near $FFFF) and must not be mistaken for it.
     int fffe = -1, fffe_at = -1;
-    for (uint32_t i = 0; i + 1 < log_count && i < LOG_N - 1; i++)
+    for (uint32_t i = 0; i + 1 < log_count && i < LOG_N - 1 && i <= VECTOR_WINDOW; i++)
         if (cycle_log[i].addr == 0xFFFE && cycle_log[i + 1].addr == 0xFFFF) {
             fffe = cycle_log[i].data << 8 | cycle_log[i + 1].data;
             fffe_at = (int)i;
             break;
         }
     if (fffe < 0)
-        printf("listen: no $FFFE/$FFFF fetch seen -> FAIL (check AS, E, R/W, RES and the straps)\n");
+        printf("listen: no $FFFE/$FFFF fetch in the first %u cycles -> STOP: check AS, E, R/W, RES and the\n"
+               "        straps, and send this log to the agent\n",
+               VECTOR_WINDOW + 1);
     else if (fffe_at >= (int)VECTOR_WINDOW)
         printf("listen: vector fetch at cycle %d, after the %u-cycle window -> STOP, send this log to the agent\n",
                fffe_at, VECTOR_WINDOW);

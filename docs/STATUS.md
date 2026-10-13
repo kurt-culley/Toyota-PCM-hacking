@@ -146,7 +146,9 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
 - [x] Reader firmware flashed to the Pico 2 W; banner correct on macOS [BENCH:owner report 2026-10-13].
 - [x] Breadboard wired (Pico 2 W layout), multimeter checklist all six checks OK, `rigcheck` PASS [BENCH:owner report 2026-10-13]. The first `rigcheck` correctly refused to run with the 5 V jumper only half removed.
 - [x] Chip fitted (rail strips found split mid-board and bridged); `clock` PASS: E = 249,981 Hz, 49 % duty [BENCH:owner report 2026-10-13].
-- [ ] `listen`, `res`, `probe`, `dump` ×3, `size`.
+- [x] `listen` PASS: cycles 0-1 read the vector from the floating bus ($FE, $FF), cycle 4 reads $FFFF internally ($BE), so the vector is external only in the window [BENCH:owner listen.txt 2026-10-13]. The firmware check that first reported STOP had matched a later stack pull (RTS from $FFFE/$FFFF); it now only looks at the first cycles.
+- [ ] **Fault to clear before `probe`:** A8 and A9 read as wired-AND whenever they differ ($FE→$FC at cycle 2, $01→$00 at cycles 40-41, $F2→$F0 after the RTS). Every other bit agrees with the instruction flow. Likely chip pins 28/29 (rows d32/d33) bent together or sharing a hole, since the unpowered checks passed before the chip went in.
+- [ ] `res`, `probe`, `dump` ×3, `size`.
 - [ ] Dump ×3, verified; Verifier sign-off.
 
 ## Open questions
@@ -163,6 +165,10 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
 | Q8 | Does the 17140's `OX` pin carry the mixture-screw CO resistor? The 1984 VAF pin is missing from the board (Ross R-M08) | Continuity **Test B**, then the ROM ADC channel map (P4) |
 | Q9 | Is there a **1986–89 UK mk1b wiring diagram** to confirm the 17140 pinout (VISC, OX, W, ACT, FPU ...)? The 1988 repair manual is mk1b-era but **US spec** (air flow meter, O2 sensor), so it defines `V-ISC`, `FPU` and `W` but cannot say what the UK car uses | Owner: a UK/European 1986–89 EWD or repair manual supplement |
 | Q10 | What is jumper **node N**? About 750 Ω to ground, the same both ways, not connected to the main +5 V. Is it a logic-high source, such as a standby 5 V rail? This decides what P34 reads (0 or 1) with the factory J8 fitted | **Powered** measurement of N and P20–P22 in the socketed ECU with the chip out (P3). Needs the owner's confirmation at the time (CLAUDE.md hardware safety) |
+
+### Bench observations to follow up (P4)
+- **17140 reset vector is probably `$F2BE`** (LIKELY): an RTS with the stack on ROM pulled `$F2`/`$BE` from `$FFFE`/`$FFFF`; the logged jump to `$F0BE` is the A8/A9 fault. Mode check at `$F2BE`: `LDAB $03 / ANDB #$E0 / CMPB #$E0 / BEQ`, read Port 2 = `$18` (mode 0) [BENCH:listen].
+- **Bus-cycle counts look 6801-like, not HD6301:** LSRB, CLRA show 2 bus cycles and ABX, LSRD 3, where the HD6301V1 handbook gives 1 (GUESS until checked against the handbook and more logs). If confirmed, the emulator's cycle counts for the D151801 need a 6801 timing table; it affects main-loop pacing, not the ROM arithmetic.
 
 ## Conflicts log
 

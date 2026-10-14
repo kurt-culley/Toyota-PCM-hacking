@@ -48,6 +48,10 @@ uint8_t d_port_out(const d151801_t *d, int i);  // port index 0..3: pin levels
 // Advance time by n cycles: run due external events and output compares in time order.
 void d_advance(d151801_t *d, int64_t n, d_next_event_fn next_ev, d_run_event_fn run_ev, void *ev_ctx);
 void d_set_pin(d151801_t *d, int port, int bit, int level);
+// As d_set_pin, for an edge that happened at time t (<= now): an input capture records the
+// free-running counter as it was at t. Used by the real-time firmware, whose input edges are
+// timestamped when they happen but reach the emulator a few us later.
+void d_set_pin_at(d151801_t *d, int port, int bit, int level, int64_t t);
 void d_is3_edge(d151801_t *d);
 // Highest-priority pending maskable interrupt vector, or 0 (ICF > OCF > TOF > SCI).
 uint16_t d_irq_vector(const d151801_t *d);

@@ -196,7 +196,7 @@ void d_advance(d151801_t *d, int64_t n, d_next_event_fn next_ev, d_run_event_fn 
     if (d_frc(d) < f0 || n >= 0x10000) d->tof = 1;  // wrapped through $0000
 }
 
-void d_set_pin(d151801_t *d, int port, int bit, int level) {
+static void set_pin_frc(d151801_t *d, int port, int bit, int level, uint16_t frc) {
     int i = port - 1;
     uint8_t mask = (uint8_t)(1 << bit);
     int old = (d->pins[i] & mask) ? 1 : 0;
@@ -207,10 +207,16 @@ void d_set_pin(d151801_t *d, int port, int bit, int level) {
     if (ch) {
         ch->pin_in = (uint8_t)level;
         if (((ch->tcsr & IEDG) != 0) == (level != 0)) {
-            ch->icr = d_frc(d);
+            ch->icr = frc;
             ch->tcsr |= ICF;
         }
     }
+}
+
+void d_set_pin(d151801_t *d, int port, int bit, int level) { set_pin_frc(d, port, bit, level, d_frc(d)); }
+
+void d_set_pin_at(d151801_t *d, int port, int bit, int level, int64_t t) {
+    set_pin_frc(d, port, bit, level, (uint16_t)(t + d->frc_offset));
 }
 
 void d_is3_edge(d151801_t *d) { d->p3csr |= IS3F; }

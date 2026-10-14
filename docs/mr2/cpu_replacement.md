@@ -76,6 +76,16 @@ The emulated chip runs **locked to real time**:
 5. **Differential against the real D151801:** the real chip in mode 7 on the breadboard harness and the emulator, driven with identical NE/G/ADC stimulus; compare every IGT and injector edge to the µs. This settles timer 2, the cycle table and anything undocumented.
 6. **Bench ECU:** the emulator in the spare ECU against the stock ECU (CLAUDE.md: bench outputs must match first). Only then the car.
 
+## Loopback test (no wiring)
+
+[`hardware/ecu-emu/loopback/`](../../hardware/ecu-emu/loopback/) builds `ecu_emu_loopback_pico2_w.uf2`: step 4 of the validation path, on one Pico.
+
+- **Core 1** runs the emulated chip with the 17140 ROM, locked to real time. It executes only while its time is behind the real 1 µs clock. Input edges reach it as timestamped events (`d_set_pin_at`, so input captures hold the true edge time), and it drives its output pins as they change.
+- **Core 0** plays the engine exactly as `engine17140.py` models it: NE every 30°, G every 6th edge, the ADC hybrid (P20 falls 20 µs + 200 µs/V after the hold line drops, for the channel on P12–P14), and the IGF echo 20 µs after each spark. It reads the emulator's outputs back through the same pads.
+- **Pins:** each signal is one GPIO, driven by one core and read through the pad by the other: NE GP2, G GP3, ADC end GP4, IGF GP5, IGT GP6, ADC select GP7–9, hold GP10, injector GP11.
+- **Operating points:** 800 rpm / 35 kPa, 2000 / 50 and 5000 / 95, each 3 s to settle then 3 s measured. It prints RpmWord, spark angle after the G edge, injector pulse, events per revolution, emulator load, worst lag, how late the spark pin is, and how late the stimulus is. The Python simulator's values for the same inputs are printed in brackets.
+- **What to expect:** RpmWord and events per revolution should match exactly. The spark angle and injector pulse should be within a few µs of the brackets. In this first version the emulator drives its output pins when its own time reaches the compare, so the pins lag by the emulator's few-µs lag. The next version pre-schedules compare outputs in hardware, which removes that.
+
 ## Speed test (no wiring)
 
 [`hardware/ecu-emu/bench/`](../../hardware/ecu-emu/bench/) builds `ecu_emu_bench_pico2_w.uf2`. Flash it, open the USB serial port, and read the line it prints every few seconds: instructions per second and the multiple of the real chip's speed. Nothing is connected to the ECU.

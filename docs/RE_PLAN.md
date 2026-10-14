@@ -123,9 +123,8 @@ flowchart LR
   P4 --> P6[P6 Secret maps]
   P5 --> P7[P7 Modified ROM + TunerStudio]
   P6 --> P7
-  P3 --> P8[P8 Bench rig - parallel]
+  P3 --> P8[P8 Measurement + logging - parallel]
   P8 --> P4
-  P8 --> P7
 ```
 
 ### P0: Foundations
@@ -226,8 +225,8 @@ flowchart LR
 
 1. **Port-usage audit** of the MR2 ROM: which port bits are read and written, and what each one means. Done (first pass): [`mr2/architecture.md`](mr2/architecture.md).
 2. **CPU replacement by emulation** (§6b, [`mr2/cpu_replacement.md`](mr2/cpu_replacement.md)): port the peripheral model to C, run it on the Pico 2 W with PIO edge timing, and take it through the validation steps listed there: the C core against the Python core, the C peripherals against the simulator, then the RP2350 with real I/O.
-3. **Differential test against the real D151801** on the breadboard harness (mode 7, identical stimulus): every IGT and injector edge must agree. This settles timer 2, the cycle table and anything undocumented.
-4. Run the **stock image** in the spare ECU on the bench and compare it with the stock reference, the car's own ECU.
+3. **Chip-in-isolation test against the real D151801** on the reader breadboard ([`hardware/chip_diff_test.md`](hardware/chip_diff_test.md)): mode 7, the same engine model and schedule as the loopback; every output edge must agree. This settles timer 2, the cycle table and anything undocumented.
+4. Run the **stock image** in the car on the in-car test rig (spare ECU, [`mr2/cpu_replacement.md`](mr2/cpu_replacement.md#in-car-test-rig)), with the car's own ECU kept as the known-good spare: key-on checks, then idle timing against the timing light, then gentle logged driving.
 5. Make calibration-only edits, handling the ROM checksum (word sum `$AA55` balanced at `$FFEE`, `pcmre.checksum`).
 6. Integrate TunerStudio:
    - The RP2350 exposes the calibration area and live variables to TunerStudio over USB or Wi-Fi. It uses the TunerStudio serial protocol with an INI generated from `defs/mr2_17140.yaml`.
@@ -235,11 +234,11 @@ flowchart LR
    - Map edits go into the RP2350's image; "Burn" saves to its flash.
    - If TunerStudio fails, fall back to TunerPro RT (offline XDF).
 7. Put it on a **factory-assembled** board: the RP2350, the 74HCT buffers and the DIP-40 plug. The external-memory designs (§6b) are the fallback if emulation fails validation.
-8. Never run the engine until the bench outputs match the stock ECU.
+8. Never run the engine until the emulator has passed the chip-in-isolation test against the stock CPU.
 
-### P8: Bench rig and validation (designed after P4)
+### P8: Measurement and logging
 
-P8 is required before P7 runs on the engine. Its design waits for P4 and STATUS Q5 (whether NE/G need a VR-style waveform).
+P7's validation does not depend on P8: the emulator is checked against the real CPU on the breadboard (P7 step 3). P8 covers measurements of the ECU board and the car (spark angle, injector pulse, sensor curves), done as they are needed.
 - **Prediction** comes from the whole-ROM simulator ([`bluetop/simulation.md`](bluetop/simulation.md)), which will run the 17140 ROM too.
 - The Pico 2 W is the **bench stimulus** (NE/G from PIO; fixed resistors or a potentiometer for THW/THA; PIM/VTA from PWM + RC), scripted from Python. Firmware lives in `hardware/bench-sim/`.
 - The Pico 2 W is the **timing meter**: PIO edge capture of IGT, injectors and NE/G calibrates spark degrees (upstream issue #6, R-I06) and checks the injector pulse (R-F23).
@@ -346,10 +345,9 @@ So the board **replaces the CPU**: an RP2350 on a DIP-40 plug runs the 17140 pro
   1. the C core against the Python core;
   2. the C peripheral model against the simulator;
   3. the RP2350 with real I/O;
-  4. a **differential test against the real D151801** on the breadboard harness, with identical stimulus;
-  5. the bench ECU against the stock ECU;
-  6. then the car.
-- **Later (owner idea):** a fallback to the factory chip on the same board (a socket for the D151801 and a selector), to be designed once the emulator works on the bench.
+  4. the **chip-in-isolation test against the real D151801** on the reader breadboard, with identical stimulus;
+  5. then the car, on the in-car test rig in the spare ECU.
+- **Later (owner idea):** a fallback to the factory chip on the same board (a socket for the D151801 and a selector), to be designed once the emulator has run in the car.
 - **Fallbacks if emulation fails validation:** the external-memory designs (dual-port SRAM "middle-man" run by the Pico, or flash + CPLD as on the upstream 1UZ card).
 - **Nothing in 6b is ordered** until the P4 port audit is done and a design review has frozen the pin budget.
 

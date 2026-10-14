@@ -49,7 +49,7 @@ This repo is used to reverse-engineer Denso/Toyota ECUs. The active project is t
 
 - Bring the D151801 supply up **before** releasing /RES.
 - Use ESD precautions. Keep a known-good ECU aside.
-- Never run the engine on untested code. Bench outputs must match the stock ECU first.
+- Never run the engine on untested code. The emulator must first match the stock CPU (the chip-in-isolation test, [`docs/hardware/chip_diff_test.md`](docs/hardware/chip_diff_test.md)).
 - Agents may draft posts for the upstream repo, but must never post without the owner's approval.
 
 ## Repo map

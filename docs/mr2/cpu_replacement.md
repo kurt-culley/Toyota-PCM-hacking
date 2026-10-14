@@ -51,7 +51,7 @@ The emulated chip runs **locked to real time**:
 - **Inputs:** PIO timestamps every input edge (NE, ADC end, IGF) with a 1 MHz counter, so ICR1/ICR2 hold the exact capture time, as on the real chip.
 - **Outputs:** when the program writes OCR1/OCR2, the compare is handed to PIO or a hardware alarm, which switches the IGT or injector pin at that exact µs. Spark and injection timing therefore do not depend on how fast the emulation runs, only on it keeping up.
 - **Headroom:** on a PC the C core runs the 17140 ROM about **270×** faster than the real chip [EMU: host benchmark]. **On the owner's Pico 2 W at the stock 150 MHz it runs at 4.5× the real chip** (1.42 M instructions/s, E-clock equivalent 4.48 MHz) [BENCH: owner, ecu_emu_bench v1, 2026-10-14]. With a direct memory path for RAM/ROM (only `$00`–`$1F` through callbacks): **4.6× at 150 MHz and 7.7× at 250 MHz** (2.46 M instructions/s) [BENCH: owner, ecu_emu_bench v2, 2026-10-14]. CPU speed is not a risk; the peripheral model has to fit inside that margin.
-- **Open:** the D151801 showed 6801-like bus-cycle counts on the bench (STATUS). The emulator's per-instruction cycle table must match the real chip, so that the main-loop pacing is right. The differential test below settles it.
+- **Open:** the D151801 showed 6801-like bus-cycle counts on the bench (STATUS). The emulator's per-instruction cycle table must match the real chip, so that the main-loop pacing is right. The chip-in-isolation test (validation step 5) settles it.
 
 ## Pins (about 22 signals)
 
@@ -65,16 +65,16 @@ The emulated chip runs **locked to real time**:
   - P23 (fault output when the link is off);
   - P31, P40, P41.
 - **Settings, no wire:** J8 (P34), the trims (P42/P43), the P36 strap. Pin 40 (E) and the crystal pins are left open unless the board turns out to use E.
-- **Fit:** the Pico 2 W's 26 usable GPIOs suffice for the bench prototype. A final board can use an RP2350B for spare pins.
+- **Fit:** the Pico 2 W's 26 usable GPIOs suffice for the in-car test rig. A final board can use an RP2350B for spare pins.
 
 ## Validation path
 
 1. **C core against the Python core: done** [EMU:tests/test_hd6301_c.py].
 2. **Speed on the RP2350:** the bench UF2 (below) on the owner's Pico 2 W.
 3. **C peripheral model against the Python simulator: done.** CPU + peripherals + memory in C (`board.c`), driven by the same engine model through `emu.cboard`: every spark, injector edge, ADC conversion, interrupt count and RAM byte identical at 8 operating points (idle, cruise, full load, rev limit, cranking, cold with map B, no IGF, test terminal) [EMU:tests/test_d151801_c.py]. A one-bit fault in the C output-compare logic fails all 8.
-4. **On the Pico with real I/O:** PIO stimulus from the simulator's scenarios, outputs captured and compared.
-5. **Differential against the real D151801:** the real chip in mode 7 on the breadboard harness and the emulator, driven with identical NE/G/ADC stimulus; compare every IGT and injector edge to the µs. This settles timer 2, the cycle table and anything undocumented.
-6. **Bench ECU:** the emulator in the spare ECU against the stock ECU (CLAUDE.md: bench outputs must match first). Only then the car.
+4. **On the Pico, real time: done.** The loopback test (below): every output edge, RAM byte and injector pulse bit-exact with the simulator, in real time.
+5. **Against the real D151801:** the chip-in-isolation test ([`chip_diff_test.md`](../hardware/chip_diff_test.md)). The real chip runs its own ROM on the reader breadboard, the Pico plays the engine with the same model and schedule as the loopback, and its edges must give the same checksums. This settles timer 2, the cycle table, the reset latency and anything undocumented. No ECU board is needed: the emulator uses the car's ECU board unchanged, exactly as the chip does.
+6. **The car** (below), with the car's own ECU kept as the known-good spare.
 
 ## Loopback test (no wiring)
 
@@ -103,6 +103,38 @@ The injector pulse differed by up to 6 %. The cause is that the ECU's fuelling d
 
 [`hardware/ecu-emu/bench/`](../../hardware/ecu-emu/bench/) builds `ecu_emu_bench_pico2_w.uf2`. Flash it, open the USB serial port, and read the line it prints every few seconds: instructions per second and the multiple of the real chip's speed. Nothing is connected to the ECU.
 
+## In-car test rig
+
+**Status: proposed; nothing ordered until the owner approves** ([`../../hardware/BOM.md`](../../hardware/BOM.md) section C). It goes in the **spare ECU**, which already has a turned-pin socket where the D151801 was. The car's own ECU stays untouched as the known-good spare.
+
+```mermaid
+flowchart LR
+  SOCK["Spare ECU: CPU socket"] --- PLUG["DIP-40 IDC plug"]
+  PLUG ---|"40-way ribbon, about 15 cm"| HDR["2x20 boxed header"]
+  subgraph RIG["Stripboard"]
+    HDR
+    PICO["Pico 2 W<br/>(in female headers)"]
+    BUF["2x 74HCT541<br/>powered from the ECU's 5 V"]
+    RIN["1 kOhm in series<br/>on every input"]
+    PWR["5 V buck from switched +B<br/>-> Schottky -> VSYS"]
+    PICO -->|12 outputs| BUF --> HDR
+    HDR -->|inputs| RIN --> PICO
+    PWR --> PICO
+  end
+  PICO ---|USB extension| LAPTOP["Laptop: flash the tune, log"]
+```
+
+- **Ribbon:** the rig sits beside the ECU, so it works whatever the clearance above the socket.
+- **Outputs:** the 12 outputs (IGT, P12–P15, injector, P22–P24, P31, P40, P41) go through the 74HCT541s. These are powered from socket pin 21, so the board sees true 5 V CMOS levels.
+- **Inputs:** the board's 5 V logic reaches the Pico's 5 V-tolerant GPIOs through 1 kΩ, which limits the current if the ECU's 5 V comes up a moment before the Pico's 3.3 V.
+- **Power:** the Pico runs from a small 5 V buck fed from the ECU's switched +B (one flying lead), not from the ECU's 5 V regulator. That regulator's spare capacity is unknown, and it also feeds the sensors.
+- **Reset:** the ECU's own reset line holds /RES low at power-up, and the emulator starts when it rises.
+- **First drive, in order**, each with the owner's confirmation:
+  1. key on, engine off: check the fault lamp and the serial-link values;
+  2. idle: a timing light shows 16° BTDC with T open and 10° with T–E1 shorted;
+  3. a gentle drive with logging.
+- **Final board:** a KiCad PCB, factory-assembled (JLCPCB PCBA). It carries the RP2350 (or a castellated Pico 2 W), SMD 74HCT541s, the buck, USB-C reachable for flashing, and turned-pin DIP-40 legs underneath. Its outline waits for a photo of the clearance above the CPU socket.
+
 ## Later: factory-chip fallback on the same board
 
-The owner would like the board to be able to fall back to the factory D151801, for example with a socket for the original chip and a switch that selects which one drives the ECU pins. To revisit once the emulator works on the bench.
+The owner would like the board to be able to fall back to the factory D151801, for example with a socket for the original chip and a switch that selects which one drives the ECU pins. To revisit once the emulator has run in the car.

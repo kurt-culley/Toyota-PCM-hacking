@@ -22,26 +22,46 @@
 | A10 | **Full-size breadboard, 830 points** (or two half-size joined) | 1 | The Pico and the DIP-40 need 20 rows each | Amazon UK | ~£5 |
 | opt | ESD wrist strap | 1 | Protects the only D151801 | Amazon UK | ~£5 |
 
-Already owned: male-to-male jumpers, multimeter, and an older **Raspberry Pi Pico WH (RP2040)**: not 5 V tolerant, so not used on the CPU; it is the bench's "engine" Pico (stimulus and measurement through dividers and a transistor, [`../docs/hardware/ecu_bench_setup.md`](../docs/hardware/ecu_bench_setup.md)). No scope or logic analyser is needed: the reader firmware measures the chip's E clock itself.
+Already owned: male-to-male jumpers, multimeter, and an older **Raspberry Pi Pico WH (RP2040)**: not 5 V tolerant, so not used. No scope or logic analyser is needed: the reader firmware measures the chip's E clock itself.
+
+**Chip-in-isolation test** ([`../docs/hardware/chip_diff_test.md`](../docs/hardware/chip_diff_test.md)) on the same breadboard: only **1 kΩ ×3 and 10 kΩ ×8** more (A4 assortment).
 
 
 ---
 
-## B. Deferred: bench rig and logger (phase P8)
+## B. Deferred: measurement and logging (phase P8)
 
-Designed after P4. Expected to need only resistors, clamps (TVS/Zener) and a fused 12 V bench supply; the Pico 2 W provides stimulus, timing and logging.
+Bought as each measurement is needed: resistors, clamps (TVS/Zener) and, for any powered ECU-board measurement, a fused 12 V supply. The Pico 2 W provides stimulus, timing and logging.
 
 ---
 
-## C. Deferred: in-car modified-ROM board (phase P7) — DO NOT ORDER
+## C. In-car modified-ROM board (phase P7)
 
-**Status: provisional.** Nothing is ordered until the P4 port audit is complete and a design review has frozen the pin budget.
+### C1. In-car test rig (prototype): proposed, awaiting the owner's approval to order
+
+Plugs into the spare ECU's CPU socket in place of the D151801 ([`../docs/mr2/cpu_replacement.md`](../docs/mr2/cpu_replacement.md#in-car-test-rig)). Only after the emulator passes the chip-in-isolation test.
+
+| # | Item | Qty | Why | Where | Approx. |
+|---|---|---|---|---|---|
+| C1 | **Raspberry Pi Pico 2 W with headers** (as A1) | 1 | The emulated CPU. The owner's existing one can be used; a second keeps the reader/logger breadboard intact | The Pi Hut, Pimoroni | ~£7–8 |
+| C2 | **40-way IDC DIP plug** (DIL "transition" plug, 600 mil) | 2 (1 spare) | Plugs into the ECU's turned-pin CPU socket | CPC / Farnell, eBay | ~£2 each |
+| C3 | **40-way grey ribbon** (1.27 mm pitch, about 0.5 m) + **40-way IDC socket** (2×20, 2.54 mm) + **2×20 boxed header** | 1 each | Socket to rig, about 15 cm, so the rig sits beside the ECU whatever the clearance | CPC, Amazon UK | ~£6 |
+| C4 | **74HCT541N** (DIP-20) + DIP-20 sockets | 2 + 2 (+1 spare chip) | The 12 outputs at true 5 V CMOS levels; the Pico's 3.3 V cannot meet 5 V-CMOS inputs | CPC, Farnell | ~£3 |
+| C5 | **5 V buck module**, 6–36 V in, at least 500 mA, reverse-polarity protected (e.g. Pololu D24V5F5 or D24V10F5) | 1 | Powers the Pico from the ECU's switched +B; the ECU's 5 V regulator also feeds the sensors and its spare capacity is unknown | The Pi Hut, Pimoroni | ~£6 |
+| C6 | **1N5819** Schottky diode | 2 | Buck to VSYS, so USB and the car supply can both be connected | CPC, Amazon UK | <£1 |
+| C7 | Resistors **1 kΩ ×15, 10 kΩ ×4**; capacitors **100 nF ×3, 10 µF ×2** | — | Series protection on the inputs; decoupling for the buffers and the Pico | A4/A5 assortment | (owned) |
+| C8 | **Stripboard**, about 100 × 160 mm, + 2× 1×20 female headers | 1 | Carries the Pico (removable), buffers and header | CPC, Amazon UK | ~£5 |
+| C9 | **Micro-USB extension lead**, about 1 m, data | 1 | Flash the tune with the ECU closed | Amazon UK | ~£4 |
+| — | Flying lead + inline fuse holder with 1 A fuse | 1 | +B to the buck | Car accessory shop | ~£3 |
+
+**Total about £30** with a second Pico 2 W.
+
+### C2. Final board: DO NOT ORDER
 
 | Item | Indicative part | Why |
 |---|---|---|
-| Prototype | the Pico 2 W (A1) emulating the CPU + 74HCT buffers for the 5 V outputs + a DIP-40 plug (RE_PLAN §6b) | Nothing else: no external memory or logic |
-| Final board | an RP2350 (RP2350B for spare pins) + wireless module + 74HCT buffers on a DIP-40 plug, powered from the ECU's 5 V (KiCad, JLCPCB PCBA) | In-car use |
-| Fallback | external-memory designs: dual-port SRAM run by the Pico, or flash + CPLD | Only if emulation fails the bench validation |
+| Final board | an RP2350 (or a castellated Pico 2 W) + SMD 74HCT541s + 5 V buck + USB-C on a PCB with turned-pin DIP-40 legs (KiCad, JLCPCB PCBA) | In-car use; outline waits for the clearance photo above the CPU socket |
+| Fallback | external-memory designs: dual-port SRAM run by the Pico, or flash + CPLD | Only if emulation fails validation |
 
 ---
 

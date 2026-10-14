@@ -47,7 +47,7 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
 | P5 | Warm-up / cold start (goal 1), blocked until the P4 gate | ☐ blocked | ☐ |
 | P6 | Secret maps (goal 2) | ☐ | ☐ |
 | P7 | Modified ROM + TunerStudio (goal 3) | ☐ | ☐ |
-| P8 | Bench rig + validation (RP2350) | ☐ | — |
+| P8 | Measurement + logging (RP2350) | ☐ | — |
 
 ### P0 tasks
 - [x] Archive the missing upstream comments (#4 and #1, all read through the API on 2026-10-09). See [`upstream_issues.md`](upstream_issues.md).
@@ -276,7 +276,8 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
     - nits: StartCount, `$FA27`, the P23 description, the instruction count, P32 → LIKELY, overrun and keep-alive wording, the map footer, the 4A-GZE alternative, citation ranges, stronger missing-IGF and slow-climb tests.
   - **Re-check of the fixes (same independent agent, 2026-10-14): PASS.** Its cosmetic follow-ups are applied (citation `$FDC9-$FDD5`, evidence tag on the `ModeFlags` bit 7 statement, a car check of the P30 polarity).
 - [x] **P7 early exploration: the C HD6301 core** (`hardware/ecu-emu/core/`, switch generated from the opcode table by `pcmre.gen_hd6301_c`). It matches the MAME-verified Python core on all 256 opcodes (random cases, interrupts included) and on 200 000 steps of the 17140 ROM [EMU:tests/test_hd6301_c.py]. On a PC it runs the ROM about 270× faster than the real chip. **On the owner's Pico 2 W: 4.6× the real chip at 150 MHz, 7.7× at 250 MHz** [BENCH: owner, bench v2, 2026-10-14]. **D151801 peripherals in C done** (`d151801.c`, `board.c`): identical to the Python simulator at 8 operating points, every spark, injector edge, ADC conversion and RAM byte [EMU:tests/test_d151801_c.py]. Loopback on the Pico (v1, owner 2026-10-14): RpmWord exact, spark within 0.13°, 72 % busy, lag ≤ 14 µs. **v2 on the Pico: all 6 phases PASS, bit-exact with the simulator** (every output edge, RAM, injector pulse) [BENCH: owner 2026-10-14]. A low-rpm lag spike (1.1 ms at 800 rpm, a crank-queue horizon bug) is fixed in v2.1.
-- [ ] **Bench setup (draft for owner review):** [`hardware/ecu_bench_setup.md`](hardware/ecu_bench_setup.md). Stage 0 runs the spare ECU with the real D151801 and a simulated engine (baseline; also the real-chip check of the model). Stage 1 puts the emulator Pico in the CPU socket and compares edge for edge. The parts list needs approval.
+- [ ] **Chip-in-isolation test (next P7 step):** [`hardware/chip_diff_test.md`](hardware/chip_diff_test.md). The real D151801 runs its own ROM in mode 7 on the reader breadboard while the Pico plays the engine with the loopback's model and schedule; its edge checksums must equal `expected.h`, which the emulator already matches. Owner decision 2026-10-14: this replaces the ECU bench as the emulator's validation; then the car on the in-car test rig (spare ECU, car's own ECU kept as the known-good spare). To do: firmware `hardware/ecu-emu/chipdiff/`, host diff `analysis/emu/chipdiff.py`, wiring picture; owner rewires the breadboard (unpowered) and runs it.
+- [ ] **In-car test rig: parts list proposed** ([`../hardware/BOM.md`](../hardware/BOM.md) section C1; about £30). Awaiting owner approval to order. The final PCB outline waits for a photo of the clearance above the CPU socket.
 - [x] **Ross Tier-B pass on the 17140** (2026-10-14; not yet Verifier-reviewed). Every claim whose "Test on" includes `MR2 ROM` (43) has a 17140 status, evidence and a "P4 17140" note in [`ross/claims.md`](ross/claims.md). Simulator results are pinned in [`../tests/test_ross17140.py`](../tests/test_ross17140.py) (34 tests, about 16 s, on the C-backed simulator). The simulator gained two inputs, `idl_closed` (P1-6) and `p37` (P3-7); their defaults keep the old pin levels, so every earlier result is unchanged.
 
   | Status (17140) | Count | Claims |
@@ -339,4 +340,3 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
 
 | Date | Item | Reason | Owner approved? |
 |---|---|---|---|
-| 2026-10-14 | Owned Raspberry Pi Pico WH (RP2040) as the bench "engine" Pico | Already owned, no purchase; the Pico 2 W is the emulator under test, so the stimulus needs a second board. The RP2040 is not 5 V tolerant, so every ECU signal reaches it through a divider, clamp or transistor ([`hardware/ecu_bench_setup.md`](hardware/ecu_bench_setup.md)) | Yes (owner, 2026-10-14) |

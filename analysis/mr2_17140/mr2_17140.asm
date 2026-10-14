@@ -1098,7 +1098,8 @@ SvcIgnition:
 	bsr	SvcEvents		; computes the spark edge/delay $9E/$9F from the crank period [ROM:$F81B-$F84C] LIKELY
 	ldab	IgnBase
 	stab	$AB
-	clra
+IgnFixedTest:
+	clra		; fixed spark sum $00AA instead of the maps when ModeFlags bit 7 = 1 (start/stall state), DiagFlags bit 7 = 0 and PORT3 bit 0 (P30) = 0 [ROM:$F7F2-$F800] CONFIRMED (code); not reached at warm idle
 	ldab	ModeFlags
 	bpl	L_F802
 	ldab	DiagFlags
@@ -1468,7 +1469,7 @@ L_FA17:
 	abx
 	cpx	$BC
 RevLimitSel:
-	ldx	#$07B6		; rev limit: $07B6 = 7600 rpm (slow climb), $07EB at $FA26 = 7400 rpm (fast climb through 6000 rpm); value = 15e6 / rpm [ROM:$FA1E-$FA29] CONFIRMED (code, EMU)
+	ldx	#$07B6		; rev limit: $07B6 = 7600 rpm (slow climb), $07EB (constant at $FA27) = 7400 rpm (fast climb through 6000 rpm); value = 15e6 / rpm [ROM:$FA1E-$FA29] CONFIRMED (code, EMU)
 	inca
 	bne	L_FA29
 	bcc	L_FA29
@@ -2032,7 +2033,7 @@ L_FDA6:
 	staa	$66
 	rts
 IgnMapSelect:
-	ldd	#$3A4B		; PORT3 bit 4 (P34, jumper J8) selects ignition map $F1EF (1) or $F25D (0) [ROM:$FDCF-$FDD5] LIKELY (Ross R-I15)
+	ldd	#$3A4B		; PORT3 bit 4 (P34, jumper J8) selects ignition map $F1EF (1) or $F25D (0) [ROM:$FDC9-$FDD5] CONFIRMED (code, Verifier) (Ross R-I15)
 	cmpb	$66
 	bcs	L_FDBE
 	cmpa	Coolant

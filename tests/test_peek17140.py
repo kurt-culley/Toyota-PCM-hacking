@@ -76,3 +76,17 @@ def test_polling_flat_out_leaves_spark_and_injection_alone():
     assert set(busy.engine.spark_tooth_offsets(t0)) == set(quiet.engine.spark_tooth_offsets(t0))
     pulses = busy.injector_pulses("Tout1", t0), quiet.injector_pulses("Tout1", t0)
     assert abs(max(pulses[0]) - max(pulses[1])) <= 20 and abs(min(pulses[0]) - min(pulses[1])) <= 20
+
+
+def test_pin_12_flashes_only_with_the_test_terminal_shorted():
+    from emu.engine17140 import ROM_17140, Engine17140
+
+    def edges(test_terminal: bool) -> int:
+        s = Simulation(ROM_17140.read_bytes(), inputs=Inputs17140(test_terminal=test_terminal), engine=Engine17140)
+        log: list[int] = []
+        s.periph.listeners.append(lambda name, level, t: name == "P2-4" and log.append(t))
+        s.run_ms(6500)  # the pattern starts about 4.5 s after power-up
+        return len([t for t in log if t > 1_000_000])
+
+    assert edges(True) >= 3  # P30 = 0: the fault-code pattern toggles the line
+    assert edges(False) == 0  # P30 = 1: steady

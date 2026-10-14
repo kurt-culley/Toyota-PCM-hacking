@@ -8,7 +8,7 @@
 
 ## Mechanism
 
-The ROM compares the crank period, not rpm. `$82` is the NE period sum (`NEperiodSum`, stored by the crank interrupt at edge 0), and **rpm ≈ 15,000,000 / `$82`** [EMU: 2499 at 6000 rpm].
+The ROM compares the crank period, not rpm. `$82` is the NE period sum (`NEperiodSum`, stored by the crank interrupt at edge 0), and **rpm ≈ 15,000,000 / `$82`** [EMU: 2499 at 6000 rpm]. All rpm figures here assume E = 1 MHz (the 4 MHz crystal) and 30° of crank per NE edge, both LIKELY; the constants themselves are CONFIRMED (code).
 
 ```mermaid
 flowchart TD
@@ -31,7 +31,7 @@ flowchart TD
 | **Delay** | 3 consecutive fuel calculations over the limit (`$94` counts `$FD`→`$FF`) | [ROM:$FA2B-$FA3E] CONFIRMED (code) |
 | **Action** | **Fuel only**: `SchedInj` returns without scheduling a pulse while `$95` ≠ 0. Sparks continue | [ROM:$FFB7-$FFC1] CONFIRMED (code); [EMU] |
 | **Recovery** | No hysteresis: fuel returns at the first calculation below the limit | [EMU:test_fuel_cut_at_7600_with_no_hysteresis] |
-| **Missing IGF** | `SchedInj` also skips injection once **2** sparks in a row have no IGF echo (`StartCount` ≥ 2); 4 set the IGF fault code | [ROM:$FE54-$FE6D, $FFB8-$FFC1] CONFIRMED (code); [EMU:test_missing_igf_stops_injection] |
+| **Missing IGF** | `SchedInj` also skips injection once **2** sparks in a row have no IGF echo (`StartCount` ≥ 2); at 4 the IGF fault is logged when `$6B` bit 7 is set [ROM:$FE60] | [ROM:$FE54-$FE6D, $FFB8-$FFC1] CONFIRMED (code); [EMU:test_missing_igf_stops_injection] |
 
 **Other speed limits in the code:**
 - **`RpmWord` `$77` saturates at 2344 (≈ 7325 rpm)**, and `RpmIndex` `$73` at 255 (≈ 6375 rpm) [EMU]. Anything that needs rpm above those (a limiter, a launch control) must use `$82`, as the stock limiter does.

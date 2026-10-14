@@ -33,7 +33,7 @@ The structure matches the Bluetop's design: crank interrupts set event flags, an
 | `$18`, `$1B`, `$1D` | **second timer channel** (TCSR2, OCR2, ICR2): the NE input capture and the ignition output compare. The Bluetop listing names the same registers TmrCntStat2 / OutCmp2 / InpCap2 | [ROM:$FE36-$FE45, $FEB4-$FEC4] CONFIRMED (code) |
 | `$40`–`$FF` | RAM. Self-test writes `$55AA`/`$AA55` over `$40`–`$FF`; reset clears `$44`–`$CB`; stack top `$00FF` | [ROM:$F310-$F336, $F2CA] CONFIRMED (code) |
 | `$F000`–`$F2BD` | calibration tables and table descriptors, at the **start** of the ROM | [ingest: 45 referenced blocks] LIKELY |
-| `$F2BE`–`$FFED` | code | [xref: 1877 instructions] |
+| `$F2BE`–`$FFED` | code | [xref: 1783 instructions here, plus 94 in `$F01E`–`$F194` (lookup helpers and a range check inside the table area)] |
 | `$FFEE` | checksum balance word (`$523D`); the ROM word sum is `$AA55` | [ROM:$F2FE-$F30B] CONFIRMED |
 
 **Ports (car mode 7):**
@@ -45,7 +45,7 @@ The structure matches the Bluetop's design: crank interrupts set event flags, an
 | PORT1 bit 7 | read as a test/diagnostic input (`ldx PORT1 / bmi`) before the self-test and fault logging | [ROM:$F2FA, $F717] | GUESS |
 | PORT2 bit 3 (P23, SCI RX, pin 11) | read once at reset: **low enables the serial diagnostic link** ([`serial_link.md`](serial_link.md)) | [ROM:$F33B-$F343] | CONFIRMED (code) |
 | PORT2 bit 1 (P21, Tout1) | timer-1 output-compare pin, driven by OC1 | [ROM:$FE9B-$FEB0] | LIKELY |
-| PORT2 bits 2–4 | outputs set and cleared in the main loop (bit 2 near the start logic, bit 3 by an idle-related compare, bit 4 at $F7DF) | [ROM:$F497-$F49F, $FC1C-$FC28, $F7DF-$F7E9] | GUESS |
+| PORT2 bits 2–4 | outputs set and cleared in the main loop (bit 2 near the start logic, bit 3 by a fault-dependent timer compare (`$69` against `$A6`, 8 with a stored fault), bit 4 = the fault-code flasher; bits 3–4 are also the serial link's RX/TX, [`serial_link.md`](serial_link.md)) | [ROM:$F497-$F49F, $FC1C-$FC28, $F7DF-$F7E9] | bits 3–4 LIKELY, bit 2 GUESS |
 | PORT3 bit 5 | G (cam reference): resets the NE edge count | [ROM:$FED2] | LIKELY |
 | PORT3 bits 0, 3, 6, 7 | switch inputs (bit 0 tested before the self-test and the fault logic; bit 3 counted as edges into $B5) | [ROM:$F2F5, $F70D, $FBD0-$FBE3] | GUESS |
 | PORT4 bits 0–1, 2–3 | outputs bits 0–1 (set from an rpm compare); inputs bits 2–3 select an offset table at $F01A | [ROM:$FB9E-$FBB6, $FDE6-$FDF8] | GUESS |
@@ -98,17 +98,21 @@ The structure matches the Bluetop's design: crank interrupts set event flags, an
 
 ## Coverage and option behaviours
 
-**No hidden code.** Tracing every path from the vectors reaches every code byte from `$F2BE` to `$FFED` except `$F9D2` (`$3D`), a padding byte between two helpers [xref] CONFIRMED. There are no dead routines or extra programs in the ROM. Everything below is existing code chosen by inputs.
+**No hidden code.** Tracing every path from the vectors reaches every code byte from `$F2BE` to `$FFED` except `$F9D2` (`$3D`), a padding byte between two helpers [xref; independent byte-coverage check by the Verifier, 2026-10-14] CONFIRMED. There are no dead routines or extra programs in the ROM. Everything below is existing code chosen by inputs.
+
+**P30 is probably the test terminal T, active low** (LIKELY): the self-test, the flasher pattern and the fixed sum all act on P30 = 0.
 
 | Behaviour | Selected by | Evidence |
 |---|---|---|
 | Serial diagnostic link ([`serial_link.md`](serial_link.md)) | P23 low at reset, then a request at least once a second | [ROM:$F33B, $F403, $F62E] [EMU] CONFIRMED |
 | Ignition map A or B, and the rpm fuel correction `$F117` | P34 (jumper J8) | [ROM:$FDCF, $FAC2] [EMU] CONFIRMED |
-| Fixed spark sum `$00AA` (setting the base timing) | P30 high (test terminal, GUESS) | [ROM:$F7F6-$F7FF] CONFIRMED (code) |
+| Fixed spark sum `$00AA` | **P30 = 0**, with `ModeFlags` bit 7 set (a start/stall state, not warm idle) and `DiagFlags` bit 7 clear | [ROM:$F7F2-$F800] CONFIRMED (code); whether this is the T-terminal base timing is doubtful (STATUS conflicts log) |
+| Fault-code flasher pattern on pin 12 (P24) | P30 = 0 builds the pattern from the stored faults; P30 = 1 clears it and `DiagFlags` | [ROM:$F769-$F7E9] CONFIRMED (code) |
+| Spark skipped altogether | P30 = 1 and `$A4` bit 7 (a current fault) | [ROM:$FF7C-$FF83] CONFIRMED (code); meaning GUESS |
 | Advance trim +9 / −17 / −9 / 0 counts (≈ +2.1° / −4.0° / −2.1° / 0°) | PORT4 bits 2–3 (jumpers or connector pins, Q12) | [ROM:$FDE4-$FDFD] code CONFIRMED, wiring GUESS |
-| ROM checksum and RAM test at reset | PORT3 bits 0/6 and PORT1 bit 7 test inputs | [ROM:$F2F2-$F2FB] LIKELY |
+| ROM checksum and RAM test at reset (and `DiagFlags` = `$AA` afterwards, bit 7 set) | P30 = 0, P36 = 1, P17 = 0 | [ROM:$F2F0-$F2FD, $F331] CONFIRMED (code) |
 | Mode 2 (external memory) accepted besides mode 7 | mode pins | [ROM:$F2BE-$F2C8] CONFIRMED (code) |
-| P32 (jumpers J4/J9) | not read by any instruction | [xref] CONFIRMED |
+| P32 (jumpers J4/J9) | no direct PORT3 read tests bit 2; 21 indexed reads have an unknown X | [xref] LIKELY |
 | `$F000`–`$F002` = `3F 3F 3F` (SWI) | — a stray jump to the start of the ROM traps to the reset vector | [ROM:$F000] LIKELY intent |
 
 Table bytes that the simulator sweep never read (across rpm, pressure, both P34 levels, coolant, throttle, air temperature, battery and mixture): the high-load staircase `$F1DA`–`$F1EE` (see [`maps.md`](maps.md)), the top rows of both ignition maps, part of the reference table `$F047`–`$F054`, `$F095`–`$F09D` (an event path the sweep did not trigger) and the high range of the mixture table `$F0B1`–`$F0B8` [EMU:sweep].

@@ -33,7 +33,7 @@ There is no O2 channel. A UK 1985–89 MR2 runs open loop, which fits.
 
 ## Ignition: two base maps, chosen by P34 (jumper J8)
 
-`IgnMapSelect` [ROM:$FDCF-$FDD5]:
+`IgnMapSelect` [ROM:$FDC9-$FDD5]:
 - **PORT3 bit 4 = 1** → map **A** `$F1EF` (13 × 8).
 - **PORT3 bit 4 = 0** → map **B** `$F25D` (13 × 7).
 
@@ -63,7 +63,7 @@ Rows run from light load (row 0) to heavy load. Values are raw. **Larger means m
 
 **Other ignition paths** (the base value `$A8` is not always the map):
 - With `ModeFlags` bit 7 set, the base comes from a 1-D rpm table `$F0FA` instead of the maps [ROM:$FD96-$FDA3].
-- With PORT3 bit 0 set, the spark sum is a fixed `$00AA`, probably the fixed timing for the test terminal (GUESS) [ROM:$F7F6-$F7FF].
+- With PORT3 bit 0 = **0**, `ModeFlags` bit 7 set and `DiagFlags` bit 7 clear, the spark sum is a fixed `$00AA` [ROM:$F7F2-$F800]. `ModeFlags` bit 7 is set only at low rpm (cranking, stall), so this is not reached at a warm idle; see the absolute-advance row below.
 - +13 is added when `$72` bit 7 is set [ROM:$FDDA].
 - `SvcIgnition` sums `$A8` + `$A9` + `$AA` + `$AB`, with `$AB` a copy of `$A8`, so **the map value counts twice** in the advance. This matters when calibrating degrees per count [ROM:$F7F0, $F806].
 
@@ -139,14 +139,14 @@ The 17140 ROM runs in the whole-ROM simulator with its own I/O model, [`analysis
 | Quantity | Unit | How sure |
 |---|---|---|
 | RpmWord `$77` | rpm × 0.32, within 2 counts from 1200 to 5200 rpm | CONFIRMED [EMU], given 30° per NE edge (LIKELY: the 4A-GE's 24-tooth NE rotor) |
-| Ignition map value | **15/64° per count** (0.234°). The map counts twice in a sum read at 15/128° per count. Identical at 1200, 2000, 3600 and 5200 rpm | CONFIRMED [EMU] |
-| Absolute advance | BTDC = 10 + (2 v + 85 − 170) × 15/128 ≈ **v × 15/64** when warm (coolant term `$A9` = 85, no trims) | The factory figure is LIKELY: base timing is set to **10° BTDC with T–E1 shorted** (repair manual). The GUESS is the ROM link: that shorting T selects the fixed-sum path (`$00AA`). That path also needs `ModeFlags` bit 7 set and `DiagFlags` bit 7 clear, and it is taken when PORT3 bit 0 reads **0** [ROM:$F7F4-$F7FF], so the pin polarity is open; the simulator does not yet reproduce it. Check: timing-light readings with T **open** at idle and at a steady 2500–3000 rpm, against the predicted values |
+| Ignition map value | **15/64° per count** (0.234°), given E = 1 MHz and 30° per NE edge (both LIKELY). The map counts twice in a sum read at 15/128° per count. Identical at 1200, 2000, 3600 and 5200 rpm | CONFIRMED [EMU] |
+| Absolute advance | **Unknown offset.** Advance = map value × 15/64° + a constant. Anchoring the fixed sum `$00AA` at the factory 10° BTDC puts a warm idle (map value 192 at 800 rpm, 35 kPa) at 45° BTDC, which is not credible, and the fixed-sum path is not reached at warm idle anyway (`ModeFlags` bit 7 is a start/stall state). So the 10° anchor does not apply to the maps | Settle with timing-light readings with T **open** at a warm idle and a steady 2500–3000 rpm, compared with the map values the serial link reports for the same moment (STATUS conflicts log) |
 | Load `$46` | ≈ 4.98 × kPa + 98.6, linear | LIKELY: rests on the EWD PIM curve and **ADC channel 7 being the 5 V supply (GUESS)** |
 | Map rows | map A: 40 kPa + 12.85 kPa per row (40–130); map B: 53–130 kPa | as Load |
 | Injector pulse | InjPulse `$88` µs + dead time `$8A` µs, on Tout1 (P2-1) active low, one per revolution | CONFIRMED [EMU] |
 | Cold advance | `$A9` = 85 from coolant reading 12 to 82, 117 at 124 (a cold sensor), so about +3.8° cold | LIKELY [EMU] |
 
-**Doubt about the kPa scale.** The high-load staircase `$F1DA` only applies above Load `$2B8`. On the current scale that is about 120 kPa, which a naturally aspirated engine cannot reach. The top one or two rows of both ignition maps are out of reach for the same reason. A factory calibration with unreachable tables is unlikely, so the scale is probably **about 20–25 % low**, most likely because ADC channel 7 is not the 5 V supply. Logged as a conflict in STATUS. Two ways to settle it:
+**Doubt about the kPa scale.** The high-load staircase `$F1DA` only applies above Load `$2B8`. On the current scale that is about 120 kPa, which a naturally aspirated engine cannot reach. The top one or two rows of both ignition maps are out of reach for the same reason. A factory calibration with unreachable tables is unlikely, so the scale is probably **about 20–25 % low**, most likely because ADC channel 7 is not the 5 V supply. The alternative is a table layout shared with the supercharged 4A-GZE, where those rows would be reachable. Logged as a conflict in STATUS. Two ways to settle it:
 - read Load over the serial link with the key on and the engine off (barometric pressure, about 100 kPa);
 - measure what channel 7 carries.
 

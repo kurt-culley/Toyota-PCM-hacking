@@ -39,7 +39,7 @@ sequenceDiagram
 | **Rate** | One request per main-loop pass, and the ECU waits for each reply. Simulated: about **200 words/s at 2000 rpm** and **130 words/s at 5000 rpm**, 4–10 ms per word | [EMU:sim] LIKELY. The real chip may be slower if its cycle counts are 6801-like (STATUS bench observations) |
 | **Effect on the engine** | None seen: polling flat out at 5000 rpm leaves every spark time identical and the injector pulses within 20 µs | [EMU:test_polling_flat_out_leaves_spark_and_injection_alone] |
 
-Send the next request only after the reply has arrived. A second byte sent while the first is unanswered overruns the receiver and is dropped.
+Send the next request only after the reply has arrived. A second byte sent while the first is unanswered overruns the receiver, and the ROM drops both. The keep-alive windows are fixed from reset, so the first request must arrive within about 1.03 s of reset, and the link switches off 1–2 s after the last request.
 
 ## What it can read
 
@@ -60,10 +60,10 @@ The ECU sends a word, so for a byte variable at `addr`, request `addr` and use t
 | `$9E` / `$9F` | IgnEdge / IgnDelay | spark edge and delay |
 | `$40`–`$43` | SelfTestMark / FaultBits2 | fault-code bits |
 | `$99`, `$59`, `$5A` | ModeFlags, InjFlags, StateFlags | engine-state bits |
-| `$02` | PORT1 / PORT2 | output pins (ADC select, injector, idle-related outputs) |
+| `$02` | PORT1 / PORT2 | output pins (ADC select, injector, fault outputs) |
 | `$06` | PORT3 / PORT4 | **switch inputs**: P34 (J8 map select) = bit 4 of the high byte; the PORT4 trim jumpers = bits 2–3 of the low byte; P30 test terminal = bit 0 of the high byte |
 
-**Avoid** `$08`–`$1F`. Reading some of these registers is the first half of the sequence that clears a timer, serial or IS3 (spark-confirmation, IGF) flag. In particular, a read of `$0E`/`$0F` (P3CSR) followed by the ROM's own Port 3 read would clear an IGF flag before the ignition interrupt counts it, and four missed IGF flags set the ignition fault [ROM:$FE57-$FE6D] (handbook flag-clear rules) LIKELY. Also avoid `$FF`: its low byte comes from `$0100`, which is not memory in mode 7. Ports `$02`–`$07` (other than the write-only direction registers, which read `$FF`) and RAM `$40`–`$FE` are safe.
+**Avoid** `$08`–`$1F`. Reading some of these registers is the first half of the sequence that clears a timer, serial or IS3 (spark-confirmation, IGF) flag. In particular, a read of `$0E`/`$0F` (P3CSR) followed by the ROM's own Port 3 read would clear an IGF flag before the ignition interrupt counts it, two missed IGF flags stop injection and four can log the ignition fault (when `$6B` bit 7 is set) [ROM:$FE57-$FE6D, $FFB8] (handbook flag-clear rules) LIKELY. In the simulator the IGF flag lives only about 40 µs before the interrupt reads it, so the hazard is small but real IGF timing decides it. Also avoid `$FF`: its low byte comes from `$0100`, which is not memory in mode 7. Ports `$02`–`$07` (other than the write-only direction registers, which read `$FF`) and RAM `$40`–`$FE` are safe.
 
 ## What this is good for
 
@@ -92,7 +92,7 @@ flowchart LR
 Both pins are ordinary Port 2 outputs whenever the SCI is off. The main loop writes DDR2 = `$FE` every pass [ROM:$F371-$F383]:
 - **Pin 12 (P24)** is driven by the fault-code flasher [ROM:$F769-$F7E9] CONFIRMED (code). That routine:
   - builds a flash pattern from the stored fault bits `$40`/`$42`;
-  - switches to a test-terminal mode when P30 is set;
+  - builds that pattern only while P30 = 0 (the test terminal, LIKELY active low); P30 = 1 clears it;
   - drives PORT2 bit 4 from the sign of `$A1`.
 
   This is almost certainly the **check-engine lamp (`W`)** driver, which the 1984 EWD also routes to the check connector as `DG` LIKELY. In the simulator, with the key on and the engine stopped, the line toggles in a slow pattern [EMU:sim].

@@ -111,6 +111,14 @@ def build(spec: dict, rom: bytes) -> tuple[Listing, xref.Xref]:
     return Listing(ram_labels=ram, labels=labels, items=items, org=org), x
 
 
+def dropped_labels(spec: dict, listing: Listing) -> list[int]:
+    """Symbols-file labels that fall inside an instruction, so the listing cannot show them."""
+    starts = {it.addr for it in listing.items}
+    wanted = set(spec.get("labels") or {}) | {d["start"] for d in spec.get("data") or []}
+    wanted |= set(spec.get("notes") or {})
+    return sorted(a for a in wanted if a not in starts)
+
+
 def run(name: str, write: bool) -> bool:
     spec, rom = load(name)
     listing, x = build(spec, rom)
@@ -121,6 +129,8 @@ def run(name: str, write: bool) -> bool:
     )
     got = assemble_asl(src, listing.org, 0xFFFF)
     ok = got == rom
+    for a in dropped_labels(spec, listing):
+        print(f"warning: ${a:04X} is inside an instruction; its label/note is not shown", file=sys.stderr)
     print(f"{name}: {len(x.routines)} routines, {len(x.instrs)} instructions; asl round trip "
           f"{'IDENTICAL' if ok else 'MISMATCH'}")  # fmt: skip
     if write and ok:

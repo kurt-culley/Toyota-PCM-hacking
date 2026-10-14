@@ -108,7 +108,7 @@ ram:
       CONFIRMED (code)
   0xa7:
     name: StartCount
-    note: counts OC2 events up to 4 [ROM:$FE54-$FE6B] GUESS
+    note: 'missing-IGF counter: +1 per ignition OC2 event, 0 when the IS3 (IGF) flag is set; SchedInj injects nothing while >= 2; at 4 the IGF fault is logged when $6B bit 7 is set [ROM:$FE54-$FE6B, $FFB8] CONFIRMED (code)'
   0xc0:
     name: NEtime
     note: ICR2 at the latest NE edge [ROM:$FEC2]
@@ -141,7 +141,7 @@ ram:
     note: 'armed rev limit as an NEsum: $07B6 (7600 rpm) or $07EB (7400 rpm) after a fast climb through 6000 rpm [ROM:$FA03-$FA29] CONFIRMED (code, EMU)'
   0xcc:
     name: DiagFlags
-    note: 'bit 0 set after a serial RAM-peek reply [ROM:$F41B]; checked and cleared about once a second, and the SCI is switched off if it was clear (link keep-alive) [ROM:$F62E-$F641] CONFIRMED (code, EMU); bit 7 tested widely GUESS'
+    note: 'bit 0 set after a serial RAM-peek reply [ROM:$F41B]; checked and cleared about once a second, and the SCI is switched off if it was clear (link keep-alive) [ROM:$F62E-$F641] CONFIRMED (code, EMU); bit 7 set after the reset self-test ($AA stored at $F331), cleared only by the flasher''s P30 = 1 branch [ROM:$F77A]; it blocks the fixed spark sum [ROM:$F7F7] CONFIRMED (code)'
   0x64:
     name: Counters
     note: '8 saturating up-counters $64-$6B, all incremented together at $FBC8 [ROM:$FBC8-$FBCD] CONFIRMED (code); $6A is the link keep-alive timer'
@@ -231,20 +231,20 @@ labels:
     note: X = table pair; uses the second table at rpm >= 3200 (RpmWord >= $0400); input Load [ROM:$F9F0-$FA01] LIKELY
   0xfdae:
     name: IgnMapSelect
-    note: PORT3 bit 4 (P34, jumper J8) selects ignition map $F1EF (1) or $F25D (0) [ROM:$FDCF-$FDD5] LIKELY (Ross R-I15)
+    note: PORT3 bit 4 (P34, jumper J8) selects ignition map $F1EF (1) or $F25D (0) [ROM:$FDC9-$FDD5] CONFIRMED (code, Verifier) (Ross R-I15)
   0xf000:
     name: Tables
     note: 'calibration tables and descriptors $F000-$F2BD, except code at $F01E-$F03A (range check and clamp); $F000-$F002 = 3F 3F 3F (SWI opcodes: a stray jump to the start of the ROM traps to the reset vector) LIKELY'
   0xfa1e:
     name: RevLimitSel
-    note: 'rev limit: $07B6 = 7600 rpm (slow climb), $07EB at $FA26 = 7400 rpm (fast climb through 6000 rpm); value = 15e6 / rpm [ROM:$FA1E-$FA29] CONFIRMED (code, EMU)'
+    note: 'rev limit: $07B6 = 7600 rpm (slow climb), $07EB (constant at $FA27) = 7400 rpm (fast climb through 6000 rpm); value = 15e6 / rpm [ROM:$FA1E-$FA29] CONFIRMED (code, EMU)'
   0xfa03:
     name: FuelPulse
     note: 'injection pulse: density x speed x staircase (lag-filtered in $B8) x InjFlags factor x caller factor x ThaCorr x (P34 ? 1.00 : $61) x mixture term, minimum 600 counts -> InjPulse [ROM:$FA03-$FB1F]
       LIKELY'
-  0xf7f6:
+  0xf7f2:
     name: IgnFixedTest
-    note: 'PORT3 bit 0 set: the spark sum is the fixed $00AA instead of the maps (test-terminal fixed timing, GUESS) [ROM:$F7F6-$F7FF]'
+    note: 'fixed spark sum $00AA instead of the maps when ModeFlags bit 7 = 1 (start/stall state), DiagFlags bit 7 = 0 and PORT3 bit 0 (P30) = 0 [ROM:$F7F2-$F800] CONFIRMED (code); not reached at warm idle'
 data:
 - start: 0xf0ff
   end: 0xf116

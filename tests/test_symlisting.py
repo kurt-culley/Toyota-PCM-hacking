@@ -31,3 +31,11 @@ def test_17140_vectors_and_mode_check():
     assert word(0xFFFE) == 0xF2BE and word(0xFFF4) == 0xFE36 and word(0xFFF6) == 0xFEB4
     # Reset accepts mode 7 ($E0) or mode 2 ($40): LDAB $03 / ANDB #$E0 / CMPB #$E0 / BEQ / CMPB #$40 / BNE *
     assert rom[0x2BE:0x2CA] == bytes.fromhex("D603C4E0C1E02704C14026FE")
+
+
+def test_17140_no_label_or_note_falls_inside_an_instruction():
+    from pcmre.symlisting import dropped_labels
+
+    spec, rom = load("mr2_17140")
+    listing, _ = build(spec, rom)
+    assert dropped_labels(spec, listing) == []

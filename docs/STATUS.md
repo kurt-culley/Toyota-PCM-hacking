@@ -229,7 +229,7 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
   - **15/64° per ignition-map count** CONFIRMED;
   - **injector pulse = InjPulse + dead time** in µs, CONFIRMED;
   - **Load ≈ 4.98 × kPa + 98.6** LIKELY, resting on the PIM curve and ADC ch7 = 5 V (GUESS);
-  - **absolute advance ≈ v × 15/64° BTDC when warm**, factory 10° BTDC with T–E1 shorted is LIKELY; the GUESS is that T selects the ROM's fixed-sum path (its conditions and P30 polarity are open).
+  - **absolute advance: offset unknown** (see the conflicts log, 2026-10-14); the readable maps show the map's own contribution, v × 15/64°.
 
   Readable maps: [`mr2/ignition_maps.md`](mr2/ignition_maps.md).
 - [x] Code and table sweep, first pass ([`mr2/architecture.md`](mr2/architecture.md) "Coverage and option behaviours"); not yet Verifier-reviewed:
@@ -252,6 +252,24 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
   - `RpmWord` saturates at about 7325 rpm, so the limiter uses the crank period `$82`.
   
   Not yet Verifier-reviewed.
+- **Verifier (independent agent, 2026-10-14) on P4 so far (architecture, maps, units, serial link, rev limiter, symbols, simulator): PASS WITH ISSUES**, no blockers.
+  - **Confirmed against the ROM and in its own simulator runs:**
+    - the serial link (X = 0 at both entries, P23 enable, E/128, keep-alive, pin 12 flasher);
+    - the rev limiter (threshold rule, 3-pass counter, SchedInj skips, 7600/7400 rpm);
+    - P34 map selection and both map tables byte for byte;
+    - the staircase thresholds;
+    - RpmWord/RpmIndex saturation;
+    - coverage (independent byte check);
+    - the advance arithmetic.
+  - **Fixed:**
+    - P30 polarity: the fixed spark sum, the self-test and the flasher pattern all act on P30 = 0, and the simulator now models T open as P3-0 high;
+    - the fixed-sum path is a start/stall path, so the 10° anchor does not apply to the maps (readable maps are now relative; conflicts log);
+    - the undocumented P30 spark-skip at `$FF7C` added to the option table;
+    - the origin of DiagFlags bit 7 recorded;
+    - `pcmre.symlisting` now warns about labels inside an instruction (`IgnFixedTest` moved to `$F7F2`, test added);
+    - rpm figures marked as resting on E = 1 MHz and 30°/edge;
+    - nits: StartCount, `$FA27`, the P23 description, the instruction count, P32 → LIKELY, overrun and keep-alive wording, the map footer, the 4A-GZE alternative, citation ranges, stronger missing-IGF and slow-climb tests.
+  - **Re-check of the fixes:** pending.
 - [ ] Bench and car anchors: Load at key-on, engine off, over the serial link (kPa scale); what ADC ch7 measures; timing-light readings with T open at idle and at a steady 2500–3000 rpm; PORT3 over the link (Q10).
 - [x] Pico 2 W serial-link logger ([`../hardware/peek-logger/firmware/`](../hardware/peek-logger/firmware/)) and host decoder (`pcmre.peeklog`): the firmware's link logic runs against the simulated ECU [EMU:tests/test_peek_logger.py]; the UF2 builds warning-free. Not yet run on hardware; not Verifier-reviewed.
 - [ ] Logger on the spare ECU on the bench (after Q11; owner confirmation), then the Wi-Fi dashboard.
@@ -275,6 +293,8 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
 | 2026-10-10 | T-VIS ignition step direction (R-I09) | Earlier P2 note: +8 raw "while T-VIS is shut/off", so less advance with T-VIS open, opposite to Ross | ROM: +8 when `TVIScounter` ≥ 0, the state above 4350 rpm [ROM:$FC47–$FC6D] [EMU:test_readable]. EWD p25: S/TH switches at 4350 rpm, where T-VIS opens | **Resolved:** the old note confused the VSV output being off with the valves being shut. +2.8° applies with T-VIS **open**, agreeing with Ross. Fixed in claims.md, bluetop.yaml, simulation.md, and (2026-10-13) the fuel_chain.md ignition diagram |
 | 2026-10-13 | Ignition clamp in degrees | ignition_table.md said "about 10° to 64°", fuel_chain.md "≈11°–65°": the raw sum × 90/256 without the conversion offset | ROM: sum clamped to `$1F`–`$B8` [ROM:$F8E6]; the ROM's own conversion gives 0.2°–54° BTDC warm, before the 256 µs lead [EMU:pcmre.readable.degrees, simulation.md formula] | **Resolved:** the two docs left out the −10.74° offset. Both corrected |
 | 2026-10-13 | 17140 load (kPa) scale | Simulator scale Load ≈ 4.98 × kPa + 98.6, resting on the EWD PIM curve and ADC ch7 = 5 V (GUESS) | ROM: the high-load staircase `$F1DA` is used only above Load `$2B8` [ROM:$FA81-$FA8D], about 120 kPa on that scale, unreachable without boost; the top ignition-map rows likewise [EMU:sweep] | **Open.** Probably the scale is about 20–25 % low (ch7 not 5 V). Settle with Load at key-on, engine off, over the serial link, or a ch7 measurement. Until then the kPa labels in `mr2/ignition_maps.md` are GUESS |
+| 2026-10-14 | 17140 absolute ignition advance | Assumption (P4 step 3): the ROM's fixed spark sum `$00AA` is the factory base timing, 10° BTDC with T–E1 shorted | ROM: the fixed sum needs `ModeFlags` bit 7 (a start/stall state) and P30 = 0 [ROM:$F7F2-$F800], so it is not used at a warm idle; anchoring it at 10° puts a warm idle (map value 192) at 45° BTDC, not credible [Verifier, EMU] | **Open.** The maps are shown relative (v × 15/64°). Settle the offset with a timing light at a warm idle with T open, read next to the map value from the serial link |
+| 2026-10-14 | P30 (test terminal) polarity | Earlier docs and the simulator: fixed timing with P3-0 high | ROM: the self-test, the flasher pattern and the fixed sum all act on P30 = 0 [ROM:$F2F0, $F774, $F7F2] | **Resolved (LIKELY):** T shorted reads P30 = 0. Docs and simulator corrected |
 | 2026-10-09 | HD6301 DAA V flag | Handbook table 3-2-1 (PDF p.190): V affected | Handbook instruction details (PDF p.89): V not affected | Open. The core clears V, as MAME does. The Bluetop never executes DAA; check the 17140 ROM for DAA before relying on it |
 | 2026-10-09 | Bluetop IDL input polarity | cap.asm comment: P4-2 IDL "active low" (throttle closed = 0) | ROM behaviour: idle state (`byte_95` negative) builds while P4-2 is **high**, and three idle-only uses agree (idle advance, 800 µs airflow fallback, tip-in pulse below 2500 rpm); a second cap.asm comment at $F7F1 also says P4-2 is high when IDL is closed [ROM:$F9F7–$FA39, $F814, $F1E0, $FA19] | ROM wins (truth order): P4-2 high = throttle closed at the CPU pin, LIKELY (the input buffer presumably inverts). The simulation uses the ROM's polarity |
 | 2026-10-09 | Bluetop cranking spark | Assumption that the CPU makes every spark | ROM: in start mode (`byte_C6` > 0) /IGT is held high, yet missing IGF still cuts fuel [ROM:$F24A, $F370, $F92D, $F420] | The cranking spark must come from outside the CPU (LIKELY the SE056 from NE). Modelled as such; confirm on the bench (P8) and in the 17140 ROM (P4) |

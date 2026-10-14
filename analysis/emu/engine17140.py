@@ -26,7 +26,8 @@ the CPU pins; the ROM fixes most of it, the rest is marked GUESS.
   dwell, LIKELY). P2-1 is OC1's pin (Tout1), logged as the injector drive (LIKELY; the
   active level is read from the logs).
 - **IGF.** Each spark gets an IS3 echo 20 us later, as on the Bluetop.
-- **Switch inputs.** P3-0 low (the ROM uses fixed timing when it is high [ROM:$F7F6]), P3-4 =
+- **Switch inputs.** P3-0 high = test terminal T open (LIKELY: the self-test, the fault-code
+  flasher pattern and the fixed spark sum all act on P3-0 = 0 [ROM:$F2F0, $F774, $F7F2]), P3-4 =
   ``p34`` (jumper J8: map select), P3-3 vehicle-speed pulses off, P3-6 low (no self-test),
   P1-7 high, PORT4 inputs high (trim code 11 = 0). Their meanings are LIKELY/GUESS as noted
   in docs/mr2/maps.md.
@@ -56,7 +57,7 @@ class Inputs17140:
     ref_v: float = 5.0  # channel 7 reference (GUESS: the 5 V supply)
     zero_v: float = 0.0  # channel 0
     p34: int = 1  # jumper J8 level: 1 -> map $F1EF, 0 -> map $F25D
-    test_terminal: bool = False  # P3-0 high: fixed timing
+    test_terminal: bool = False  # True = T shorted: P3-0 low (LIKELY polarity)
     igf: bool = True
     ne_duty: float = 0.5
 
@@ -90,7 +91,7 @@ class Engine17140:
 
     def update_sensors(self) -> None:
         p, i = self.p, self.inputs
-        p.set_pin(3, 0, 1 if i.test_terminal else 0)
+        p.set_pin(3, 0, 0 if i.test_terminal else 1)
         p.set_pin(3, 4, 1 if i.p34 else 0)
         p.set_pin(3, 6, 0)
         p.set_pin(3, 5, 0)

@@ -35,7 +35,7 @@ flowchart TD
 
 **Other speed limits in the code:**
 - **`RpmWord` `$77` saturates at 2344 (≈ 7325 rpm)**, and `RpmIndex` `$73` at 255 (≈ 6375 rpm) [EMU]. Anything that needs rpm above those (a limiter, a launch control) must use `$82`, as the stock limiter does.
-- **Above 6000 rpm** (`$82` < `$09C4`) injection switches to **every other revolution with a doubled pulse**: the same fuel, half the events (Ross's injection-mode claim) [EMU].
+- **Above 6000 rpm** (RpmIndex above `$F0`; back below `$E0` = 5600 rpm) injection switches to **every other revolution with a doubled pulse** and one dead time: the same fuel, half the events (Ross's injection-mode claim) [ROM:$F454-$F460, $FEE1-$FF11] [EMU:tests/test_ross17140.py::test_double_pulse_every_other_revolution_above_6000_rpm]. The `$82` < `$09C4` (6000 rpm) test in `FuelPulse` only arms the fast-climb check above.
 
 ## In tuning terms
 

@@ -42,10 +42,11 @@ The structure matches the Bluetop's design: crank interrupts set event flags, an
 |---|---|---|---|
 | PORT1 bits 2–4 | ADC channel select (8 channels) | [ROM:$FB5F-$FB96] | LIKELY |
 | PORT1 bit 5 | set when a channel is selected; bits 5–7 cleared at the OC1 tick that starts a conversion | [ROM:$FB8D-$FB96, $FE8B-$FE8F] | GUESS |
-| PORT1 bit 7 | read as a test/diagnostic input (`ldx PORT1 / bmi`) before the self-test and fault logging | [ROM:$F2FA, $F717] | GUESS |
+| PORT1 bit 6 (P16) | **IDL**: low for more than 37 ADC ticks (about 150 ms) = throttle closed (`ModeFlags` bit 7: idle ignition table, decel fuel cut); high with T shorted adds a fault bit, like Toyota's code 51 | [ROM:$F4C9-$F51E, $F769-$F797] [EMU:tests/test_ross17140.py] | LIKELY |
+| PORT1 bit 7 (P17) | read as a test/diagnostic input (`ldx PORT1 / bmi`) before the self-test and fault logging; while low, holds the P31 timer `$71` at 0 and allows the hot-start output on PORT2 bit 2 | [ROM:$F2FA, $F717, $F3A6-$F3AA, $F487] | GUESS (perhaps STA) |
 | PORT2 bit 3 (P23, SCI RX, pin 11) | read once at reset: **low enables the serial diagnostic link** ([`serial_link.md`](serial_link.md)) | [ROM:$F33B-$F343] | CONFIRMED (code) |
 | PORT2 bit 1 (P21, Tout1) | timer-1 output-compare pin, driven by OC1 | [ROM:$FE9B-$FEB0] | LIKELY |
-| PORT2 bits 2–4 | outputs set and cleared in the main loop (bit 2 near the start logic, bit 3 by a fault-dependent timer compare (`$69` against `$A6`, 8 with a stored fault), bit 4 = the fault-code flasher; bits 3–4 are also the serial link's RX/TX, [`serial_link.md`](serial_link.md)) | [ROM:$F497-$F49F, $FC1C-$FC28, $F7DF-$F7E9] | bits 3–4 LIKELY, bit 2 GUESS |
+| PORT2 bits 2–4 | outputs set and cleared in the main loop (bit 2 low after a hot crank (coolant and intake air both hot) for about 90 s, a fuel-pressure-up-like output (GUESS), bit 3 by a fault-dependent timer compare (`$69` against `$A6`, 8 with a stored fault), bit 4 = the fault-code flasher; bits 3–4 are also the serial link's RX/TX, [`serial_link.md`](serial_link.md)) | [ROM:$F478-$F49F, $F654-$F672, $FC1C-$FC28, $F7DF-$F7E9] | bits 3–4 LIKELY, bit 2 GUESS |
 | PORT3 bit 5 | G (cam reference): resets the NE edge count | [ROM:$FED2] | LIKELY |
 | PORT3 bits 0, 3, 6, 7 | switch inputs (bit 0 tested before the self-test and the fault logic; bit 3 counted as edges into $B5) | [ROM:$F2F5, $F70D, $FBD0-$FBE3] | GUESS |
 | PORT4 bits 0–1, 2–3 | outputs bits 0–1 (set from an rpm compare); inputs bits 2–3 select an offset table at $F01A | [ROM:$FB9E-$FBB6, $FDE6-$FDF8] | GUESS |
@@ -58,13 +59,13 @@ In expanded mode 2 these pins become the address/data bus, so whatever the ROM u
 | Pin | Use in the ROM | Evidence | Meaning |
 |---|---|---|---|
 | P30 | input: fixed spark sum, flasher pattern, self-test, spark-skip; all act on 0 | [ROM:$F2F0, $F771, $F7FA, $FF7C] | test terminal T, active low, LIKELY |
-| P31 | **output**: on for a time after start-up (`$71` < `$15`), and with `ModeFlags` bit 1 above an rpm threshold with hysteresis (read back from its own pin) | [ROM:$F3A4-$F3CD] | fuel-pump control (`FC`), GUESS |
+| P31 | **output**: on while P17 is low and for about 21 s after it rises (`$71` < `$15`), and during a decel fuel cut (`ModeFlags` bit 1) above the return rpm + 7 RpmIndex counts, with hysteresis (read back from its own pin) | [ROM:$F3A2-$F3CC] [EMU, Ross pass] | an idle-up (`VISC`) output is the best fit, GUESS; STATUS Q2 |
 | P32 | not used | [ROM: DDR3, every PORT3 read] | — |
 | P33 | input: edges counted into `$B5` (speed-like) | [ROM:$FBD0-$FBE3] | vehicle-speed sensor (`SPD`), GUESS |
 | P34 | input: map select, fuel correction | [ROM:$FAC2, $FDCC] | jumper J8, CONFIRMED (bench) |
 | P35 | input: G | [ROM:$FEC8-$FED3] | G, LIKELY |
 | P36 | input: reset only (self-test gate) | [ROM:$F2F0-$F2F6] | a test strap, GUESS |
-| P37 | input: caps the start-rpm threshold | [ROM:$F4EC-$F4F4] | unknown, GUESS |
+| P37 | input: when high, a floor of `$3C` (1500 rpm back, about 1900 rpm cut) under the decel fuel-cut rpm, the 1988 RM's A/C-on figures | [ROM:$F4EC-$F4F4] [EMU:tests/test_ross17140.py::test_decel_fuel_cut_and_return] | A/C switch, GUESS |
 | P40, P41 | **outputs** from an rpm compare | [ROM:$FB98-$FBB6] | T-VIS VSV (`STH`) and one more, GUESS |
 | P42, P43 | inputs: advance trim | [ROM:$FDE7-$FDF8] | trim jumpers (Q12), LIKELY |
 | P44–P47 | not used | [ROM: DDR4, every PORT4 read] | — |
@@ -125,7 +126,7 @@ In expanded mode 2 these pins become the address/data bus, so whatever the ROM u
 |---|---|---|
 | Serial diagnostic link ([`serial_link.md`](serial_link.md)) | P23 low at reset, then a request at least once a second | [ROM:$F33B, $F403, $F62E] [EMU] CONFIRMED |
 | Ignition map A or B, and the rpm fuel correction `$F117` | P34 (jumper J8) | [ROM:$FDC9-$FDD5, $FAC2] [EMU] CONFIRMED |
-| Fixed spark sum `$00AA` | **P30 = 0**, with `ModeFlags` bit 7 set (a start/stall state, not warm idle) and `DiagFlags` bit 7 clear | [ROM:$F7F2-$F800] CONFIRMED (code); whether this is the T-terminal base timing is doubtful (STATUS conflicts log) |
+| Fixed spark sum `$00AA` | **P30 = 0**, with `ModeFlags` bit 7 set (throttle closed, or cranking) and `DiagFlags` bit 7 clear | [ROM:$F7F2-$F800] CONFIRMED (code); the closed-throttle T-terminal base timing (10° BTDC), LIKELY [EMU:tests/test_ross17140.py] (STATUS conflicts log) |
 | Fault-code flasher pattern on pin 12 (P24) | P30 = 0 builds the pattern from the stored faults; P30 = 1 clears it and `DiagFlags` | [ROM:$F769-$F7E9] CONFIRMED (code) |
 | Spark skipped altogether | P30 = 1 and `$A4` bit 7 (a current fault) | [ROM:$FF7C-$FF83] CONFIRMED (code); meaning GUESS |
 | Advance trim +9 / −17 / −9 / 0 counts (≈ +2.1° / −4.0° / −2.1° / 0°) | PORT4 bits 2–3 (jumpers or connector pins, Q12) | [ROM:$FDE4-$FDFD] code CONFIRMED, wiring GUESS |

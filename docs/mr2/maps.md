@@ -62,8 +62,8 @@ That looks like an octane/fuel-grade selection, probably on the untested jumpers
 Rows run from light load (row 0) to heavy load. Values are raw. **Larger means more advance** (CONFIRMED in code: the spark delay is `$05AA` − the sum [ROM:$F81B-$F824]). **Degrees per count are not yet known.**
 
 **Other ignition paths** (the base value `$A8` is not always the map):
-- With `ModeFlags` bit 7 set, the base comes from a 1-D rpm table `$F0FA` instead of the maps [ROM:$FD96-$FDA3].
-- With PORT3 bit 0 = **0**, `ModeFlags` bit 7 set and `DiagFlags` bit 7 clear, the spark sum is a fixed `$00AA` [ROM:$F7F2-$F800]. `ModeFlags` bit 7 is set only at low rpm (cranking, stall; the threshold also depends on a start counter `$67` and on P37) [ROM:$F4C9-$F506] [EMU] LIKELY, so this is not reached at a warm idle; see the absolute-advance row below.
+- With the throttle closed (`ModeFlags` bit 7: P16, the IDL contact, low for about 150 ms; also set while cranking), the base comes from the **idle ignition table `$F0FA`** instead of the maps, with no trims: 68/98/162 at 1200/1600/2000 rpm, held outside, the values Ross shows for the 17030 (R-I07) [ROM:$FD96-$FDA4, $F4C9-$F51E] [EMU:tests/test_ross17140.py] LIKELY (P16 = IDL).
+- With PORT3 bit 0 = **0** (T shorted), `ModeFlags` bit 7 set and `DiagFlags` bit 7 clear, the spark sum is a fixed `$00AA` [ROM:$F7F2-$F800]. With the engine running, bit 7 means the throttle is closed, so this is the factory base-timing check (T–E1 shorted, idle, 10° BTDC); with the throttle open, T changes nothing [EMU:tests/test_ross17140.py::test_t_terminal_fixed_sum_only_with_the_throttle_closed] LIKELY. See the absolute-advance row below.
 - +13 is added when `$72` bit 7 is set [ROM:$FDDA].
 - `SvcIgnition` sums `$A8` + `$A9` + `$AA` + `$AB`, with `$AB` a copy of `$A8`, so **the map value counts twice** in the advance. This matters when calibrating degrees per count [ROM:$F7F0, $F806].
 
@@ -140,13 +140,20 @@ The 17140 ROM runs in the whole-ROM simulator with its own I/O model, [`analysis
 |---|---|---|
 | RpmWord `$77` | rpm × 0.32, within 2 counts from 1200 to 5200 rpm | CONFIRMED [EMU], given 30° per NE edge (LIKELY: the 4A-GE's 24-tooth NE rotor) |
 | Ignition map value | **15/64° per count** (0.234°), given E = 1 MHz and 30° per NE edge (both LIKELY). The map counts twice in a sum read at 15/128° per count. Identical at 1200, 2000, 3600 and 5200 rpm | CONFIRMED [EMU] |
-| Absolute advance | **Unknown offset.** Advance = map value × 15/64° + a constant. Anchoring the fixed sum `$00AA` at the factory 10° BTDC puts a warm idle (map value 192 at 800 rpm, 35 kPa) at 45° BTDC, which is not credible, and the fixed-sum path is not reached at warm idle anyway (`ModeFlags` bit 7 is a start/stall state). So the 10° anchor does not apply to the maps | Settle with timing-light readings with T **open** at a warm idle and a steady 2500–3000 rpm, compared with the map values the serial link reports for the same moment (STATUS conflicts log) |
-| Load `$46` | ≈ 4.98 × kPa + 98.6, linear | LIKELY: rests on the EWD PIM curve and **ADC channel 7 being the 5 V supply (GUESS)** |
-| Map rows | map A: 40 kPa + 12.85 kPa per row (40–130); map B: 53–130 kPa | as Load |
+| Absolute advance | **Anchored at the T-terminal check (LIKELY):** the fixed sum 170 (`$00AA`) is used at closed-throttle idle with T shorted, which the factory sets to 10° BTDC, so advance ≈ 10° + (sum − 170) × 15/128°. A warm idle with T open (idle table 68, coolant term 85) then sits at **16.0° BTDC**, 5.98° earlier than with T shorted [EMU]. Off idle, warm and untrimmed, the sum is 2 × map + 85, so **a map cell is almost exactly its own advance: v × 15/64° BTDC** (+0.04°); light-load cells reach 50° | LIKELY: confirm with a timing light at a warm idle, T open (expect about 16°) and T shorted (10°); STATUS conflicts log |
+| Load `$46` | simulator default ≈ 4.98 × kPa + 98.6; **LIKELY ≈ 6.14 × kPa + 123** (256 counts per 5 V, see below) | the ROM's readings are ratiometric to ADC ch7 (153.7 × V / V_ch7, table `$F044`); the scale in volts rests on the EWD PIM curve |
+| Map rows | LIKELY scale: map A 28–101 kPa (10.4 kPa per row), map B 39–101 kPa; simulator default: map A 40–130, map B 53–130 kPa | as Load |
 | Injector pulse | InjPulse `$88` µs + dead time `$8A` µs, on Tout1 (P2-1) active low, one per revolution | CONFIRMED [EMU] |
 | Cold advance | `$A9` = 85 from coolant reading 12 to 82, 117 at 124 (a cold sensor), so about +3.8° cold | LIKELY [EMU] |
 
-**Doubt about the kPa scale.** The high-load staircase `$F1DA` only applies above Load `$2B8`. On the current scale that is about 120 kPa, which a naturally aspirated engine cannot reach. The top one or two rows of both ignition maps are out of reach for the same reason. A factory calibration with unreachable tables is unlikely, so the scale is probably **about 20–25 % low**, most likely because ADC channel 7 is not the 5 V supply. The alternative is a table layout shared with the supercharged 4A-GZE, where those rows would be reachable. Logged as a conflict in STATUS. Two ways to settle it:
+**Doubt about the kPa scale.** The high-load staircase `$F1DA` only applies above Load `$2B8`. On the simulator's default scale that is about 120 kPa, which a naturally aspirated engine cannot reach. The top one or two rows of both ignition maps are out of reach for the same reason. A factory calibration with unreachable tables is unlikely, so the scale is probably **about 20 % low**. The alternative is a table layout shared with the supercharged 4A-GZE, where those rows would be reachable. Logged as a conflict in STATUS.
+
+**What the Ross pass added (2026-10-14):**
+- The reference table `$F044` is exactly ratiometric: (AdcRef + 410) × the ch7 time is constant to 0.1 %, so every reading is 153.7 × V / V_ch7 [EMU:tests/test_ross17140.py::test_adc_reference_table_is_ratiometric]. In the simulator, AdcRef sits at the end of that table for any `ref_v` above about 3.7 V, so the default scale actually rests on the GUESS converter constant `adc_k`, not on ch7 being 5 V.
+- With **256 counts per 5 V** (`ref_v=3.0` in the simulator), 101.3 kPa reads Load 745: exactly the top row of both ignition maps and the top density site [EMU:tests/test_ross17140.py::test_load_tables_top_out_at_one_atmosphere_on_a_256_per_5v_scale]. The mixture screw then reads 128 (zero correction) at mid travel, and both end-stop checks (10 and 248) can be reached; on the default scale a 5 V input reads only about 207. The high-load staircase starts at 93 kPa.
+- So **Load ≈ 6.14 × kPa + 123 is LIKELY**. The simulator default and `ignition_maps.md` still use the old scale until a Verifier agrees.
+
+Two ways to settle it:
 - read Load over the serial link with the key on and the engine off (barometric pressure, about 100 kPa);
 - measure what channel 7 carries.
 

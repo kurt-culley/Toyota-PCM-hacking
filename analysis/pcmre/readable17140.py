@@ -55,8 +55,9 @@ def build() -> str:
         "**How sure the numbers are:**",
         "- **Degree scale:** 15/64° per map count, measured in the simulator at four speeds "
         "[EMU:tests/test_sim17140.py].",
-        "- **Absolute degrees:** taken from the ROM's fixed-timing value, assumed to be the factory "
-        "10° BTDC (GUESS). One timing-light reading in the car settles this.",
+        "- **Absolute degrees:** the factory base timing is 10° BTDC with T–E1 shorted (LIKELY); the "
+        "GUESS is that shorting T selects the ROM's fixed-timing value. Timing-light readings with T open "
+        "settle this.",
         "- **kPa per row:** from the factory MAP-sensor curve (LIKELY) and the assumption that ADC "
         "channel 7 is the 5 V supply (GUESS).",
         "",

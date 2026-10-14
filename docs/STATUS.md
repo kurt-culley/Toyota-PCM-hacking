@@ -228,7 +228,7 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
   - **15/64° per ignition-map count** CONFIRMED;
   - **injector pulse = InjPulse + dead time** in µs, CONFIRMED;
   - **Load ≈ 4.98 × kPa + 98.6** LIKELY, resting on the PIM curve and ADC ch7 = 5 V (GUESS);
-  - **absolute advance ≈ v × 15/64° BTDC when warm**, GUESS: anchored on the fixed-sum timing being 10° BTDC.
+  - **absolute advance ≈ v × 15/64° BTDC when warm**, factory 10° BTDC with T–E1 shorted is LIKELY; the GUESS is that T selects the ROM's fixed-sum path (its conditions and P30 polarity are open).
 
   Readable maps: [`mr2/ignition_maps.md`](mr2/ignition_maps.md).
 - [x] Code and table sweep, first pass ([`mr2/architecture.md`](mr2/architecture.md) "Coverage and option behaviours"); not yet Verifier-reviewed:
@@ -251,7 +251,7 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
   - `RpmWord` saturates at about 7325 rpm, so the limiter uses the crank period `$82`.
   
   Not yet Verifier-reviewed.
-- [ ] Bench and car anchors: Load at key-on, engine off, over the serial link (kPa scale); what ADC ch7 measures; a timing-light reading with the test terminal shorted; PORT3 over the link (Q10).
+- [ ] Bench and car anchors: Load at key-on, engine off, over the serial link (kPa scale); what ADC ch7 measures; timing-light readings with T open at idle and at a steady 2500–3000 rpm; PORT3 over the link (Q10).
 - [ ] Pico 2 W serial-link logger firmware and host decoder, tested against the simulator model first.
 
 ### Bench observations to follow up (P4)

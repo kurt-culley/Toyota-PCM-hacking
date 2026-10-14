@@ -140,7 +140,7 @@ The 17140 ROM runs in the whole-ROM simulator with its own I/O model, [`analysis
 |---|---|---|
 | RpmWord `$77` | rpm × 0.32, within 2 counts from 1200 to 5200 rpm | CONFIRMED [EMU], given 30° per NE edge (LIKELY: the 4A-GE's 24-tooth NE rotor) |
 | Ignition map value | **15/64° per count** (0.234°). The map counts twice in a sum read at 15/128° per count. Identical at 1200, 2000, 3600 and 5200 rpm | CONFIRMED [EMU] |
-| Absolute advance | BTDC = 10 + (2 v + 85 − 170) × 15/128 ≈ **v × 15/64** when warm (coolant term `$A9` = 85, no trims) | GUESS: anchored on the ROM's fixed-sum timing (`$00AA`) being the factory 10° BTDC. A timing light settles it |
+| Absolute advance | BTDC = 10 + (2 v + 85 − 170) × 15/128 ≈ **v × 15/64** when warm (coolant term `$A9` = 85, no trims) | The factory figure is LIKELY: base timing is set to **10° BTDC with T–E1 shorted** (repair manual). The GUESS is the ROM link: that shorting T selects the fixed-sum path (`$00AA`). That path also needs `ModeFlags` bit 7 set and `DiagFlags` bit 7 clear, and it is taken when PORT3 bit 0 reads **0** [ROM:$F7F4-$F7FF], so the pin polarity is open; the simulator does not yet reproduce it. Check: timing-light readings with T **open** at idle and at a steady 2500–3000 rpm, against the predicted values |
 | Load `$46` | ≈ 4.98 × kPa + 98.6, linear | LIKELY: rests on the EWD PIM curve and **ADC channel 7 being the 5 V supply (GUESS)** |
 | Map rows | map A: 40 kPa + 12.85 kPa per row (40–130); map B: 53–130 kPa | as Load |
 | Injector pulse | InjPulse `$88` µs + dead time `$8A` µs, on Tout1 (P2-1) active low, one per revolution | CONFIRMED [EMU] |
@@ -165,5 +165,5 @@ Until then, the kPa labels in [`ignition_maps.md`](ignition_maps.md) may be stre
 ## Next
 
 1. Read the live variables through the serial link ([`serial_link.md`](serial_link.md)): Load at key-on (kPa scale), PORT3 (which map the car runs), and the channel readings against known inputs.
-2. Settle the two GUESS anchors on the bench and in the car: what ADC channel 7 measures, and a timing-light reading with the test terminal shorted.
+2. Settle the two GUESS anchors on the bench and in the car: what ADC channel 7 measures, and timing-light readings with T open (idle, steady 2500–3000 rpm). With T shorted a correctly set car always reads 10°, so that reading only checks the distributor setting.
 3. Write `analysis/defs/mr2_17140.yaml` (replacing the auto-ported Bluetop file) and generate the XDF and readable tables.

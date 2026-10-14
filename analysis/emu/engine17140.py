@@ -31,6 +31,13 @@ the CPU pins; the ROM fixes most of it, the rest is marked GUESS.
   ``p34`` (jumper J8: map select), P3-3 vehicle-speed pulses off, P3-6 low (no self-test),
   P1-7 high, PORT4 inputs high (trim code 11 = 0). Their meanings are LIKELY/GUESS as noted
   in docs/mr2/maps.md.
+- **P1-6 = IDL (throttle idle contact), low = throttle closed** (LIKELY): ~150 ms low sets the
+  closed-throttle state (`ModeFlags` bit 7: idle ignition table $F0FA, decel fuel cut) [ROM:$F4C9-$F51E],
+  and with T shorted a high P1-6 adds a fault bit, as Toyota's code 51 [ROM:$F769-$F795]; the 1984 EWD
+  gives IDL 4-6 V with the throttle open. ``idl_closed`` drives it (default open = the pin's old level).
+- **P3-7** only sets a floor of $3C (1500 rpm return, about 1900 rpm cut) under the decel fuel-cut rpm
+  [ROM:$F4EC-$F4F4]; those are the 1988 RM's A/C-on figures, so it is probably the A/C switch (GUESS).
+  ``p37`` drives it (default 1 = the pin's old level).
 """
 
 from __future__ import annotations
@@ -58,6 +65,8 @@ class Inputs17140:
     zero_v: float = 0.0  # channel 0
     p34: int = 1  # jumper J8 level: 1 -> map $F1EF, 0 -> map $F25D
     test_terminal: bool = False  # True = T shorted: P3-0 low (LIKELY polarity)
+    idl_closed: bool = False  # True = throttle closed: P1-6 (IDL) low (LIKELY)
+    p37: int = 1  # P3-7: decel-cut rpm floor when 1 (GUESS: A/C on)
     igf: bool = True
     ne_duty: float = 0.5
 
@@ -92,6 +101,8 @@ class Engine17140:
     def update_sensors(self) -> None:
         p, i = self.p, self.inputs
         p.set_pin(3, 0, 0 if i.test_terminal else 1)
+        p.set_pin(1, 6, 0 if i.idl_closed else 1)
+        p.set_pin(3, 7, 1 if i.p37 else 0)
         p.set_pin(3, 4, 1 if i.p34 else 0)
         p.set_pin(3, 6, 0)
         p.set_pin(3, 5, 0)

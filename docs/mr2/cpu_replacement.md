@@ -37,10 +37,10 @@ All of this is from the 17140's own register use [xref], and all of it is alread
 | Block | Registers | Pins | Model status |
 |---|---|---|---|
 | CPU | — | — | **C core done**: matches the MAME-verified Python core on every opcode and on 200 000 steps of the 17140 ROM [EMU:tests/test_hd6301_c.py] |
-| Timer 1 | TCSR `$08`, FRC `$09`, OCR1 `$0B`, ICR1 `$0D` | IC1 ← P20 (ADC end), OC1 → P21 (injector) | Python, handbook-based |
-| Timer 2 (Denso) | TCSR2 `$18`, OCR2 `$1B`, ICR2 `$1D` | IC2 ← P10 (NE), OC2 → P11 (IGT) | Python, inferred from the ROM (GUESS until compared with the real chip) |
-| SCI | RMCR `$10`, TRCSR `$11`, RDR `$12`, TDR `$13` | P23/P24 | Python (17140 host model) |
-| Ports | `$00`–`$07`, P3CSR `$0F` (IS3 = IGF) | Port 1/2/3/4, SC1 | Python |
+| Timer 1 | TCSR `$08`, FRC `$09`, OCR1 `$0B`, ICR1 `$0D` | IC1 ← P20 (ADC end), OC1 → P21 (injector) | **C done** (`d151801.c`), handbook-based |
+| Timer 2 (Denso) | TCSR2 `$18`, OCR2 `$1B`, ICR2 `$1D` | IC2 ← P10 (NE), OC2 → P11 (IGT) | **C done**; inferred from the ROM (GUESS until compared with the real chip) |
+| SCI | RMCR `$10`, TRCSR `$11`, RDR `$12`, TDR `$13` | P23/P24 | **C done** (UART line side via callbacks) |
+| Ports | `$00`–`$07`, P3CSR `$0F` (IS3 = IGF) | Port 1/2/3/4, SC1 | **C done** |
 | RAM, RAMCR | `$40`–`$FF`, `$14` | STBY | Python; standby (battery-backed fault codes) to design |
 | Reset, mode | PORT2 bits 5–7 read as mode 7 | RES | trivial |
 
@@ -71,7 +71,7 @@ The emulated chip runs **locked to real time**:
 
 1. **C core against the Python core: done** [EMU:tests/test_hd6301_c.py].
 2. **Speed on the RP2350:** the bench UF2 (below) on the owner's Pico 2 W.
-3. **C peripheral model against the Python simulator:** same stimulus, same spark and injector edges.
+3. **C peripheral model against the Python simulator: done.** CPU + peripherals + memory in C (`board.c`), driven by the same engine model through `emu.cboard`: every spark, injector edge, ADC conversion, interrupt count and RAM byte identical at 8 operating points (idle, cruise, full load, rev limit, cranking, cold with map B, no IGF, test terminal) [EMU:tests/test_d151801_c.py]. A one-bit fault in the C output-compare logic fails all 8.
 4. **On the Pico with real I/O:** PIO stimulus from the simulator's scenarios, outputs captured and compared.
 5. **Differential against the real D151801:** the real chip in mode 7 on the breadboard harness and the emulator, driven with identical NE/G/ADC stimulus; compare every IGT and injector edge to the µs. This settles timer 2, the cycle table and anything undocumented.
 6. **Bench ECU:** the emulator in the spare ECU against the stock ECU (CLAUDE.md: bench outputs must match first). Only then the car.

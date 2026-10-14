@@ -18,7 +18,6 @@ import shutil
 import subprocess
 from collections.abc import Callable
 from functools import cache
-from pathlib import Path
 
 from .engine import ROOT
 from .engine17140 import ROM_17140, Engine17140, Inputs17140

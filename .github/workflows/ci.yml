@@ -64,3 +64,17 @@ jobs:
         with:
           name: rp2350_reader_${{ matrix.board }}
           path: build/rp2350_reader_${{ matrix.board }}.uf2
+
+      - name: Build the serial-link logger UF2 (Pico 2 W only; warnings are errors)
+        if: matrix.board == 'pico2_w'
+        env:
+          PICO_SDK_PATH: ${{ runner.temp }}/pico-sdk
+        run: |
+          cmake -S hardware/peek-logger/firmware -B build-logger -G Ninja -DPICO_BOARD=pico2_w
+          cmake --build build-logger
+
+      - uses: actions/upload-artifact@v4
+        if: matrix.board == 'pico2_w'
+        with:
+          name: peek_logger_pico2_w
+          path: build-logger/peek_logger_pico2_w.uf2

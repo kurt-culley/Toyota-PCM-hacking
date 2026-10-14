@@ -104,9 +104,39 @@ Both pins are ordinary Port 2 outputs whenever the SCI is off. The main loop wri
 - **At every key-on**, pin 11's level depends on what the board's circuit presents while it is still an input. If that level is low, the link switches itself on for about 1 s and then off again with no request.
 
 So a full link through the existing connector is only possible if the board traces allow it. The likely answer is "receive yes, send no". In that case the minimum change is one wire from pin 11 (plus ground) to a spare connector pin or a small socket inside the case.
-- **Firmware:** a small Pico program: hold TX low (break) while waiting for the ECU's power, release it, then poll a variable list in a loop and stream the values over USB or Wi-Fi. Every hardware step needs the owner's confirmation before power is applied.
+- **Firmware:** [`hardware/peek-logger/firmware/`](../../hardware/peek-logger/firmware/) (Pico 2 W; CI builds `peek_logger_pico2_w.uf2`). Every hardware step needs the owner's confirmation before power is applied.
+
+## The logger
+
+```mermaid
+stateDiagram-v2
+  OFF : TX held low (break)
+  HOLD : TX low for 250 ms after the ECU's 5 V appears
+  POLL : one request at a time, 30 ms timeout
+  LOST : TX released (high impedance)
+  [*] --> OFF
+  OFF --> HOLD: ECU 5 V sensed
+  HOLD --> POLL: 250 ms
+  POLL --> LOST: 3 requests unanswered
+  POLL --> OFF: ECU 5 V gone
+  LOST --> OFF: ECU 5 V gone
+```
+
+| Pico 2 W | ECU |
+|---|---|
+| GP0 (UART0 TX) through 1 kΩ | chip pin 11 (P23, SCI RX) |
+| GP1 (UART0 RX) through 1 kΩ | chip pin 12 (P24, SCI TX) |
+| GP2, from a 10 kΩ / 15 kΩ divider (top on the ECU's 5 V `VCC`) | ECU 5 V sense |
+| GND | ECU ground |
+
+- **Why the series resistors:** whenever the link is off, pin 11 is an ECU output (a fault-code line). The resistor limits any fight with the Pico's TX to a few mA, and the logger releases TX (LOST) as soon as the ECU stops answering.
+- **Output:** USB serial lines `D,<ms>,<addr>,<word>` (reply), `M,<ms>,<addr>` (miss), `S,<ms>,<state>`. Command `v 77 46 53 …` sets the polled addresses; addresses outside `$02`–`$07` and `$40`–`$FE` are refused.
+- **Decoding:** `PYTHONPATH=analysis uv run python -m pcmre.peeklog capture.txt -o log.csv` gives one row per pass in physical units (rpm, kPa, µs, degrees; GUESS scalings marked).
+- **Tested:** the firmware's link logic (`link.h`) is compiled for the host and run against the simulated ECU: it brings the link up through the break, keeps it alive, decodes rpm, load and pulse correctly, and lets go of the line when the ECU never answers [EMU:tests/test_peek_logger.py].
+- **Wi-Fi dashboard:** next step, on the same board.
 
 ## Next
 
 - Q11: trace chip pins 11 and 12 on the board (unpowered continuity).
-- Write the Pico 2 W logger firmware and a host decoder, test them against the simulator model, then try the link on the spare ECU on the bench before the car.
+- Try the logger on the spare ECU on the bench before the car (needs Q11 and the owner's confirmation).
+- Add the Wi-Fi dashboard to the logger.

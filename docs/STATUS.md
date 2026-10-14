@@ -253,7 +253,8 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
   
   Not yet Verifier-reviewed.
 - [ ] Bench and car anchors: Load at key-on, engine off, over the serial link (kPa scale); what ADC ch7 measures; timing-light readings with T open at idle and at a steady 2500–3000 rpm; PORT3 over the link (Q10).
-- [ ] Pico 2 W serial-link logger firmware and host decoder, tested against the simulator model first.
+- [x] Pico 2 W serial-link logger ([`../hardware/peek-logger/firmware/`](../hardware/peek-logger/firmware/)) and host decoder (`pcmre.peeklog`): the firmware's link logic runs against the simulated ECU [EMU:tests/test_peek_logger.py]; the UF2 builds warning-free. Not yet run on hardware; not Verifier-reviewed.
+- [ ] Logger on the spare ECU on the bench (after Q11; owner confirmation), then the Wi-Fi dashboard.
 
 ### Bench observations to follow up (P4)
 - **Day-one ingest** ([`../analysis/mr2_17140/ingest.md`](../analysis/mr2_17140/ingest.md)):

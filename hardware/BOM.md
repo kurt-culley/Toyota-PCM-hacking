@@ -22,7 +22,7 @@
 | A10 | **Full-size breadboard, 830 points** (or two half-size joined) | 1 | The Pico and the DIP-40 need 20 rows each | Amazon UK | ~£5 |
 | opt | ESD wrist strap | 1 | Protects the only D151801 | Amazon UK | ~£5 |
 
-Already owned: male-to-male jumpers, multimeter. No scope or logic analyser is needed: the reader firmware measures the chip's E clock itself.
+Already owned: male-to-male jumpers, multimeter, and an older **Raspberry Pi Pico WH (RP2040)**: not 5 V tolerant, so not used on the CPU; it is the bench's "engine" Pico (stimulus and measurement through dividers and a transistor, [`../docs/hardware/ecu_bench_setup.md`](../docs/hardware/ecu_bench_setup.md)). No scope or logic analyser is needed: the reader firmware measures the chip's E clock itself.
 
 
 ---

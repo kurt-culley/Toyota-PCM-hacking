@@ -20,7 +20,7 @@ flowchart LR
   end
   CPU["Stage 0: the real D151801"] -.plugs into.-> SOCK
   EMU["Stage 1: emulator Pico 2 W<br/>on a breadboard, ribbon to a DIP-40 plug,<br/>74HCT541 x2 on the outputs"] -.plugs into.-> SOCK
-  STIM["Engine Pico<br/>(NE, G, IGF echo; measures IGT and injectors)"] -->|NE, G1/G-, IGF| CIRC
+  STIM["Engine Pico: old Pico WH (RP2040, 3.3 V only)<br/>(NE, G, IGF echo; measures IGT and injectors)"] -->|NE, G1/G-, IGF| CIRC
   CIRC -->|IGT, #10/#20| STIM
   SENS["Sensor stand-ins:<br/>pots for PIM and VTA,<br/>resistors for THW and THA"] -->|VCC, PIM, VTA, THW, THA, E2| CIRC
   LOADS["Dummy injector loads<br/>(47 ohm 5 W, or 12 V bulbs)"] --- CIRC
@@ -47,9 +47,13 @@ Wired at the ECU's edge connector, using the board labels ([`aw11_ecu.md`](aw11_
 | #10, #20 | Dummy loads to 12 V; the driver side to the engine Pico through a 33 kΩ / 10 kΩ divider and a 3.3 V clamp | Injector pulses |
 | STH, FC, VISC, W | 12 V bulbs or LEDs with resistors to 12 V | T-VIS, fuel pump, idle-up and check-engine outputs, so they can be seen |
 
-**The engine Pico** generates NE every 30° and G every 180°, echoes IGF, and timestamps every IGT and injector edge, just as the loopback's core 0 does now. It can be:
-- the old Pico WH (RP2040) if still owned: everything it touches goes through dividers or a transistor, so 5 V tolerance doesn't matter;
-- or a second Pico 2 W (about £7). That is a purchase, so it needs the owner's approval and a BOM line.
+**The engine Pico is the owner's old Raspberry Pi Pico WH (RP2040)** (owner decision, 2026-10-14; no purchase). It generates NE every 30° and G every 180°, echoes IGF, and timestamps every IGT and injector edge, just as the loopback's core 0 does now.
+
+**Its pins are 3.3 V only, not 5 V tolerant even when powered**, so nothing from the ECU reaches it directly:
+- **Inputs** (IGT, #10, #20) go through the dividers in the table, plus a 3.3 V Zener clamp on each.
+- **Outputs:**
+  - NE and G go through a series resistor into the ECU's input conditioner, which sees only 0–3.3 V;
+  - IGF goes through the NPN transistor, so the ECU's 5 V pull-up never reaches the Pico pin.
 
 ## CPU-socket side (Stage 1 only)
 
@@ -87,7 +91,7 @@ That is 26 GPIOs. The **74HCT541** buffers (5 V powered from the ECU's Vcc) turn
 | 74HCT541 ×2 | 5 V outputs |
 | 10 kΩ pots ×3, resistors (300 Ω, 2.2 kΩ, dividers), 2N3904 ×2, 3.3 V Zener ×2 | Sensors, IGF echo, input protection |
 | 47 Ω 5 W resistors ×2 (or 12 V 5 W bulbs) | Dummy injector loads |
-| Engine Pico: the old Pico WH, or a second Pico 2 W | Stimulus and measurement |
+| (owned) Engine Pico: the old Pico WH (RP2040) | Stimulus and measurement |
 
 ## Steps (draft)
 

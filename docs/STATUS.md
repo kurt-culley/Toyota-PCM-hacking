@@ -306,4 +306,4 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
 
 | Date | Item | Reason | Owner approved? |
 |---|---|---|---|
-| — | — | — | — |
+| 2026-10-14 | Owned Raspberry Pi Pico WH (RP2040) as the bench "engine" Pico | Already owned, no purchase; the Pico 2 W is the emulator under test, so the stimulus needs a second board. The RP2040 is not 5 V tolerant, so every ECU signal reaches it through a divider, clamp or transistor ([`hardware/ecu_bench_setup.md`](hardware/ecu_bench_setup.md)) | Yes (owner, 2026-10-14) |

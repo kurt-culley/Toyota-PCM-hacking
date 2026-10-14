@@ -49,7 +49,7 @@ typedef struct {
     // crank producer state (core 0) and ring
     eng_ev_t ring[ENG_RING];
     volatile uint32_t head, tail;
-    volatile int64_t queued_until;  // every crank edge before this time is in the ring
+    volatile int64_t queued_until;  // every crank edge up to this time is in the ring
     int64_t tooth, pend_glow, pend_nelow;
     int edge;
     // consumer side (core 1)
@@ -96,6 +96,12 @@ static void eng_crank_fill(eng_t *e, int64_t until) {
         ENG_DMB();
         e->head = e->head + 1;
         e->queued_until = ev.t;
+    }
+    // Every edge up to `until` is queued (the next one is later), so the emulator may run to
+    // `until` even when the last queued edge is much earlier (slow rpm, long gaps).
+    if (e->head - e->tail < ENG_RING - 4 && until > e->queued_until) {
+        ENG_DMB();
+        e->queued_until = until;
     }
 }
 

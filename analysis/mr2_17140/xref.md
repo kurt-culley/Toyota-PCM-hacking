@@ -41,8 +41,8 @@ Instruction counts include code shared with other routines (fall-through tails).
 
 | Entry | Routine | Instrs | Called by | Calls |
 |---|---|---|---|---|
-| `$F01E` | sub_F01E | 14 | SvcAdc, SvcEvents, SvcIgnition | – |
-| `$F027` | sub_F027 | 13 | SvcIgnition | – |
+| `$F01E` | IgnTrimTbl+3 | 14 | SvcAdc, SvcEvents, SvcIgnition | – |
+| `$F027` | IgnTrimTbl+12 | 13 | SvcIgnition | – |
 | `$F11D` | Lookup1D_a | 22 | SvcAdc, SvcEvents, SvcIgnition | sub_F15B |
 | `$F11E` | Lookup1D_a+1 | 21 | DensityLookup | sub_F15B |
 | `$F11F` | Lookup1D_a+2 | 20 | SvcEvents, SvcIgnition | sub_F15B |
@@ -66,8 +66,8 @@ Instruction counts include code shared with other routines (fall-through tails).
 | `$F70D` | sub_F70D | 23 | IRQ_OCF, Reset | – |
 | `$F716` | sub_F716 | 18 | SvcAdc, SvcEvents, SvcIgnition | – |
 | `$F717` | sub_F717 | 17 | SvcAdc, SvcEvents, SvcIgnition | – |
-| `$F7EC` | SvcIgnition | 893 | Reset | DensityLookup, Lookup1D_a, Lookup1D_a+13, Lookup1D_a+15, Lookup1D_a+2, Lookup1D_a+9, Lookup2D, Mul16, SchedInj, SvcAdc, SvcAdc+14, SvcAdc+15, … (+18) |
-| `$F84D` | SvcEvents | 840 | Reset, SvcIgnition | DensityLookup, Lookup1D_a, Lookup1D_a+13, Lookup1D_a+15, Lookup1D_a+2, Lookup1D_a+9, Lookup2D, SchedInj, SvcAdc, SvcAdc+14, SvcAdc+15, SvcAdc+5, … (+15) |
+| `$F7EC` | SvcIgnition | 893 | Reset | DensityLookup, IgnTrimTbl+12, IgnTrimTbl+3, Lookup1D_a, Lookup1D_a+13, Lookup1D_a+15, Lookup1D_a+2, Lookup1D_a+9, Lookup2D, Mul16, SchedInj, SvcAdc, … (+18) |
+| `$F84D` | SvcEvents | 840 | Reset, SvcIgnition | DensityLookup, IgnTrimTbl+3, Lookup1D_a, Lookup1D_a+13, Lookup1D_a+15, Lookup1D_a+2, Lookup1D_a+9, Lookup2D, SchedInj, SvcAdc, SvcAdc+14, SvcAdc+15, … (+15) |
 | `$F8C2` | sub_F8C2 | 12 | SvcEvents, SvcIgnition | sub_F130 |
 | `$F8CB` | sub_F8CB | 8 | SvcEvents, SvcIgnition | sub_F130 |
 | `$F9D3` | sub_F9D3 | 8 | SvcEvents, SvcIgnition | – |
@@ -81,7 +81,7 @@ Instruction counts include code shared with other routines (fall-through tails).
 | `$F9E4` | sub_F9E4 | 1 | Reset | – |
 | `$F9E5` | sub_F9E5 | 7 | Reset, SvcAdc, SvcEvents, SvcIgnition | – |
 | `$F9F0` | DensityLookup | 14 | SvcEvents, SvcIgnition | Lookup1D_a+1 |
-| `$FB23` | SvcAdc | 495 | SvcEvents, SvcIgnition | Lookup1D_a, Lookup1D_a+15, Lookup1D_a+9, Lookup2D, SchedInj, SvcAdc+5, sub_F01E, sub_F130, sub_F132, sub_F6E6, sub_F716, sub_F717, … (+3) |
+| `$FB23` | SvcAdc | 495 | SvcEvents, SvcIgnition | IgnTrimTbl+3, Lookup1D_a, Lookup1D_a+15, Lookup1D_a+9, Lookup2D, SchedInj, SvcAdc+5, sub_F130, sub_F132, sub_F6E6, sub_F716, sub_F717, … (+3) |
 | `$FB28` | SvcAdc+5 | 9 | SvcAdc, SvcEvents, SvcIgnition | Mul16 |
 | `$FB31` | SvcAdc+14 | 28 | SvcEvents, SvcIgnition | – |
 | `$FB32` | SvcAdc+15 | 27 | SvcEvents, SvcIgnition | – |
@@ -153,35 +153,35 @@ Both kinds are counted in the summary; the sites are: `$F146`, `$F148`, `$F150`,
 | `$48` | – | 2 | SvcEvents, SvcIgnition | SvcEvents, SvcIgnition |
 | `$49` | – | 2 | SvcEvents, SvcIgnition | SvcEvents, SvcIgnition |
 | `$4A` | MapRaw | 1 | Reset, SvcAdc, SvcEvents, SvcIgnition, sub_F593 | SvcAdc, SvcEvents, SvcIgnition |
-| `$4B` | – | 2 | Reset, SvcAdc, SvcEvents, SvcIgnition | Reset, SvcAdc, SvcEvents, SvcIgnition |
+| `$4B` | LoadLag | 2 | Reset, SvcAdc, SvcEvents, SvcIgnition | Reset, SvcAdc, SvcEvents, SvcIgnition |
 | `$4C` | – | 2 | Reset, SvcAdc, SvcEvents, SvcIgnition | Reset, SvcAdc, SvcEvents, SvcIgnition |
 | `$4D` | CoolantCorr | 1 | SvcEvents, SvcIgnition | SvcAdc, SvcEvents, SvcIgnition |
-| `$4E` | – | 1 | SvcEvents, SvcIgnition | SvcEvents, SvcIgnition |
+| `$4E` | LoadDelta | 1 | SvcEvents, SvcIgnition | SvcEvents, SvcIgnition |
 | `$4F` | – | 1 | SvcEvents, SvcIgnition | SvcEvents, SvcIgnition |
 | `$50` | AdcZero | 1 | SvcAdc, SvcEvents, SvcIgnition | SvcAdc, SvcEvents, SvcIgnition |
-| `$51` | – | 1 | SvcEvents, SvcIgnition | Reset |
-| `$52` | – | 1 | SvcEvents, SvcIgnition | Reset |
+| `$51` | TransGainUp | 1 | SvcEvents, SvcIgnition | Reset |
+| `$52` | TransGainDown | 1 | SvcEvents, SvcIgnition | Reset |
 | `$53` | Coolant | 2 | Lookup1D_a+13, Lookup1D_a+7, Reset, SvcAdc, SvcEvents, SvcIgnition | Reset, SvcAdc, SvcEvents, SvcIgnition |
-| `$54` | – | 2 | Reset | Reset |
+| `$54` | StartCoolant | 2 | Reset | Reset |
 | `$55` | AdcRef | 1 | SvcAdc, SvcEvents, SvcIgnition | SvcAdc, SvcEvents, SvcIgnition |
-| `$56` | – | 2 | SvcEvents, SvcIgnition | Reset |
+| `$56` | FuelCap | 2 | SvcEvents, SvcIgnition | Reset |
 | `$57` | – | 2 | SvcEvents, SvcIgnition | Reset |
-| `$58` | – | 1 | SvcEvents, SvcIgnition | Reset |
+| `$58` | WarmFuel | 1 | SvcEvents, SvcIgnition | Reset |
 | `$59` | InjFlags | 2 | SvcAdc, SvcEvents, SvcIgnition | Reset, SvcAdc, SvcEvents, SvcIgnition |
 | `$5A` | StateFlags | 2 | Reset, SvcAdc, SvcEvents, SvcIgnition | Reset, SvcAdc, SvcEvents, SvcIgnition |
 | `$5B` | – | 2 | IRQ_ICF, Reset | IRQ_ICF, Reset |
-| `$5C` | – | 2 | Reset, SvcEvents, SvcIgnition | Reset |
-| `$5D` | – | 2 | SvcEvents, SvcIgnition | SvcEvents, SvcIgnition |
+| `$5C` | AfterStart | 2 | Reset, SvcEvents, SvcIgnition | Reset |
+| `$5D` | AccelFuel | 2 | SvcEvents, SvcIgnition | SvcEvents, SvcIgnition |
 | `$5E` | ThaCorr | 1 | SvcEvents, SvcIgnition | SvcAdc, SvcEvents, SvcIgnition |
 | `$5F` | Tha | 1 | Reset | SvcAdc, SvcEvents, SvcIgnition |
-| `$60` | – | 1 | SvcEvents, SvcIgnition | Reset, SvcEvents, SvcIgnition |
+| `$60` | RegionFuel | 1 | SvcEvents, SvcIgnition | Reset, SvcEvents, SvcIgnition |
 | `$61` | SecretRpmFuel | 1 | SvcEvents, SvcIgnition | Reset |
-| `$62` | – | 1 | Reset | Reset |
+| `$62` | RegionState | 1 | Reset | Reset |
 | `$63` | – | 1 | Reset | Reset |
 | `$64` | Counters | 2 | Reset, SvcAdc, SvcEvents, SvcIgnition, sub_F9E5† | IRQ_ICF, Reset, sub_F9E5† |
 | `$65` | – | 2 | IRQ_ICF | IRQ_ICF, Reset |
 | `$66` | – | 1 | SvcAdc, SvcEvents, SvcIgnition | SvcAdc, SvcEvents, SvcIgnition |
-| `$67` | – | 1 | Reset | Reset |
+| `$67` | IdlTimer | 1 | Reset | Reset |
 | `$68` | – | 2 | SvcAdc, SvcEvents, SvcIgnition | SvcAdc, SvcEvents, SvcIgnition |
 | `$69` | – | 2 | SvcAdc, SvcEvents, SvcIgnition | SvcAdc, SvcEvents, SvcIgnition |
 | `$6A` | LinkTimer | 1 | Reset | Reset |
@@ -189,12 +189,12 @@ Both kinds are counted in the summary; the sites are: `$F146`, `$F148`, `$F150`,
 | `$6C` | – | 1 | Reset, sub_F9E5† | IRQ_ICF, Reset, sub_F9E5† |
 | `$6D` | – | 2 | sub_F6E6 | sub_F6E6 |
 | `$6E` | – | 2 | SvcAdc, SvcEvents, SvcIgnition, sub_F6E6 | SvcAdc, SvcEvents, SvcIgnition |
-| `$6F` | – | 1 | Reset, SvcEvents, SvcIgnition, sub_F9E5† | Reset, sub_F9E5† |
+| `$6F` | SecsRun | 1 | Reset, SvcEvents, SvcIgnition, sub_F9E5† | Reset, sub_F9E5† |
 | `$70` | – | 1 | Reset | Reset |
 | `$71` | – | 1 | Reset | Reset |
-| `$72` | – | 1 | SvcAdc, SvcEvents, SvcIgnition | SvcAdc, SvcEvents, SvcIgnition |
+| `$72` | TvisTimer | 1 | SvcAdc, SvcEvents, SvcIgnition | SvcAdc, SvcEvents, SvcIgnition |
 | `$73` | RpmIndex | 1 | Reset, SvcAdc, SvcEvents, SvcIgnition, sub_F58D | Reset |
-| `$74` | – | 2 | SvcEvents, SvcIgnition | SvcEvents, SvcIgnition |
+| `$74` | RpmByte | 2 | SvcEvents, SvcIgnition | SvcEvents, SvcIgnition |
 | `$75` | – | 2 | Reset, SvcEvents, SvcIgnition, sub_F8C2 | SvcEvents, SvcIgnition |
 | `$76` | – | 1 | sub_F8C2 | SvcEvents, SvcIgnition |
 | `$77` | RpmWord | 2 | DensityLookup, Reset, SvcAdc, SvcEvents, SvcIgnition | Reset |
@@ -230,8 +230,8 @@ Both kinds are counted in the summary; the sites are: `$F146`, `$F148`, `$F150`,
 | `$97` | NEcount | 2 | IRQ_ICF, SvcIgnition | IRQ_ICF, Reset |
 | `$98` | – | 2 | Reset | IRQ_ICF, Reset |
 | `$99` | ModeFlags | 2 | IRQ_ICF, IRQ_OCF, Reset, SvcAdc, SvcEvents, SvcIgnition | Reset |
-| `$9A` | – | 2 | Reset | Reset |
-| `$9B` | – | 1 | Reset | Reset |
+| `$9A` | DecelCutBase | 2 | Reset | Reset |
+| `$9B` | DecelCutRpm | 1 | Reset | Reset |
 | `$9C` | – | 2 | IRQ_ICF | IRQ_ICF, SvcIgnition |
 | `$9D` | – | 2 | IRQ_ICF | IRQ_ICF, SvcIgnition |
 | `$9E` | IgnEdge | 1 | IRQ_ICF, SvcIgnition | SvcIgnition |
@@ -245,8 +245,8 @@ Both kinds are counted in the summary; the sites are: `$F146`, `$F148`, `$F150`,
 | `$A6` | – | 2 | SvcAdc, SvcEvents, SvcIgnition | SvcAdc, SvcEvents, SvcIgnition |
 | `$A7` | StartCount | 1 | IRQ_OCF, SchedInj | IRQ_OCF |
 | `$A8` | IgnBase | 1 | SvcIgnition | SvcAdc, SvcEvents, SvcIgnition |
-| `$A9` | – | 1 | – | Reset |
-| `$AA` | – | 1 | – | SvcEvents, SvcIgnition |
+| `$A9` | IgnCoolant | 1 | – | Reset |
+| `$AA` | IgnIdleStab | 1 | – | SvcEvents, SvcIgnition |
 | `$AB` | – | 2 | Lookup2D, Lookup2D†, SvcAdc, SvcEvents, SvcIgnition, SvcIgnition† | Lookup2D, SvcAdc, SvcEvents, SvcIgnition |
 | `$AC` | – | 2 | Lookup2D†, Mul16, SvcAdc, SvcAdc+14, SvcAdc+15, SvcEvents, SvcIgnition | Lookup2D, Mul16, SvcAdc, SvcAdc+14, SvcAdc+15, SvcEvents, SvcIgnition |
 | `$AD` | – | 2 | Lookup2D, Mul16, SvcAdc, SvcAdc+14, SvcAdc+15, SvcEvents, SvcIgnition | Lookup2D, Mul16, SvcAdc, SvcAdc+14, SvcAdc+15, SvcEvents, SvcIgnition |
@@ -254,13 +254,13 @@ Both kinds are counted in the summary; the sites are: `$F146`, `$F148`, `$F150`,
 | `$AF` | – | 2 | Lookup2D, Mul16, SvcAdc+14, SvcAdc+15, SvcEvents, SvcIgnition | Mul16, SvcAdc, SvcAdc+14, SvcAdc+15, SvcEvents, SvcIgnition |
 | `$B0` | – | 2 | Lookup2D, Mul16, SvcAdc+14, SvcAdc+15 | Lookup2D, Mul16, SvcAdc, SvcAdc+14, SvcAdc+15, SvcEvents, SvcIgnition |
 | `$B1` | – | 2 | Lookup2D, Mul16, SvcAdc+14, SvcAdc+15 | Lookup2D, Mul16, SvcAdc+14, SvcAdc+15 |
-| `$B2` | – | 2 | SvcEvents, SvcIgnition | SvcEvents, SvcIgnition |
+| `$B2` | RpmSlow | 2 | SvcEvents, SvcIgnition | SvcEvents, SvcIgnition |
 | `$B3` | – | 2 | SvcEvents, SvcIgnition | SvcEvents, SvcIgnition |
 | `$B4` | – | 1 | Reset, SvcAdc, SvcEvents, SvcIgnition, sub_F8C2, sub_F8CB | Reset |
 | `$B5` | – | 2 | Reset, SvcAdc, SvcEvents, SvcIgnition | Reset, SvcAdc, SvcEvents, SvcIgnition |
 | `$B6` | – | 2 | Reset, SvcAdc, SvcEvents, SvcIgnition | Reset, SvcAdc, SvcEvents, SvcIgnition |
-| `$B7` | – | 1 | IRQ_ICF, Reset | IRQ_ICF, Reset |
-| `$B8` | – | 1 | SvcEvents, SvcIgnition | Reset, SvcEvents, SvcIgnition |
+| `$B7` | InjPhase | 1 | IRQ_ICF, Reset | IRQ_ICF, Reset |
+| `$B8` | StairFilt | 1 | SvcEvents, SvcIgnition | Reset, SvcEvents, SvcIgnition |
 | `$B9` | RevLimit | 2 | SvcEvents, SvcIgnition | SvcEvents, SvcIgnition |
 | `$BA` | – | 2 | SvcEvents, SvcIgnition | SvcEvents, SvcIgnition |
 | `$BB` | – | 1 | SvcEvents, SvcIgnition | SvcEvents, SvcIgnition |
@@ -294,55 +294,55 @@ X base for an indexed call). Code addresses that are only used as call or jump t
 |---|---|---|---|
 | `$F000` | Tables | ptr/r | Reset, Reset† |
 | `$F001` | – | r | Reset† |
-| `$F002` | – | r | sub_F01E† |
-| `$F003` | – | ptr/r | SvcAdc, SvcEvents, SvcIgnition, sub_F01E† |
-| `$F004` | – | r | sub_F01E† |
-| `$F005` | – | r | sub_F01E† |
-| `$F006` | – | r | sub_F01E† |
-| `$F007` | – | r | sub_F01E† |
-| `$F008` | – | r | sub_F01E† |
+| `$F002` | – | r | IgnTrimTbl+3† |
+| `$F003` | – | ptr/r | IgnTrimTbl+3†, SvcAdc, SvcEvents, SvcIgnition |
+| `$F004` | – | r | IgnTrimTbl+3† |
+| `$F005` | – | r | IgnTrimTbl+3† |
+| `$F006` | – | r | IgnTrimTbl+3† |
+| `$F007` | – | r | IgnTrimTbl+3† |
+| `$F008` | – | r | IgnTrimTbl+3† |
 | `$F009` | – | ptr | SvcAdc, SvcEvents, SvcIgnition |
-| `$F00C` | – | r | sub_F01E† |
-| `$F00D` | – | ptr/r | SvcAdc, SvcEvents, SvcIgnition, sub_F01E† |
-| `$F00E` | – | r | sub_F01E† |
+| `$F00C` | – | r | IgnTrimTbl+3† |
+| `$F00D` | MixLimits | ptr/r | IgnTrimTbl+3†, SvcAdc, SvcEvents, SvcIgnition |
+| `$F00E` | – | r | IgnTrimTbl+3† |
 | `$F00F` | – | ptr/r | SvcEvents, SvcEvents†, SvcIgnition, SvcIgnition† |
 | `$F010` | – | r | SvcEvents†, SvcIgnition† |
 | `$F011` | – | r | SvcEvents†, SvcIgnition† |
 | `$F012` | – | r | SvcEvents†, SvcIgnition† |
-| `$F013` | – | ptr/r | SvcIgnition, sub_F027† |
-| `$F014` | – | r | sub_F027† |
-| `$F015` | – | r | sub_F027† |
-| `$F016` | – | r | sub_F027† |
-| `$F017` | – | ptr/r | SvcIgnition, sub_F027† |
-| `$F018` | – | r | sub_F027† |
-| `$F019` | – | r | sub_F027† |
-| `$F01A` | – | ptr/r | SvcAdc, SvcEvents, SvcIgnition, sub_F027† |
+| `$F013` | SparkClamp | ptr/r | IgnTrimTbl+12†, SvcIgnition |
+| `$F014` | – | r | IgnTrimTbl+12† |
+| `$F015` | – | r | IgnTrimTbl+12† |
+| `$F016` | – | r | IgnTrimTbl+12† |
+| `$F017` | – | ptr/r | IgnTrimTbl+12†, SvcIgnition |
+| `$F018` | – | r | IgnTrimTbl+12† |
+| `$F019` | – | r | IgnTrimTbl+12† |
+| `$F01A` | – | ptr/r | IgnTrimTbl+12†, SvcAdc, SvcEvents, SvcIgnition |
 | `$F031` | – | ptr | Reset |
-| `$F044` | – | ptr/r | SvcAdc, SvcEvents, SvcIgnition, sub_F15B† |
+| `$F044` | AdcRefTbl | ptr/r | SvcAdc, SvcEvents, SvcIgnition, sub_F15B† |
 | `$F045` | – | r | sub_F15B† |
 | `$F046` | – | r | sub_F15B† |
-| `$F056` | – | ptr/r | Lookup1D_a+13†, Reset |
+| `$F056` | AfterStartTbl | ptr/r | Lookup1D_a+13†, Reset |
 | `$F057` | – | r | Lookup1D_a+13† |
 | `$F058` | – | r | Lookup1D_a+13† |
-| `$F05F` | – | ptr/r | Lookup1D_a+13†, SvcEvents, SvcIgnition |
+| `$F05F` | CrankFuelTbl | ptr/r | Lookup1D_a+13†, SvcEvents, SvcIgnition |
 | `$F060` | – | r | Lookup1D_a+13† |
 | `$F061` | – | r | Lookup1D_a+13† |
-| `$F069` | – | ptr/r | Lookup1D_a+13†, Reset |
+| `$F069` | WarmFuelTbl | ptr/r | Lookup1D_a+13†, Reset |
 | `$F06A` | – | r | Lookup1D_a+13† |
 | `$F06B` | – | r | Lookup1D_a+13† |
-| `$F072` | – | ptr/r | Lookup1D_a+15†, SvcEvents, SvcIgnition |
+| `$F072` | GlobalRpmTbl | ptr/r | Lookup1D_a+15†, SvcEvents, SvcIgnition |
 | `$F073` | – | r | Lookup1D_a+15† |
 | `$F074` | – | r | Lookup1D_a+15† |
-| `$F077` | – | ptr/r | Lookup1D_a+7†, Reset |
+| `$F077` | TransGainTbls | ptr/r | Lookup1D_a+7†, Reset |
 | `$F078` | – | r | Lookup1D_a+7† |
 | `$F079` | – | r | Lookup1D_a+7† |
 | `$F07D` | – | ptr/r | Lookup1D_a+7†, Reset |
 | `$F07E` | – | r | Lookup1D_a+7† |
 | `$F07F` | – | r | Lookup1D_a+7† |
-| `$F083` | – | ptr/r | Lookup1D_a+9†, SvcAdc, SvcEvents, SvcIgnition |
+| `$F083` | ThaCorrTbl | ptr/r | Lookup1D_a+9†, SvcAdc, SvcEvents, SvcIgnition |
 | `$F084` | – | r | Lookup1D_a+9† |
 | `$F085` | – | r | Lookup1D_a+9† |
-| `$F089` | – | ptr/r | Lookup1D_a+15†, SvcEvents, SvcIgnition |
+| `$F089` | TransLimitTbl | ptr/r | Lookup1D_a+15†, SvcEvents, SvcIgnition |
 | `$F08A` | – | r | Lookup1D_a+15† |
 | `$F08B` | – | r | Lookup1D_a+15† |
 | `$F090` | – | ptr/r | SvcAdc, SvcEvents, SvcIgnition, sub_F132† |
@@ -354,13 +354,13 @@ X base for an indexed call). Code addresses that are only used as call or jump t
 | `$F099` | – | ptr/r | SvcEvents, SvcIgnition, sub_F130† |
 | `$F09A` | – | r | sub_F130† |
 | `$F09B` | – | r | sub_F130† |
-| `$F09E` | – | ptr/r | Lookup1D_a+7†, Reset |
+| `$F09E` | FuelCapTbl | ptr/r | Lookup1D_a+7†, Reset |
 | `$F09F` | – | r | Lookup1D_a+7† |
 | `$F0A0` | – | r | Lookup1D_a+7† |
-| `$F0A4` | – | ptr/r | Lookup1D_a+15†, SvcAdc, SvcEvents, SvcIgnition |
+| `$F0A4` | DeadTimeTbl | ptr/r | Lookup1D_a+15†, SvcAdc, SvcEvents, SvcIgnition |
 | `$F0A5` | – | r | Lookup1D_a+15† |
 | `$F0A6` | – | r | Lookup1D_a+15† |
-| `$F0AB` | – | ptr/r | SvcAdc, SvcEvents, SvcIgnition, sub_F132† |
+| `$F0AB` | MixRemapTbls | ptr/r | SvcAdc, SvcEvents, SvcIgnition, sub_F132† |
 | `$F0AC` | – | r | sub_F132† |
 | `$F0AD` | – | r | sub_F132† |
 | `$F0B1` | – | ptr/r | SvcAdc, SvcEvents, SvcIgnition, sub_F132† |
@@ -369,13 +369,13 @@ X base for an indexed call). Code addresses that are only used as call or jump t
 | `$F0B9` | – | ptr/r | SvcAdc, SvcEvents, SvcIgnition, sub_F132† |
 | `$F0BA` | – | r | sub_F132† |
 | `$F0BB` | – | r | sub_F132† |
-| `$F0BD` | – | ptr/r | Lookup1D_a+15†, SvcEvents, SvcIgnition |
+| `$F0BD` | MixRpmTbl | ptr/r | Lookup1D_a+15†, SvcEvents, SvcIgnition |
 | `$F0BE` | – | r | Lookup1D_a+15† |
 | `$F0BF` | – | r | Lookup1D_a+15† |
-| `$F0C4` | – | ptr/r | Lookup1D_a+7†, Reset |
+| `$F0C4` | DecelCutTbl | ptr/r | Lookup1D_a+7†, Reset |
 | `$F0C5` | – | r | Lookup1D_a+7† |
 | `$F0C6` | – | r | Lookup1D_a+7† |
-| `$F0CA` | – | ptr/r | Reset, Reset† |
+| `$F0CA` | RegionTbls | ptr/r | Reset, Reset† |
 | `$F0CB` | – | r | Reset† |
 | `$F0CC` | – | r | Reset† |
 | `$F0CD` | – | r | Reset† |
@@ -388,17 +388,17 @@ X base for an indexed call). Code addresses that are only used as call or jump t
 | `$F0DB` | – | ptr/r | Lookup1D_a+15†, Reset |
 | `$F0DC` | – | r | Lookup1D_a+15† |
 | `$F0DD` | – | r | Lookup1D_a+15† |
-| `$F0E2` | – | ptr | Reset |
-| `$F0EC` | – | ptr/r | Lookup1D_a+15†, Reset |
+| `$F0E2` | RegionFuelTbl | ptr | Reset |
+| `$F0EC` | IgnWarmTbl | ptr/r | Lookup1D_a+15†, Reset |
 | `$F0ED` | – | r | Lookup1D_a+15† |
 | `$F0EE` | – | r | Lookup1D_a+15† |
-| `$F0F2` | – | ptr/r | Reset, sub_F132† |
+| `$F0F2` | IgnHotTbl | ptr/r | Reset, sub_F132† |
 | `$F0F3` | – | r | sub_F132† |
 | `$F0F4` | – | r | sub_F132† |
-| `$F0F6` | – | ptr/r | SvcEvents, SvcIgnition, sub_F130† |
+| `$F0F6` | IdleStabTbl | ptr/r | SvcEvents, SvcIgnition, sub_F130† |
 | `$F0F7` | – | r | sub_F130† |
 | `$F0F8` | – | r | sub_F130† |
-| `$F0FA` | – | ptr/r | SvcAdc, SvcEvents, SvcIgnition, sub_F130† |
+| `$F0FA` | IdleIgnTbl | ptr/r | SvcAdc, SvcEvents, SvcIgnition, sub_F130† |
 | `$F0FB` | – | r | sub_F130† |
 | `$F0FC` | – | r | sub_F130† |
 | `$F0FF` | DensityMaps | ptr/r | SvcEvents, SvcIgnition, sub_F15B† |
@@ -529,7 +529,7 @@ flowchart LR
   rF9E4["sub_F9E4<br/>$F9E4"]
   rF9E5["sub_F9E5<br/>$F9E5"]
   rFFB7["SchedInj<br/>$FFB7"]
-  rF01E["sub_F01E<br/>$F01E"]
+  rF01E["IgnTrimTbl+3<br/>$F01E"]
   rF11D["Lookup1D_a<br/>$F11D"]
   rF11F["Lookup1D_a+2<br/>$F11F"]
   rF126["Lookup1D_a+9<br/>$F126"]
@@ -554,7 +554,7 @@ flowchart LR
   rF15B["sub_F15B<br/>$F15B"]
   rF159["sub_F159<br/>$F159"]
   rF15A["sub_F15A<br/>$F15A"]
-  rF027["sub_F027<br/>$F027"]
+  rF027["IgnTrimTbl+12<br/>$F027"]
   rF2BE --> rF120
   rF2BE --> rF124
   rF2BE --> rF12A

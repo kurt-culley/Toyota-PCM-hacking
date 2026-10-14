@@ -38,18 +38,33 @@ TpsOpen	equ	$44
 TpsZero	equ	$45
 Load	equ	$46
 MapRaw	equ	$4A
+LoadLag	equ	$4B
 CoolantCorr	equ	$4D
+LoadDelta	equ	$4E
 AdcZero	equ	$50
+TransGainUp	equ	$51
+TransGainDown	equ	$52
 Coolant	equ	$53
+StartCoolant	equ	$54
 AdcRef	equ	$55
+FuelCap	equ	$56
+WarmFuel	equ	$58
 InjFlags	equ	$59
 StateFlags	equ	$5A
+AfterStart	equ	$5C
+AccelFuel	equ	$5D
 ThaCorr	equ	$5E
 Tha	equ	$5F
+RegionFuel	equ	$60
 SecretRpmFuel	equ	$61
+RegionState	equ	$62
 Counters	equ	$64
+IdlTimer	equ	$67
 LinkTimer	equ	$6A
+SecsRun	equ	$6F
+TvisTimer	equ	$72
 RpmIndex	equ	$73
+RpmByte	equ	$74
 RpmWord	equ	$77
 NEperiod0	equ	$7C
 NEperiod1	equ	$7E
@@ -66,10 +81,17 @@ RevCount	equ	$94
 FuelCut	equ	$95
 NEcount	equ	$97
 ModeFlags	equ	$99
+DecelCutBase	equ	$9A
+DecelCutRpm	equ	$9B
 IgnEdge	equ	$9E
 IgnDelay	equ	$9F
 StartCount	equ	$A7
 IgnBase	equ	$A8
+IgnCoolant	equ	$A9
+IgnIdleStab	equ	$AA
+RpmSlow	equ	$B2
+InjPhase	equ	$B7
+StairFilt	equ	$B8
 RevLimit	equ	$B9
 NEtime	equ	$C0
 OC2next	equ	$C5
@@ -84,9 +106,16 @@ DiagFlags	equ	$CC
 
 Tables:
 	db	$3F,$3F,$3F,$E6,$1A,$FA,$05,$F9		; calibration tables and descriptors $F000-$F2BD, except code at $F01E-$F03A (range check and clamp); $F000-$F002 = 3F 3F 3F (SWI opcodes: a stray jump to the start of the ROM traps to the reset vector) LIKELY
-	db	$07,$81,$20,$04,$40,$F8,$0A,$9A
-	db	$90,$96,$88,$02,$22,$00,$55,$01
-	db	$D5,$00,$55,$11,$09,$00
+	db	$07,$81,$20,$04,$40
+; mixture reading valid while $F00E (10) <= r < $F00D (248), else Mixture = $80, zero correction [ROM:$FC6D-$FC76] (Ross R-M06); $F00F/$F010 = MapRaw $9A / RpmIndex $90 (3600 rpm) limits of the mixture term, $F011/$F012 = $96 / $88 (3400 rpm) to re-enable [ROM:$FAD2-$FAEA] CONFIRMED (code, EMU)
+MixLimits:
+	db	$F8,$0A,$9A,$90,$96,$88
+; spark-sum clamp [max, min]: [$0222, $0055], or [$01D5, $0055] while $CB is set [ROM:$F80D-$F818, $F027] LIKELY
+SparkClamp:
+	dw	$0222,$0055,$01D5,$0055
+; PORT4 bits 2-3 advance trim, subtracted (base $F01A): 17, 9, 0 for codes 01, 10, 11; code 00 adds 9 [ROM:$FDE4-$FDFD] CONFIRMED (code)
+IgnTrimTbl:
+	db	$11,$09,$00
 L_F01E:
 	dex
 	cmpb	$01,x
@@ -111,30 +140,77 @@ L_F037:
 	clc
 	rts
 	db	$A5,$84,$6A,$55,$43,$34,$27,$1C
-	db	$12,$20,$68,$0E,$C5,$B3,$A2,$92
-	db	$83,$74,$66,$59,$4D,$41,$36,$2B
-	db	$21,$17,$0E,$23,$C0,$26,$0A,$0D
-	db	$1B,$39,$52,$77,$10,$E0,$10,$26
-	db	$30,$38,$40,$52,$67,$9F,$23,$C0
-	db	$00,$0D,$12,$1A,$24,$33,$5A,$38
-	db	$40,$80,$80,$80,$23,$C0,$1E,$23
-	db	$48,$4D,$23,$C0,$10,$30,$48,$65
-	db	$23,$C0,$36,$5A,$75,$96,$30,$80
-	db	$FF,$B3,$66,$33,$0D,$1B,$40,$00
-	db	$9C,$9C,$00,$10,$86,$7A,$00,$20
-	db	$70,$80,$90,$23,$C0,$40,$50,$60
-	db	$90,$53,$80,$FF,$99,$5E,$3F,$35
+	db	$12
+; ADC ch7 reference -> AdcRef; (AdcRef + 410) x the ch7 time is constant (314,700 +/- 0.1 %), so every reading = 153.7 x V / V_ch7 [ROM:$FC4D-$FC5B] CONFIRMED (EMU:tests/test_ross17140.py)
+AdcRefTbl:
+	db	$20,$68,$0E,$C5,$B3,$A2,$92,$83
+	db	$74,$66,$59,$4D,$41,$36,$2B,$21
+	db	$17,$0E
+; AfterStart $5C initial value vs coolant [ROM:$F4A4] LIKELY
+AfterStartTbl:
+	db	$23,$C0,$26,$0A,$0D,$1B,$39,$52
+	db	$77
+; cranking fuel vs coolant (ModeFlags bit 0 path) [ROM:$F9C4-$F9CB] LIKELY
+CrankFuelTbl:
+	db	$10,$E0,$10,$26,$30,$38,$40,$52
+	db	$67,$9F
+; WarmFuel $58 vs coolant (0 warm .. 90 cold) [ROM:$F6A3] LIKELY
+WarmFuelTbl:
+	db	$23,$C0,$00,$0D,$12,$1A,$24,$33
+	db	$5A
+; scale on WarmFuel vs RpmIndex: flat 128 (x1) on the 17140 [ROM:$F9A6-$F9AB] CONFIRMED (code)
+GlobalRpmTbl:
+	db	$38,$40,$80,$80,$80
+; TransGainUp $51 ($F077) and TransGainDown $52 ($F07D) vs coolant [ROM:$F692-$F69E] LIKELY
+TransGainTbls:
+	db	$23,$C0,$1E,$23,$48,$4D,$23,$C0
+	db	$10,$30,$48,$65
+; ThaCorr vs THA reading 35/99/163/227: 54/90/117/150 = -9.4/-2.3/+2.9/+9.4 % (hot to cold) [ROM:$FE0A-$FE12] CONFIRMED (code, EMU) (Ross R-F11)
+ThaCorrTbl:
+	db	$23,$C0,$36,$5A,$75,$96
+; limit on the rising-load transient vs MapRaw - CoolantCorr [ROM:$F90E-$F924] LIKELY
+TransLimitTbl:
+	db	$30,$80,$FF,$B3,$66,$33,$0D
+	db	$1B,$40,$00,$9C,$9C,$00,$10,$86
+	db	$7A,$00,$20,$70,$80,$90
+; FuelCap $56 vs coolant [ROM:$F688] LIKELY
+FuelCapTbl:
+	db	$23,$C0,$40,$50,$60,$90
+; InjDeadTime ~ 8 x value us vs battery reading 83..211: 2040 .. 424 us, rising as the voltage falls [ROM:$FE14-$FE1E] CONFIRMED (code, EMU) (Ross R-F17)
+DeadTimeTbl:
+	db	$53,$80,$FF,$99,$5E,$3F,$35
+; mixture reading -> Mixture: $F0B9 below 48 (28 at 10 .. 104), $F0AB 48-207 (103 .. 153, 128 at 128), $F0B1 from 208 (153 .. 228) [ROM:$FC78-$FC96] CONFIRMED (code, EMU) (Ross R-M01)
+MixRemapTbls:
 	db	$30,$A0,$67,$7B,$8F,$A3,$D0,$28
 	db	$99,$A8,$B7,$C6,$D5,$E4,$0A,$26
-	db	$1C,$9C,$28,$68,$80,$71,$60,$51
-	db	$40,$23,$C0,$38,$50,$5C,$70,$8F
-	db	$FC,$8B,$F4,$DE,$20,$AE,$71,$38
-	db	$C0,$AE,$98,$87,$96,$9E,$A4,$5C
-	db	$38,$80,$AE,$98,$87,$5C,$48,$2A
-	db	$24,$12,$00,$08,$32,$24,$24,$12
-	db	$24,$63,$60,$55,$7F,$84,$91,$0E
-	db	$04,$11,$55,$00,$10,$00,$44,$30
-	db	$20,$44,$62,$A2
+	db	$1C,$9C
+; MX2 vs RpmIndex 40/72/104/136/(168) = 1000/1800/2600/3400/(4200) rpm: 128/113/96/81/64, clamped at 3600 rpm (76) [ROM:$FAEC-$FAF1] CONFIRMED (code, EMU) (Ross R-M02: same bytes, different rpm sites)
+MixRpmTbl:
+	db	$28,$68,$80,$71,$60,$51,$40
+; DecelCutBase vs coolant 35/99/163/227: RpmIndex 56/80/92/112 (1400/2000/2300/2800 rpm) [ROM:$F675] CONFIRMED (code, EMU)
+DecelCutTbl:
+	db	$23,$C0,$38,$50,$5C,$70
+; RegionState limits: $F0CA/$F0CC [MapRaw, RpmIndex] pairs for state 0 ($8F/$FC enter, $8B/$F4 stay), $F0CE state 1, $F0D2 state 2, $F0DB state 3 (MapRaw vs RpmIndex) [ROM:$F550-$F5C5] CONFIRMED (code)
+RegionTbls:
+	db	$8F,$FC,$8B,$F4,$DE,$20,$AE,$71
+	db	$38,$C0,$AE,$98,$87,$96,$9E,$A4
+	db	$5C,$38,$80,$AE,$98,$87,$5C,$48
+; RegionFuel by RegionState 0-4: 42 36 18 0 8, with TpsOpen >= $3D: 50 36 36 18 36 [ROM:$F5DE-$F5EE] CONFIRMED (code, EMU)
+RegionFuelTbl:
+	db	$2A,$24,$12,$00,$08,$32,$24,$24
+	db	$12,$24
+; IgnCoolant vs coolant 99/131/163/195: 85/127/132/145 [ROM:$F610-$F615] CONFIRMED (code, EMU) (Ross R-I11)
+IgnWarmTbl:
+	db	$63,$60,$55,$7F,$84,$91
+; over-temperature IgnCoolant vs coolant 14/18: 17/85 [ROM:$F617-$F629] CONFIRMED (code, EMU) (Ross R-I12)
+IgnHotTbl:
+	db	$0E,$04,$11,$55
+; IgnIdleStab vs rpm dip (RpmSlow - $75) 0/16: 0/68 [ROM:$F879-$F884] CONFIRMED (code, EMU) (Ross R-I13)
+IdleStabTbl:
+	db	$00,$10,$00,$44
+; closed-throttle ignition base vs RpmIndex 48/64/80 = 1200/1600/2000 rpm: 68/98/162, held outside [ROM:$FD96-$FDA3] CONFIRMED (code, EMU) (Ross R-I07: identical values)
+IdleIgnTbl:
+	db	$30,$20,$44,$62,$A2
 ; base fuel vs Load: $F0FF below 3200 rpm, $F10B above; header [offset word, max index], 9 sites [ROM:$FA43] LIKELY (Ross R-F03/R-F06)
 DensityMaps:
 	db	$03,$A4,$08,$17,$23,$32,$41,$50
@@ -381,14 +457,14 @@ L_F344:
 	stab	PORT1
 	stab	$B4
 	ldab	#$66
-	stab	$B8
+	stab	StairFilt
 	ldab	#$2C
 	std	TpsOpen
 	ldd	#$1750
-	std	$4B
+	std	LoadLag
 	ldd	#$0380
 	std	ModeFlags
-	std	$56
+	std	FuelCap
 	stab	Coolant
 	ldab	TCSR
 	ldd	ICRH
@@ -419,7 +495,7 @@ L_F394:
 	stab	TCSR2
 	std	NEcount
 	clrb
-	stab	$B7
+	stab	InjPhase
 L_F3A2:
 	cli
 	clra
@@ -442,7 +518,7 @@ L_F3AC:
 	bcs	L_F3C4
 	adda	#$08
 L_F3C4:
-	adda	$9B
+	adda	DecelCutRpm
 	cmpa	RpmIndex
 	bcs	L_F3CC
 L_F3CA:
@@ -535,7 +611,7 @@ L_F44C:
 	jsr	L_F9D4
 	stab	RpmIndex
 	sei
-	ldaa	$B7
+	ldaa	InjPhase
 	lsra
 	ldab	#$E0
 	bcs	L_F45D
@@ -543,7 +619,7 @@ L_F44C:
 L_F45D:
 	cmpb	RpmIndex
 	rola
-	staa	$B7
+	staa	InjPhase
 	cli
 	ldx	#$F117
 	ldd	RpmWord
@@ -583,12 +659,12 @@ L_F4A1:
 	bmi	L_F4AC
 	ldx	#$F056
 	jsr	$D4,x
-	staa	$5C
+	staa	AfterStart
 L_F4AC:
 	clra
 	tab
-	staa	$54
-	staa	$6F
+	staa	StartCoolant
+	staa	SecsRun
 	std	FuelCut
 	ldd	#$8081
 	bra	L_F4BC
@@ -602,16 +678,16 @@ L_F4BE:
 L_F4C2:
 	ldd	Coolant
 	tstb
-	bne	L_F4C9
-	staa	$54
-L_F4C9:
-	ldd	#$4025
+	bne	IdlCheck
+	staa	StartCoolant
+IdlCheck:
+	ldd	#$4025		; closed-throttle branch: P16 (IDL) low for > $25 ADC ticks -> decel fuel cut above DecelCutRpm + $10, else closed-throttle idle state [ROM:$F4C9-$F51E] CONFIRMED (code, EMU) (Ross R-F25)
 	anda	PORT1
 	beq	L_F4D3
 	clra
-	staa	$67
+	staa	IdlTimer
 L_F4D3:
-	cmpb	$67
+	cmpb	IdlTimer
 	ldd	ModeFlags
 	bcc	L_F524
 	ldaa	#$23
@@ -632,7 +708,7 @@ L_F4EC:
 	bcc	L_F4F6
 	ldab	#$3C
 L_F4F6:
-	stab	$9B
+	stab	DecelCutRpm
 	ldaa	ModeFlags
 	bita	#$02
 	bne	L_F500
@@ -663,7 +739,7 @@ L_F524:
 	orab	#$04
 	stab	StateFlags
 	tsta
-	bpl	L_F550
+	bpl	RegionSelect
 	ldab	RpmIndex
 	cmpb	#$C8
 	bcc	L_F545
@@ -679,16 +755,16 @@ L_F541:
 	jsr	SchedInj
 	cli
 L_F545:
-	ldd	$4B
+	ldd	LoadLag
 	subd	#$0100
 	bcc	L_F54E
 	clra
 	clrb
 L_F54E:
-	std	$4B
-L_F550:
-	ldx	#$F0CA
-	ldaa	$62
+	std	LoadLag
+RegionSelect:
+	ldx	#$F0CA		; RegionState $62 from MapRaw and RpmIndex (tables $F0CA-$F0E1), then RegionFuel $60 from $F0E2 [ROM:$F550-$F5EE] CONFIRMED (code, EMU) (Ross R-F14)
+	ldaa	RegionState
 	bne	L_F559
 	inx
 	inx
@@ -701,7 +777,7 @@ L_F559:
 	cmpa	RpmIndex
 	bls	L_F5C5
 L_F566:
-	ldab	$62
+	ldab	RegionState
 	decb
 	beq	L_F59D
 	decb
@@ -713,7 +789,7 @@ L_F566:
 	ldab	#$03
 	cmpa	MapRaw
 	bcs	L_F5C5
-	cmpb	$62
+	cmpb	RegionState
 	bne	L_F587
 	suba	#$04
 	cmpa	MapRaw
@@ -737,7 +813,7 @@ L_F59D:
 	bsr	L_F58D
 	cmpa	MapRaw
 	bls	L_F5B2
-	ldab	$62
+	ldab	RegionState
 	cmpb	#$02
 	beq	L_F5B9
 	suba	#$04
@@ -756,7 +832,7 @@ L_F5C1:
 	bls	L_F5C5
 	ldab	#$04
 L_F5C5:
-	stab	$62
+	stab	RegionState
 	lsrb
 	lsrb
 	bcc	L_F5DE
@@ -779,11 +855,11 @@ L_F5DE:
 	bhi	L_F5E9
 	abx
 L_F5E9:
-	ldab	$62
+	ldab	RegionState
 	abx
 	ldaa	$00,x
 L_F5EE:
-	staa	$60
+	staa	RegionFuel
 	clra
 	psha
 L_F5F2:
@@ -821,7 +897,7 @@ L_F617:
 	ldaa	#$40
 	jsr	L_F132
 L_F629:
-	staa	$A9
+	staa	IgnCoolant
 	jsr	SvcIgnition
 LinkKeepAlive:
 	ldaa	LinkTimer		; every $FA counts of LinkTimer: if no peek was answered (DiagFlags bit 0 clear) switch the SCI off until the next reset [ROM:$F62E-$F641] CONFIRMED (code, EMU)
@@ -857,9 +933,9 @@ L_F662:
 	bcc	L_F675
 	orab	#$04
 	stab	PORT2
-	ldaa	$5C
+	ldaa	AfterStart
 	adda	#$0D
-	staa	$5C
+	staa	AfterStart
 	staa	$63
 	clr	>$005B
 L_F675:
@@ -868,38 +944,38 @@ L_F675:
 	bcc	L_F67E
 	ldaa	#$2A
 L_F67E:
-	ldab	$6F
+	ldab	SecsRun
 	cmpb	#$05
 	bcc	L_F686
 	adda	#$10
 L_F686:
-	staa	$9A
+	staa	DecelCutBase
 	ldx	#$F09E
 	jsr	$86,x
 	jsr	L_F9DE
-	std	$56
+	std	FuelCap
 	ldx	#$F077
 	jsr	$AD,x
-	staa	$51
+	staa	TransGainUp
 	ldx	#$F07D
 	jsr	$A7,x
-	staa	$52
+	staa	TransGainDown
 	jsr	SvcEvents
 	ldx	#$F069
 	jsr	$C1,x
-	ldab	$54
+	ldab	StartCoolant
 	beq	L_F6BA
 	cmpb	#$2D
 	bls	L_F6BC
 	ldx	DiagFlags
 	bmi	L_F6BC
-	ldab	$6F
+	ldab	SecsRun
 	cmpb	#$1E
 	bcc	L_F6BC
 L_F6BA:
 	adda	#$0D
 L_F6BC:
-	staa	$58
+	staa	WarmFuel
 	jsr	SvcIgnition
 	ldd	#$803E
 	bita	PORT1
@@ -1099,7 +1175,7 @@ SvcIgnition:
 	ldab	IgnBase
 	stab	$AB
 IgnFixedTest:
-	clra		; fixed spark sum $00AA instead of the maps when ModeFlags bit 7 = 1 (start/stall state), DiagFlags bit 7 = 0 and PORT3 bit 0 (P30) = 0 [ROM:$F7F2-$F800] CONFIRMED (code); not reached at warm idle
+	clra		; fixed spark sum $00AA instead of the maps when ModeFlags bit 7 = 1 (throttle closed or cranking), DiagFlags bit 7 = 0 and PORT3 bit 0 (P30) = 0 [ROM:$F7F2-$F800] CONFIRMED (code); so it is the closed-throttle T-terminal base timing, the factory 10 deg BTDC check [EMU:tests/test_ross17140.py] LIKELY
 	ldab	ModeFlags
 	bpl	L_F802
 	ldab	DiagFlags
@@ -1169,28 +1245,28 @@ SvcEvents:
 L_F85E:
 	brn	L_F8BF
 	tba
-	addb	$74
+	addb	RpmByte
 	rorb
-	std	$74
+	std	RpmByte
 	clra
-	subb	$B2
+	subb	RpmSlow
 	sbca	#$00
 	asld
 	asld
 	asld
-	addd	$B2
-	std	$B2
+	addd	RpmSlow
+	std	RpmSlow
 	clra
 	ldab	InjFlags
 	andb	ModeFlags
 	bpl	L_F884
-	ldab	$B2
+	ldab	RpmSlow
 	subb	$75
 	bcs	L_F884
 	ldx	#$F0F6
 	jsr	$3A,x
 L_F884:
-	staa	$AA
+	staa	IgnIdleStab
 L_F886:
 	ldaa	EvEdge2
 	beq	L_F8BB
@@ -1199,7 +1275,7 @@ L_F886:
 	ldd	#$8040
 	bitb	ModeFlags
 	beq	L_F8B1
-	ldab	$5C
+	ldab	AfterStart
 	bne	L_F8B1
 	ldab	#$2D
 	cmpb	Coolant
@@ -1215,14 +1291,14 @@ L_F886:
 	pulb
 	aba
 L_F8B1:
-	staa	$5D
+	staa	AccelFuel
 	ldd	Load
 	std	$48
 	ldab	$75
 	stab	$76
 L_F8BB:
 	ldaa	EvLoad
-	bne	L_F8DA
+	bne	GlobalFactor
 L_F8BF:
 	jmp	SvcAdc
 L_F8C2:
@@ -1241,16 +1317,16 @@ L_F8CE:
 	ldaa	#$80
 L_F8D9:
 	rts
-L_F8DA:
-	ldd	Load
+GlobalFactor:
+	ldd	Load		; global fuel factor, computed per crank group: (transient + AccelFuel + AfterStart + RegionFuel) x (1 + WarmFuel/128), capped at FuelCap, passed to FuelPulse in X (x/128) [ROM:$F8DA-$F9BF] CONFIRMED (code, EMU) (Ross R-F13)
 	asld
 	asld
 	asld
 	ldx	DiagFlags
 	bpl	L_F8E5
-	std	$4B
+	std	LoadLag
 L_F8E5:
-	subd	$4B
+	subd	LoadLag
 	std	$AB
 	bcc	L_F8EF
 	nega
@@ -1262,7 +1338,7 @@ L_F8EF:
 	bcc	L_F8F7
 	clrb
 L_F8F7:
-	stab	$4E
+	stab	LoadDelta
 	cmpb	#$14
 	ldd	$AB
 	beq	L_F90A
@@ -1278,8 +1354,8 @@ L_F908:
 	asra
 	rorb
 L_F90A:
-	addd	$4B
-	std	$4B
+	addd	LoadLag
+	std	LoadLag
 	ldx	#$F089
 	ldab	MapRaw
 	subb	CoolantCorr
@@ -1287,14 +1363,14 @@ L_F90A:
 	clrb
 L_F918:
 	jsr	$A3,x
-	ldab	$4E
+	ldab	LoadDelta
 	ldx	$AB
 	bmi	L_F92F
 	cba
 	bcc	L_F924
 	tab
 L_F924:
-	ldaa	$51
+	ldaa	TransGainUp
 	mul
 	jsr	L_F9DF
 	pshb
@@ -1302,7 +1378,7 @@ L_F924:
 	pulx
 	bra	L_F93C
 L_F92F:
-	ldaa	$52
+	ldaa	TransGainDown
 	mul
 	jsr	L_F9E0
 	nega
@@ -1316,7 +1392,7 @@ L_F93C:
 	bge	L_F944
 	ldx	#$FF80
 L_F944:
-	ldaa	$6F
+	ldaa	SecsRun
 	cmpa	#$04
 	bcs	L_F94E
 	ldaa	PORT1
@@ -1351,7 +1427,7 @@ L_F97B:
 	staa	EvLoad
 	ldab	ModeFlags
 	bpl	L_F989
-	staa	$60
+	staa	RegionFuel
 	aslb
 	bpl	L_F98D
 	bra	L_F991
@@ -1360,13 +1436,13 @@ L_F989:
 	stab	InjFlags
 L_F98D:
 	ldab	#$80
-	stab	$5D
+	stab	AccelFuel
 L_F991:
-	ldd	$5C
+	ldd	AfterStart
 	abx
 	tab
 	abx
-	ldab	$60
+	ldab	RegionFuel
 	ldaa	ModeFlags
 	bpl	L_F99E
 	ldab	#$08
@@ -1380,15 +1456,15 @@ L_F99E:
 	ldx	#$F072
 	jsr	$BA,x
 L_F9AD:
-	ldab	$58
+	ldab	WarmFuel
 	mul
 	bsr	L_F9DD
 	addd	#$0080
 	pulx
 	jsr	L_FB32
-	cpx	$56
+	cpx	FuelCap
 	bcs	L_F9BF
-	ldx	$56
+	ldx	FuelCap
 L_F9BF:
 	ldaa	ModeFlags
 	lsra
@@ -1530,16 +1606,16 @@ L_FA84:
 	bls	L_FA84
 	ldab	$02,x
 L_FA8F:
-	ldaa	$B8
+	ldaa	StairFilt
 	aba
 	rora
 	aba
 	rora
-	staa	$B8
+	staa	StairFilt
 	ldx	$AE
 	ldab	$AC
 	jsr	L_FB28
-	ldab	$B8
+	ldab	StairFilt
 	jsr	L_FB28
 	ldab	InjFlags
 	bmi	L_FAB5
@@ -1571,11 +1647,11 @@ L_FACB:
 	ldx	#$F00F
 	ldaa	StateFlags
 	bita	#$10
-	beq	L_FADD
+	beq	MixtureTerm
 	inx
 	inx
-L_FADD:
-	ldd	$00,x
+MixtureTerm:
+	ldd	$00,x		; mixture screw: only while MapRaw <= $9A and RpmIndex <= $90 (3600 rpm), re-enabled at $96/$88; pulse += (Mixture - $80) x MX2 / 32 us, MX2 from $F0BD [ROM:$FAD2-$FB15] CONFIRMED (code, EMU) (Ross R-M03/R-M04)
 	cmpa	MapRaw
 	tba
 	ldab	StateFlags
@@ -1703,13 +1779,13 @@ L_FB8D:
 	staa	PORT1
 	ldaa	PORT4
 	ldab	DiagFlags
-	bpl	L_FBA6
+	bpl	TvisOutput
 	anda	#$FC
 	oraa	#$01
 	staa	PORT4
 	bra	L_FBC8
-L_FBA6:
-	ldab	#$AA
+TvisOutput:
+	ldab	#$AA		; P41 (T-VIS VSV, LIKELY) on above RpmIndex $BA (4650 rpm), off at $AA (4250 rpm) [ROM:$FBA6-$FBB6] CONFIRMED (code, EMU) (Ross R-I10)
 	bita	#$02
 	bne	L_FBAE
 	ldab	#$BA
@@ -1720,7 +1796,7 @@ L_FBAE:
 	oraa	#$02
 L_FBB6:
 	staa	PORT4
-	ldab	$72
+	ldab	TvisTimer
 	bcs	L_FBC1
 	incb
 	ble	L_FBC6
@@ -1730,7 +1806,7 @@ L_FBC1:
 	bge	L_FBC6
 	ldab	#$F3
 L_FBC6:
-	stab	$72
+	stab	TvisTimer
 L_FBC8:
 	ldx	#$0064
 	ldaa	#$08
@@ -1986,8 +2062,8 @@ L_FD51:
 	bcs	L_FD67
 	ldab	#$18
 	mul
-	addd	$4B
-	std	$4B
+	addd	LoadLag
+	std	LoadLag
 L_FD67:
 	rts
 L_FD68:
@@ -2057,7 +2133,7 @@ L_FDC3:
 L_FDD5:
 	ldd	RpmWord
 	jsr	Lookup2D
-	ldab	$72
+	ldab	TvisTimer
 	bpl	L_FDE4
 	adda	#$0D
 	bcc	L_FDE4
@@ -2226,7 +2302,7 @@ L_FEDF:
 	stab	NEcount
 	cmpb	#$04
 	bne	L_FF14
-	ldab	$B7
+	ldab	InjPhase
 	addb	#$84
 	bcc	L_FEF7
 	bitb	#$01
@@ -2238,7 +2314,7 @@ L_FEDF:
 L_FEF5:
 	andb	#$E1
 L_FEF7:
-	stab	$B7
+	stab	InjPhase
 	bcc	L_FF14
 	ldaa	ModeFlags
 	anda	#$02
@@ -2284,7 +2360,7 @@ L_FF37:
 	sbcb	#$00
 	cba
 	bne	L_FF4E
-	ldab	$B7
+	ldab	InjPhase
 	bpl	L_FF4E
 	stab	EvLoad
 L_FF4E:
@@ -2295,7 +2371,7 @@ L_FF4E:
 L_FF55:
 	deca
 	bne	L_FF68
-	ldaa	$B7
+	ldaa	InjPhase
 	bpl	L_FF5E
 	stab	EvEdge2
 L_FF5E:

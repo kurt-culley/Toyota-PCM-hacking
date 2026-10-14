@@ -3,7 +3,7 @@
 Two checks, both through ctypes on a host build of the same C files the RP2350 firmware uses:
 - every opcode (all 256, undefined ones trap) on random registers and memory: final
   registers, flags, cycles, wait/sleep state and every memory write must match;
-- the 17140 ROM from reset for 200 000 instructions, with deterministic pseudo-random port
+- the 17140 ROM from reset for 200 000 instructions on the firmware's fast memory path, with deterministic pseudo-random port
   reads and periodic interrupt requests: the register state must match after every step.
 Plus a staleness check on the generated instruction switch.
 """
@@ -81,6 +81,7 @@ int trace(uint8_t *mem, int steps, int irq_every, uint32_t *out) {
     hd6301_t c; hd6301_init(&c, flat_rd, flat_wr, 0);
     static const uint16_t vecs[5] = {0xFFF0, 0xFFF2, 0xFFF4, 0xFFF6, 0xFFF8};
     g_mem = mem; g_io = 0;
+    c.mem = mem; c.rom_base = 0xF000; /* the firmware's fast path: only $00-$1F via callbacks */
     hd6301_reset(&c);
     for (int i = 0; i < steps; i++) {
         if (c.waiting || c.sleeping) c.sleeping = 0, c.waiting = 0;

@@ -30,9 +30,13 @@ int main(void) {
     stdio_init_all();
     for (int i = 0; i < 4096; i++) mem[0xF000 + i] = ROM17140[i];
     hd6301_t c;
-    for (;;) {
+    static const uint32_t khz[2] = {150000, 250000};
+    for (unsigned run = 0;; run++) {
+        set_sys_clock_khz(khz[run % 2], true);  // USB runs from its own PLL, so stdio survives
         sleep_ms(3000);
         hd6301_init(&c, rd, wr, 0);
+        c.mem = mem;  // fast path: only $00-$1F through rd()/wr()
+        c.rom_base = 0xF000;
         hd6301_reset(&c);
         uint64_t t0 = time_us_64();
         uint32_t n = 0;

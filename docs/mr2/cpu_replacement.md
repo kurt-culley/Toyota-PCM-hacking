@@ -50,7 +50,7 @@ The emulated chip runs **locked to real time**:
 - Core 1 executes instructions and their cycle counts, and never runs more than a few µs ahead of the real clock.
 - **Inputs:** PIO timestamps every input edge (NE, ADC end, IGF) with a 1 MHz counter, so ICR1/ICR2 hold the exact capture time, as on the real chip.
 - **Outputs:** when the program writes OCR1/OCR2, the compare is handed to PIO or a hardware alarm, which switches the IGT or injector pin at that exact µs. Spark and injection timing therefore do not depend on how fast the emulation runs, only on it keeping up.
-- **Headroom:** on a PC the C core runs the 17140 ROM about **270×** faster than the real chip [EMU: host benchmark]. The RP2350 figure comes from the bench UF2 below.
+- **Headroom:** on a PC the C core runs the 17140 ROM about **270×** faster than the real chip [EMU: host benchmark]. **On the owner's Pico 2 W at the stock 150 MHz it runs at 4.5× the real chip** (1.42 M instructions/s, E-clock equivalent 4.48 MHz) [BENCH: owner, ecu_emu_bench v1, 2026-10-14]. That is enough to keep up, with margin for the peripheral model. Two easy gains are being measured: a direct memory path for RAM/ROM, so only `$00`–`$1F` goes through callbacks (bench v2), and a higher CPU clock (250 MHz in bench v2).
 - **Open:** the D151801 showed 6801-like bus-cycle counts on the bench (STATUS). The emulator's per-instruction cycle table must match the real chip, so that the main-loop pacing is right. The differential test below settles it.
 
 ## Pins (about 22 signals)

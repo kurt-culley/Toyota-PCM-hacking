@@ -16,8 +16,21 @@
 #define D ((uint16_t)((c->a << 8) | c->b))
 #define SET_D(v) do { uint16_t _v = (v); c->a = (uint8_t)(_v >> 8); c->b = (uint8_t)_v; } while (0)
 
-#define RD(a) (c->read(c->ctx, (uint16_t)(a)))
-#define WR(a, v) (c->write(c->ctx, (uint16_t)(a), (uint8_t)(v)))
+static inline uint8_t rd(hd6301_t *c, uint16_t a) {
+    if (c->mem && a >= 0x20) return c->mem[a];
+    return c->read(c->ctx, a);
+}
+
+static inline void wr(hd6301_t *c, uint16_t a, uint8_t v) {
+    if (c->mem && a >= 0x20) {
+        if (a < c->rom_base) c->mem[a] = v;
+        return;
+    }
+    c->write(c->ctx, a, v);
+}
+
+#define RD(a) rd(c, (uint16_t)(a))
+#define WR(a, v) wr(c, (uint16_t)(a), (uint8_t)(v))
 #define RD16(a) ((uint16_t)((RD(a) << 8) | RD((uint16_t)((a) + 1))))
 #define WR16(a, v) do { uint16_t _a = (a), _w = (v); WR(_a, _w >> 8); WR((uint16_t)(_a + 1), _w); } while (0)
 #define FETCH() (RD(c->pc++))

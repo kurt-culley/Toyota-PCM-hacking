@@ -32,6 +32,11 @@ typedef struct {
     hd6301_read_fn read;
     hd6301_write_fn write;
     void *ctx;
+    // Optional fast path: if set, addresses >= $20 are read straight from mem[], and writes
+    // below rom_base go straight to mem[] (writes at or above rom_base are dropped). Only the
+    // I/O registers $00-$1F go through the callbacks. NULL: every access uses the callbacks.
+    uint8_t *mem;
+    uint16_t rom_base;
 } hd6301_t;
 
 void hd6301_init(hd6301_t *c, hd6301_read_fn rd, hd6301_write_fn wr, void *ctx);

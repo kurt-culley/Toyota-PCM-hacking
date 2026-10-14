@@ -49,8 +49,11 @@ def draw() -> Image.Image:
     img = Image.new("RGB", (W, H), BG)
     d = ImageDraw.Draw(img)
     d.text((40, 24), "ECU bench setup (draft): spare 17140 ECU with a simulated engine", font=font(34, True), fill=INK)
-    d.text((40, 70), "Stage 0: the real D151801 in its socket.   Stage 1: the D151801 out, the emulator Pico 2 W plugged in "
-           "through a ribbon.   Every powered step needs the owner's OK.", font=font(19), fill=INK)  # fmt: skip
+    sub = (
+        "Stage 0: the real D151801 in its socket.   Stage 1: the D151801 out, the emulator Pico 2 W plugged in "
+        "through a ribbon.   Every powered step needs the owner's OK."
+    )
+    d.text((40, 70), sub, font=font(19), fill=INK)
 
     # 12 V supply
     box(
@@ -77,7 +80,7 @@ def draw() -> Image.Image:
     d.text((ex0 + 18, ey0 + 72), "igniter and injector drivers: all unchanged", font=font(18), fill=INK)
     # edge connector (left side of the ECU)
     d.rectangle((ex0 - 30, ey0 + 110, ex0 + 10, ey1 - 40), fill=(60, 60, 60))
-    d.text((ex0 - 26, ey1 - 34), "edge connector", font=font(16), fill=INK)
+    d.text((ex0 + 50, ey1 - 34), "edge connector", font=font(16), fill=INK)
     # CPU socket
     sx0, sy0 = 1010, 470
     d.rectangle((sx0, sy0, sx0 + 230, sy0 + 330), fill=(40, 40, 40), outline=INK, width=3)
@@ -93,7 +96,8 @@ def draw() -> Image.Image:
 
     # engine Pico breadboard (left)
     box(d, (40, 470, 430, 900), (230, 240, 255), "Engine Pico", [
-        "old Pico WH (RP2040, 3.3 V only)", "", "makes NE every 30 deg, G every 180", "echoes IGF 20 us after each spark",
+        "old Pico WH (RP2040, 3.3 V only)", "", "makes NE every 30 deg, G every 180",
+        "echoes IGF 20 us after each spark",
         "timestamps IGT and injector edges", "", "interface parts on the breadboard:", "  series resistors on NE, G",
         "  NPN transistor on IGF", "  dividers + 3.3 V Zeners on", "  IGT, #10, #20",
     ])  # fmt: skip
@@ -134,8 +138,8 @@ def draw() -> Image.Image:
     # ribbon emulator -> socket
     for k in range(5):
         d.line([(1440, 600 + 12 * k), (1300, 600 + 12 * k), (1252, 560 + 12 * k)], fill=C["ribbon"], width=4)
-    d.text((1300, 668), "40-way ribbon", font=font(17, True), fill=(90, 90, 90))
-    d.text((1300, 690), "+ DIP-40 plug", font=font(17, True), fill=(90, 90, 90))
+    d.text((1290, 690), "40-way ribbon", font=font(16, True), fill=(90, 90, 90))
+    d.text((1290, 710), "+ DIP-40 plug", font=font(16, True), fill=(90, 90, 90))
     # USB
     wire(d, [(1600, 300), (1600, 430)], C["usb"], "USB", dy=-10)
     wire(d, [(1700, 300), (1700, 330), (235, 330), (235, 470)], C["usb"], "USB", at=1, dy=-26)

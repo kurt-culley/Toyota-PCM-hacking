@@ -269,8 +269,8 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
     - `pcmre.symlisting` now warns about labels inside an instruction (`IgnFixedTest` moved to `$F7F2`, test added);
     - rpm figures marked as resting on E = 1 MHz and 30°/edge;
     - nits: StartCount, `$FA27`, the P23 description, the instruction count, P32 → LIKELY, overrun and keep-alive wording, the map footer, the 4A-GZE alternative, citation ranges, stronger missing-IGF and slow-climb tests.
-  - **Re-check of the fixes:** pending.
-- [ ] Bench and car anchors: Load at key-on, engine off, over the serial link (kPa scale); what ADC ch7 measures; timing-light readings with T open at idle and at a steady 2500–3000 rpm; PORT3 over the link (Q10).
+  - **Re-check of the fixes (same independent agent, 2026-10-14): PASS.** Its cosmetic follow-ups are applied (citation `$FDC9-$FDD5`, evidence tag on the `ModeFlags` bit 7 statement, a car check of the P30 polarity).
+- [ ] Bench and car anchors: Load at key-on, engine off, over the serial link (kPa scale); what ADC ch7 measures; timing-light readings with T open at idle and at a steady 2500–3000 rpm; PORT3 over the link (Q10), and with T–E1 shorted confirm P3-0 reads 0 (P30 polarity).
 - [x] Pico 2 W serial-link logger ([`../hardware/peek-logger/firmware/`](../hardware/peek-logger/firmware/)) and host decoder (`pcmre.peeklog`): the firmware's link logic runs against the simulated ECU [EMU:tests/test_peek_logger.py]; the UF2 builds warning-free. Not yet run on hardware; not Verifier-reviewed.
 - [ ] Logger on the spare ECU on the bench (after Q11; owner confirmation), then the Wi-Fi dashboard.
 

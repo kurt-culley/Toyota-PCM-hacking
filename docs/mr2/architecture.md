@@ -105,7 +105,7 @@ The structure matches the Bluetop's design: crank interrupts set event flags, an
 | Behaviour | Selected by | Evidence |
 |---|---|---|
 | Serial diagnostic link ([`serial_link.md`](serial_link.md)) | P23 low at reset, then a request at least once a second | [ROM:$F33B, $F403, $F62E] [EMU] CONFIRMED |
-| Ignition map A or B, and the rpm fuel correction `$F117` | P34 (jumper J8) | [ROM:$FDCF, $FAC2] [EMU] CONFIRMED |
+| Ignition map A or B, and the rpm fuel correction `$F117` | P34 (jumper J8) | [ROM:$FDC9-$FDD5, $FAC2] [EMU] CONFIRMED |
 | Fixed spark sum `$00AA` | **P30 = 0**, with `ModeFlags` bit 7 set (a start/stall state, not warm idle) and `DiagFlags` bit 7 clear | [ROM:$F7F2-$F800] CONFIRMED (code); whether this is the T-terminal base timing is doubtful (STATUS conflicts log) |
 | Fault-code flasher pattern on pin 12 (P24) | P30 = 0 builds the pattern from the stored faults; P30 = 1 clears it and `DiagFlags` | [ROM:$F769-$F7E9] CONFIRMED (code) |
 | Spark skipped altogether | P30 = 1 and `$A4` bit 7 (a current fault) | [ROM:$FF7C-$FF83] CONFIRMED (code); meaning GUESS |

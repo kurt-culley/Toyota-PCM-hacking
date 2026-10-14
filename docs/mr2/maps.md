@@ -63,7 +63,7 @@ Rows run from light load (row 0) to heavy load. Values are raw. **Larger means m
 
 **Other ignition paths** (the base value `$A8` is not always the map):
 - With `ModeFlags` bit 7 set, the base comes from a 1-D rpm table `$F0FA` instead of the maps [ROM:$FD96-$FDA3].
-- With PORT3 bit 0 = **0**, `ModeFlags` bit 7 set and `DiagFlags` bit 7 clear, the spark sum is a fixed `$00AA` [ROM:$F7F2-$F800]. `ModeFlags` bit 7 is set only at low rpm (cranking, stall), so this is not reached at a warm idle; see the absolute-advance row below.
+- With PORT3 bit 0 = **0**, `ModeFlags` bit 7 set and `DiagFlags` bit 7 clear, the spark sum is a fixed `$00AA` [ROM:$F7F2-$F800]. `ModeFlags` bit 7 is set only at low rpm (cranking, stall; the threshold also depends on a start counter `$67` and on P37) [ROM:$F4C9-$F506] [EMU] LIKELY, so this is not reached at a warm idle; see the absolute-advance row below.
 - +13 is added when `$72` bit 7 is set [ROM:$FDDA].
 - `SvcIgnition` sums `$A8` + `$A9` + `$AA` + `$AB`, with `$AB` a copy of `$A8`, so **the map value counts twice** in the advance. This matters when calibrating degrees per count [ROM:$F7F0, $F806].
 

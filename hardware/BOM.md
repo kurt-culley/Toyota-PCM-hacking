@@ -39,10 +39,10 @@ Designed after P4. Expected to need only resistors, clamps (TVS/Zener) and a fus
 
 | Item | Indicative part | Why |
 |---|---|---|
-| Prototype | needs about 35 pins, more than the Pico 2 W's 23: a larger RP2350B board (e.g. Olimex RP2350-PICO2-BB48R, ~£12) or shift registers, decided at P7 (RE_PLAN §6b); plus an HCT buffer if some ECU inputs need 5 V CMOS levels | Proves the RP2350 route on the bench |
-| Final board | RP2350B + wireless module, 12 V → 5 V supply, TVS, polyfuse; factory-assembled (KiCad, JLCPCB PCBA) | In-car use |
+| Prototype | the Pico 2 W (A1): 26 pins after the port audit (RE_PLAN §6b); a few Schottky diodes and resistors | Proves the route on the bench |
+| Final board | a factory-assembled carrier for the Pico 2 W: DIP-40 plug, CPU socket, diodes, resistors; powered from the ECU's 5 V (KiCad, JLCPCB PCBA) | In-car use |
 | ECU interface | the DIP-40 socket (A6) + 2×20 machined-pin plug | Physical connection |
-| Fallback | ATF1508ASL CPLD + AS6C62256 SRAM | Only if the RP2350 route fails the port audit |
+| Fallback | a larger RP2350B board, then ATF1508ASL CPLD + AS6C62256 SRAM | Only if the bench shows the Pico 2 W cannot meet the pin budget or bus timing |
 
 ---
 

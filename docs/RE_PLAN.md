@@ -50,7 +50,7 @@ If the hypothesis holds, the ECU never "knows" the IACV and CSI are gone. It is 
 
 ## 1. Ground rules
 
-- **FUNDAMENTAL: RP2350-first, minimal purchases.** Every hardware task is designed around one RP2350 board (§6), the **Raspberry Pi Pico 2 W** with headers (RP2350A + Wi-Fi/BLE): 23 5 V-tolerant GPIOs (GP0–22), 3 ADC inputs (GP26–28), PIO state machines for exact bus and edge timing. One board, reflashed per job: ROM reader, serial-link logger and Wi-Fi dashboard, real-CPU harness, bench stimulus and timing meter. A larger RP2350B board is decided at P7 only if the in-car prototype needs more pins (§6b).
+- **FUNDAMENTAL: RP2350-first, minimal purchases.** Every hardware task is designed around one RP2350 board (§6), the **Raspberry Pi Pico 2 W** with headers (RP2350A + Wi-Fi/BLE): 23 5 V-tolerant GPIOs (GP0–22), 3 ADC inputs (GP26–28), PIO state machines for exact bus and edge timing. One board, reflashed per job: ROM reader, serial-link logger and Wi-Fi dashboard, real-CPU harness, bench stimulus and timing meter. The in-car modified-ROM board (P7) is a Pico 2 W too, on a factory-made carrier (§6b).
 
   Anything else is bought only when the Pico 2 W cannot do the job, and the reason is written in [`../hardware/BOM.md`](../hardware/BOM.md). Interfacing rules:
   1. **5 V logic connects directly** to the 5 V-tolerant GPIOs (GP0–22 on the Pico 2 W), **but only while the board is powered**: the 5 V side is always powered up last and down first.
@@ -225,7 +225,7 @@ flowchart LR
 ### P7: Modified ROM and TunerStudio (goal 3)
 
 1. Do a **port-usage audit** of the MR2 ROM: which port bits are read and written, and what each one means.
-2. **Prototype on an RP2350 board** (§6b; pin budget below): the D151801 runs in an expanded mode with its program served from RP2350 RAM. The board emulates the port registers that become external (`$04`–`$07`, `$0F`, including the IS3/IGF flag) and drives the ECU's lost port 3/4 lines. Outputs that need 5 V CMOS levels get an HCT buffer.
+2. **Prototype on the Pico 2 W** (§6b; pin budget there): the D151801 runs in an expanded mode with its program served from RP2350 RAM. The board emulates the port registers that become external (`$04`–`$07`, `$0F`, including the IS3/IGF flag) and drives the ECU's lost port 3/4 lines. Outputs that need 5 V CMOS levels get an HCT buffer.
 3. Run an infinite-loop test from external memory, and check the bus for contention with the firmware's own bus monitor.
 4. Run the **stock image** in expanded mode and compare it on the bench with the stock reference, the car's own ECU. The 17140's reset accepts mode 2 [ROM:$F2BE-$F2C8], so it needs no mode-test patch (the Bluetop does: `CPUModeTst` feeds the watchdog only in mode 7 [ROM:Bluetop `$FC6E`]).
 5. Make calibration-only edits, handling the ROM checksum (word sum `$AA55` balanced at `$FFEE` on the Bluetop, `pcmre.checksum`; find the MR2 equivalent) and the watchdog.
@@ -234,7 +234,7 @@ flowchart LR
    - Live variables come from the ROM's own serial RAM-peek link ([`mr2/serial_link.md`](mr2/serial_link.md)).
    - Map edits go straight into the RP2350's RAM image; "Burn" saves to its flash.
    - If TunerStudio fails, fall back to TunerPro RT (offline XDF).
-7. Port the prototype to a **factory-assembled** in-car board (RP2350B + wireless module + automotive power). The CPLD + SRAM design is the fallback if the port audit rules out the RP2350 route.
+7. Put the prototype on a **factory-assembled** carrier: the Pico 2 W module, the DIP-40 plug and CPU socket, the few resistors and diodes. The CPLD + SRAM design is the fallback if the port audit rules out the RP2350 route.
 8. Never run the engine until the bench outputs match the stock ECU.
 
 ### P8: Bench rig and validation (designed after P4)
@@ -279,7 +279,7 @@ Alternatives considered: ESP32 family (3.3 V only, no PIO), STM32 (no PIO, no wi
 | P4 | **Real-CPU harness**: the D151801 on the breadboard in mode 7 running its own ROM, with NE/G, the ADC-end edge, switch inputs and IGF driven, IGT/injector/ADC-select captured, and the serial link read | about 16 | resistors |
 | P4/P8 | **Sensor characterisation**: ADC plus known resistors gives the THW/THA NTC and PIM/VTA transfer | 1–3 | divider resistors |
 | P8 | **Bench stimulus and timing meter**: NE/G from PIO, IGT and injector edge capture, resistors or PWM + RC for the analogue inputs | about 8 | resistors, dividers, clamps |
-| P7 | **Prototype in-car board**: serves the modified image, emulates the lost ports | about 35 | **exceeds 23**: decided at P7 (§6b) |
+| P7 | **In-car board**: serves the modified image, emulates the lost ports, links to TunerStudio | 26 (all usable GPIOs) | diodes, resistors; see §6b |
 
 ### 6a. RP2350 ROM reader (P3)
 
@@ -330,24 +330,36 @@ sequenceDiagram
 
 The parts list is in [`../hardware/BOM.md`](../hardware/BOM.md).
 
-### 6b. In-car modified-ROM board (P7): prototype first, buy nothing yet
+### 6b. In-car modified-ROM board (P7): the Pico 2 W, prototype first, buy nothing yet
 
 ```mermaid
 flowchart LR
-  ECU[ECU DIP-40 socket] <-->|ports 1/2, power, crystal pass through| MCU[D151801<br/>expanded mode]
-  MCU <-->|bus at E = 1 MHz| RP[RP2350B<br/>program image in RAM<br/>emulated port registers]
+  ECU[ECU DIP-40 socket] <-->|ports 1/2, power, crystal pass through| MCU[D151801<br/>mode 2: program external]
+  MCU <-->|bus at E = 1 MHz| RP[Pico 2 W<br/>program image in RAM<br/>emulated port registers]
   RP <-->|lost port 3/4 + IGF lines| ECU
   RP <-->|USB / Wi-Fi| LINK[Laptop TunerStudio]
+  ECU -->|ECU 5 V to VSYS| RP
 ```
 
-- The RP2350 serves the modified image from RAM at the ECU's own bus speed, emulates the port registers that become external in expanded mode, and recreates the lost port 3/4 and IGF lines on the ECU side.
-- Live tuning edits the RAM image directly; there is no cycle stealing and no dual-port SRAM.
-- **Pin budget:** the bus (AD0–7, A8–15, AS, E, R/W = 19) plus the lost port 3/4 and IGF lines plus RES is about 35 pins, more than the Pico 2 W's 23. At P7, after the port audit, choose one of:
-  - a larger RP2350B board for the prototype (for example the Olimex RP2350-PICO2-BB48R, about £12; the reader firmware already has a build for it);
-  - straight to the factory-assembled RP2350B board;
-  - the Pico 2 W with shift registers for the slow, non-timing-critical port lines.
-- **Speed:** at the ECU's E = 1 MHz the reader's core-answered bus is too slow (it needed E = 125 kHz). The P7 bus server must be PIO + DMA only, whichever board is used.
-- The final board is factory-assembled. The CPLD + SRAM design stays the fallback.
+- **How it works:** the D151801 runs in mode 2, which the 17140's reset accepts unpatched [ROM:$F2BE-$F2C8], so every program fetch goes out on the bus. The Pico 2 W answers from the image in its RAM, emulates the port registers that become external (`$04`–`$07`, `$0F`, including the IS3/IGF flag), and recreates the lost port 3/4 lines on the ECU side. Live tuning edits the RAM image directly.
+- **Power:** from the ECU's own 5 V into the Pico's VSYS (through a Schottky diode); no separate supply.
+- **Bus speed:** at E = 1 MHz the reader's core-answered bus is too slow (it needed E = 125 kHz). The bus is served by **PIO + DMA only**: PIO captures the address, DMA uses it to index the image and hands the byte back to PIO, with no CPU in the loop. Register accesses (address bit 15 = 0) index a small shadow page that a core keeps up to date; writes and flag-clearing reads go to that core through a FIFO. Wi-Fi and TunerStudio run on core 0.
+- **Pin budget** (from the port audit in [`mr2/architecture.md`](mr2/architecture.md)):
+
+  | Group | Lines | Pins |
+  |---|---|---|
+  | Bus | AD0–AD7, A8–A11 (a 4 KB image), A15 (image or register), AS, E, R/W | 16 |
+  | Lost inputs | P30 (T), P33 (speed), P35 (G), P37, IS3 (IGF) | 5 |
+  | Lost outputs | P31, P40, P41 | 3 |
+  | Control | RES (open-drain), mode gate (holds P20/P22 low through reset for mode 2) | 2 |
+  | **Firmware settings, no wire** | P34 (jumper J8: map select), P42/P43 (advance trim), P36 (test strap) | 0 |
+  | Unused | P32, P44–P47 | 0 |
+  | **Total** | | **26** |
+
+  The Pico 2 W has 26 usable GPIOs: GP0–22 (5 V tolerant) and GP26–28 (not 5 V tolerant). The three non-tolerant pins take lines whose ECU side never rises above 3.3 V, checked on the bench. If a pin is short, three savings exist: drop A15 if the ROM never reads `$F004`–`$F007`/`$F00F` (then registers are told apart by address alone); time the address from E instead of AS; or make T a TunerStudio switch.
+- **Side benefit:** J8 and the trim jumpers become TunerStudio settings: map A or B and the advance trim can be switched from the laptop.
+- **Risks to settle on the bench first:** the PIO + DMA turnaround inside one 1 µs bus cycle; the mode gate's timing at reset; the Pico's pins seeing ECU 5 V while its own 3.3 V rail is still rising (series resistors where needed).
+- **Fallbacks:** a larger RP2350B board if the bench shows the pin budget or timing does not fit; the CPLD + SRAM design after that.
 - **Nothing in 6b is ordered** until the P4 port audit is done and a design review has frozen the pin budget.
 
 ## 7. Glossary seed

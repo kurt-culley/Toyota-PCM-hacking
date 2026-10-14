@@ -6,7 +6,7 @@ The Lead agent updates this file at the end of every session. The plan is in [`R
 - **P3 is done and signed off**: the 17140 ROM is dumped (4 KB, SHA-256 `0cfc1fdd…6f271f6e`).
 - **P4 steps 1–3 first pass** are done: labelled source, channel map, ignition and fuel maps, simulator units.
 - **Code sweep:** there is no hidden code, but the 17140 has a **serial diagnostic link** ([`mr2/serial_link.md`](mr2/serial_link.md)). It is a read-only live-data port that can answer Q10 and the kPa-scale doubt in the car.
-- **Hardware (owner decision, 2026-10-14):** the Pico 2 W is the only project board through P8; the Olimex BB48R is no longer bought. A larger RP2350B board is decided at P7 only if the prototype's pin budget needs it (RE_PLAN §6b).
+- **Hardware (owner decision, 2026-10-14):** the Pico 2 W is the only project board, including the in-car modified-ROM board (P7). The port audit [`mr2/architecture.md`](mr2/architecture.md) puts P7 at 26 pins, exactly the Pico 2 W's usable GPIOs, with J8 and the trim jumpers as firmware settings (RE_PLAN §6b). A larger board is a fallback only if the bench disproves it.
 - **Next:**
   - owner: trace chip pins 11/12 (Q11) and the PORT4 jumpers (Q12), both unpowered;
   - agents: Verifier review of P4 steps 1–3, then the Ross Tier-B pass.

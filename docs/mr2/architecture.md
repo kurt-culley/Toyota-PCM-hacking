@@ -51,6 +51,25 @@ The structure matches the Bluetop's design: crank interrupts set event flags, an
 | PORT4 bits 0–1, 2–3 | outputs bits 0–1 (set from an rpm compare); inputs bits 2–3 select an offset table at $F01A | [ROM:$FB9E-$FBB6, $FDE6-$FDF8] | GUESS |
 | SCI | RAM-peek diagnostic link only (not the ADC): 7812.5 baud, read-only, `$00`–`$FF`, off after about 1 s without a request ([`serial_link.md`](serial_link.md)) | [ROM:$F403-$F41E, $F62E-$F641] [EMU:tests/test_peek17140.py] | CONFIRMED |
 
+### Port 3 / Port 4 audit (P7 step 1)
+
+In expanded mode 2 these pins become the address/data bus, so whatever the ROM uses them for must be recreated by the P7 board. Direction registers: **DDR3 = `$02`** (only P31 is an output), **DDR4 = `$03`** (P40, P41 outputs), written at reset and every main-loop pass; P3CSR = `$02` (IS3 latch off) [ROM:$F2CD-$F2D1, $F37C-$F381].
+
+| Pin | Use in the ROM | Evidence | Meaning |
+|---|---|---|---|
+| P30 | input: fixed spark sum, flasher pattern, self-test, spark-skip; all act on 0 | [ROM:$F2F0, $F771, $F7FA, $FF7C] | test terminal T, active low, LIKELY |
+| P31 | **output**: on for a time after start-up (`$71` < `$15`), and with `ModeFlags` bit 1 above an rpm threshold with hysteresis (read back from its own pin) | [ROM:$F3A4-$F3CD] | fuel-pump control (`FC`), GUESS |
+| P32 | not used | [ROM: DDR3, every PORT3 read] | — |
+| P33 | input: edges counted into `$B5` (speed-like) | [ROM:$FBD0-$FBE3] | vehicle-speed sensor (`SPD`), GUESS |
+| P34 | input: map select, fuel correction | [ROM:$FAC2, $FDCC] | jumper J8, CONFIRMED (bench) |
+| P35 | input: G | [ROM:$FEC8-$FED3] | G, LIKELY |
+| P36 | input: reset only (self-test gate) | [ROM:$F2F0-$F2F6] | a test strap, GUESS |
+| P37 | input: caps the start-rpm threshold | [ROM:$F4EC-$F4F4] | unknown, GUESS |
+| P40, P41 | **outputs** from an rpm compare | [ROM:$FB98-$FBB6] | T-VIS VSV (`STH`) and one more, GUESS |
+| P42, P43 | inputs: advance trim | [ROM:$FDE7-$FDF8] | trim jumpers (Q12), LIKELY |
+| P44–P47 | not used | [ROM: DDR4, every PORT4 read] | — |
+| IS3 (IGF) | P3CSR flag: the missing-IGF counter | [ROM:$FE57-$FE5A] | IGF, CONFIRMED (code) |
+
 ## Interrupts
 
 **IRQ_ICF `$FEB4`, the crank (NE on input capture 2):**

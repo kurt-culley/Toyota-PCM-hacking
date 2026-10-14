@@ -6,7 +6,7 @@ The Lead agent updates this file at the end of every session. The plan is in [`R
 - **P3 is done and signed off**: the 17140 ROM is dumped (4 KB, SHA-256 `0cfc1fdd…6f271f6e`).
 - **P4 steps 1–3 first pass** are done: labelled source, channel map, ignition and fuel maps, simulator units.
 - **Code sweep:** there is no hidden code, but the 17140 has a **serial diagnostic link** ([`mr2/serial_link.md`](mr2/serial_link.md)). It is a read-only live-data port that can answer Q10 and the kPa-scale doubt in the car.
-- **Hardware (owner decision, 2026-10-14):** the Pico 2 W is the only project board, including the in-car modified-ROM board (P7). The port audit [`mr2/architecture.md`](mr2/architecture.md) puts P7 at 26 pins, exactly the Pico 2 W's usable GPIOs, with J8 and the trim jumpers as firmware settings (RE_PLAN §6b). A larger board is a fallback only if the bench disproves it.
+- **Hardware (owner decision, 2026-10-14):** the Pico 2 W is the only project board, including the in-car modified-ROM board (P7). P7 is a **"middle-man" board** (owner preference): the CPU runs from a dual-port SRAM at full speed, and the Pico 2 W loads and edits it and keeps the port shadows, using 24 of its 26 pins (RE_PLAN §6b; port audit in [`mr2/architecture.md`](mr2/architecture.md)). J8 and the trim jumpers become TunerStudio settings. Open: how much address decode mode 2 needs (internal reads on the bus?) and the IGF-flag ROM patch.
 - **Next:**
   - owner: trace chip pins 11/12 (Q11) and the PORT4 jumpers (Q12), both unpowered;
   - agents: Verifier review of P4 steps 1–3, then the Ross Tier-B pass.

@@ -39,10 +39,10 @@ Designed after P4. Expected to need only resistors, clamps (TVS/Zener) and a fus
 
 | Item | Indicative part | Why |
 |---|---|---|
-| Prototype | the Pico 2 W (A1): 26 pins after the port audit (RE_PLAN §6b); a few Schottky diodes and resistors | Proves the route on the bench |
-| Final board | a factory-assembled carrier for the Pico 2 W: DIP-40 plug, CPU socket, diodes, resistors; powered from the ECU's 5 V (KiCad, JLCPCB PCBA) | In-car use |
+| Prototype | the Pico 2 W (A1) + dual-port SRAM (e.g. IDT7005, 8K × 8, PLCC-68, with a socket adapter), 74HC573, 2× 74HCT595, 1–3 glue chips, Schottky diodes, resistors (RE_PLAN §6b) | The CPU runs from SRAM at full speed; the Pico loads and edits it |
+| Final board | a factory-assembled carrier: the Pico 2 W, the SRAM and glue, DIP-40 plug, CPU socket; powered from the ECU's 5 V (KiCad, JLCPCB PCBA) | In-car use |
 | ECU interface | the DIP-40 socket (A6) + 2×20 machined-pin plug | Physical connection |
-| Fallback | a larger RP2350B board, then ATF1508ASL CPLD + AS6C62256 SRAM | Only if the bench shows the Pico 2 W cannot meet the pin budget or bus timing |
+| Fallback | the Pico 2 W serving the bus directly (PIO + DMA), or a CPLD for glue and ports | Only if the bench shows the dual-port design cannot work |
 
 ---
 

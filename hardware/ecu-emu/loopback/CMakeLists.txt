@@ -17,7 +17,7 @@ file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/rom17140.h "static const unsigned char RO
 add_executable(ecu_emu_loopback main.c ../core/hd6301.c ../core/d151801.c ../core/board.c)
 target_include_directories(ecu_emu_loopback PRIVATE ../core ${CMAKE_CURRENT_BINARY_DIR})
 target_compile_options(ecu_emu_loopback PRIVATE -O2 -Wall -Wextra -Werror)
-target_link_libraries(ecu_emu_loopback pico_stdlib pico_multicore)
+target_link_libraries(ecu_emu_loopback pico_stdlib pico_multicore hardware_timer)
 pico_set_binary_type(ecu_emu_loopback copy_to_ram)
 pico_enable_stdio_usb(ecu_emu_loopback 1)
 pico_enable_stdio_uart(ecu_emu_loopback 0)

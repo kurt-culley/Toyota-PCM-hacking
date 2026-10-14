@@ -15,6 +15,7 @@
 typedef struct {
     uint8_t tcsr, armed, pin_in, pin_out;
     uint16_t ocr, icr;
+    int64_t next_match;  // absolute time of this channel's next compare match (cached)
 } d_channel_t;
 
 // Output pin change: port 1..4, bit 0..7, level 0/1, time.
@@ -38,6 +39,7 @@ typedef struct {
     d_output_fn on_output;
     d_tx_fn on_tx;
     void *ctx;
+    uint8_t oc_dirty;  // set when an output-compare prediction may have changed (see d_next_match)
 } d151801_t;
 
 void d_init(d151801_t *d);
@@ -58,5 +60,9 @@ uint16_t d_irq_vector(const d151801_t *d);
 // SCI line side: the transmitted byte has left (TDRE set again); a byte arrives in RDR.
 void d_sci_tx_done(d151801_t *d);
 void d_sci_rx(d151801_t *d, uint8_t byte);
+// Prediction for the real-time firmware: when channel ch (1 = timer 1 / P21, 2 = timer 2 / P11)
+// will next match, and the level its pin will then take (OLVL). Valid until oc_dirty is set
+// again (an OCR, FRC or TCSR write, or a match), which the caller clears after re-reading.
+void d_next_match(const d151801_t *d, int ch, int64_t *t, int *level);
 
 #endif

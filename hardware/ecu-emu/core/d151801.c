@@ -29,7 +29,19 @@ static uint8_t ch_pending(const d_channel_t *ch) {
 
 uint16_t d_frc(const d151801_t *d) { return (uint16_t)(d->now + d->frc_offset); }
 
-static void set_frc(d151801_t *d, uint16_t value) { d->frc_offset = (uint16_t)(value - (uint16_t)d->now); }
+// Next match of a channel from now: when the counter next equals OCR. A match at this very
+// count is not counted (it already happened or was just written), as in periph._next_compare.
+static void recalc_match(d151801_t *d, d_channel_t *ch) {
+    uint16_t dist = (uint16_t)(ch->ocr - d_frc(d));
+    ch->next_match = d->now + (dist ? dist : 0x10000);
+    d->oc_dirty = 1;
+}
+
+static void set_frc(d151801_t *d, uint16_t value) {
+    d->frc_offset = (uint16_t)(value - (uint16_t)d->now);
+    recalc_match(d, &d->t1);
+    recalc_match(d, &d->t2);
+}
 
 uint8_t d_port_out(const d151801_t *d, int i) {
     unsigned v = (unsigned)(d->latch[i] & d->ddr[i]) | (d->pins[i] & ~d->ddr[i] & 0xFF);
@@ -60,6 +72,8 @@ void d_init(d151801_t *d) {
     for (int i = 0; i < 4; i++) d->pins[i] = 0xFF;  // external pins default high
     d->trcsr = TDRE;
     for (int i = 0; i < 4; i++) d->last_out[i] = d_port_out(d, i);
+    recalc_match(d, &d->t1);
+    recalc_match(d, &d->t2);
 }
 
 static uint16_t read_icr(d_channel_t *ch) {
@@ -115,12 +129,13 @@ uint8_t d_read(d151801_t *d, uint16_t a) {
     }
 }
 
-static void write_ocr(d_channel_t *ch, int hi, uint8_t v) {
+static void write_ocr(d151801_t *d, d_channel_t *ch, int hi, uint8_t v) {
     ch->ocr = hi ? (uint16_t)((v << 8) | (ch->ocr & 0xFF)) : (uint16_t)((ch->ocr & 0xFF00) | v);
     if (ch->armed & OCF) {
         ch->tcsr &= (uint8_t)~OCF;
         ch->armed &= (uint8_t)~OCF;
     }
+    recalc_match(d, ch);
 }
 
 void d_write(d151801_t *d, uint16_t a, uint8_t v) {
@@ -133,13 +148,13 @@ void d_write(d151801_t *d, uint16_t a, uint8_t v) {
     case PORT2: d->latch[1] = v; outputs_changed(d); break;
     case PORT3: d->latch[2] = v; outputs_changed(d); break;
     case PORT4: d->latch[3] = v; outputs_changed(d); break;
-    case TCSR1: ch_write_tcsr(&d->t1, v); break;
+    case TCSR1: ch_write_tcsr(&d->t1, v); d->oc_dirty = 1; break;
     case FRC_H: d->frc_hi_written = v; set_frc(d, 0xFFF8); break;
     case FRC_L: set_frc(d, (uint16_t)((d->frc_hi_written << 8) | v)); break;
-    case OCR1_H: write_ocr(&d->t1, 1, v); break;
-    case OCR1_L: write_ocr(&d->t1, 0, v); break;
-    case OCR2_H: write_ocr(&d->t2, 1, v); break;
-    case OCR2_L: write_ocr(&d->t2, 0, v); break;
+    case OCR1_H: write_ocr(d, &d->t1, 1, v); break;
+    case OCR1_L: write_ocr(d, &d->t1, 0, v); break;
+    case OCR2_H: write_ocr(d, &d->t2, 1, v); break;
+    case OCR2_L: write_ocr(d, &d->t2, 0, v); break;
     case P3CSR: d->p3csr = (uint8_t)((d->p3csr & IS3F) | (v & 0x7F)); break;
     case RMCR: d->rmcr = v; break;
     case TRCSR: d->trcsr = (uint8_t)((d->trcsr & (RDRF | ORFE | TDRE)) | (v & 0x1F)); break;
@@ -149,21 +164,14 @@ void d_write(d151801_t *d, uint16_t a, uint8_t v) {
             if (d->on_tx) d->on_tx(d->ctx, v, d->now);
         }
         break;
-    case TCSR2: ch_write_tcsr(&d->t2, v); break;
+    case TCSR2: ch_write_tcsr(&d->t2, v); d->oc_dirty = 1; break;
     default: d->regs[a & 0x1F] = v; break;
     }
 }
 
 static int64_t next_compare(const d151801_t *d, int64_t end) {
-    int64_t best = -1;
-    const d_channel_t *chs[2] = {&d->t1, &d->t2};
-    for (int k = 0; k < 2; k++) {
-        uint16_t dist = (uint16_t)(chs[k]->ocr - d_frc(d));
-        if (dist == 0) continue;  // already matched at this count
-        int64_t t = d->now + dist;
-        if (t <= end && (best < 0 || t < best)) best = t;
-    }
-    return best;
+    int64_t t = d->t1.next_match < d->t2.next_match ? d->t1.next_match : d->t2.next_match;
+    return t <= end ? t : -1;
 }
 
 static void compare_match(d151801_t *d) {
@@ -172,6 +180,8 @@ static void compare_match(d151801_t *d) {
         if (chs[k]->ocr == d_frc(d)) {
             chs[k]->tcsr |= OCF;
             chs[k]->pin_out = (chs[k]->tcsr & OLVL) ? 1 : 0;
+            chs[k]->next_match = d->now + 0x10000;
+            d->oc_dirty = 1;
             outputs_changed(d);
         }
 }
@@ -237,4 +247,10 @@ void d_sci_rx(d151801_t *d, uint8_t byte) {
     if (d->trcsr & RDRF) d->trcsr |= ORFE;
     d->rdr = byte;
     d->trcsr |= RDRF;
+}
+
+void d_next_match(const d151801_t *d, int ch, int64_t *t, int *level) {
+    const d_channel_t *c = ch == 1 ? &d->t1 : &d->t2;
+    *t = c->next_match;
+    *level = (c->tcsr & OLVL) ? 1 : 0;
 }

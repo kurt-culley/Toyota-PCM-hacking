@@ -4,7 +4,8 @@ Two checks, both through ctypes on a host build of the same C files the RP2350 f
 - every opcode (all 256, undefined ones trap) on random registers and memory: final
   registers, flags, cycles, wait/sleep state and every memory write must match;
 - the 17140 ROM from reset for 200 000 instructions on the firmware's fast memory path, with
-  deterministic pseudo-random port reads and periodic interrupt requests: the register state must match after every step.
+  deterministic pseudo-random port reads and periodic interrupt requests: the register state
+  must match after every step.
 Plus a staleness check on the generated instruction switch.
 """
 

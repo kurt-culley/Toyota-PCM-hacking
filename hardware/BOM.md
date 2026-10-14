@@ -39,10 +39,9 @@ Designed after P4. Expected to need only resistors, clamps (TVS/Zener) and a fus
 
 | Item | Indicative part | Why |
 |---|---|---|
-| Prototype | the Pico 2 W (A1) + dual-port SRAM (e.g. IDT7005, 8K × 8, PLCC-68, with a socket adapter), 74HC573, 2× 74HCT595, 1–3 glue chips, Schottky diodes, resistors (RE_PLAN §6b) | The CPU runs from SRAM at full speed; the Pico loads and edits it |
-| Final board | a factory-assembled carrier: the Pico 2 W, the SRAM and glue, DIP-40 plug, CPU socket; powered from the ECU's 5 V (KiCad, JLCPCB PCBA) | In-car use |
-| ECU interface | the DIP-40 socket (A6) + 2×20 machined-pin plug | Physical connection |
-| Fallback | the Pico 2 W serving the bus directly (PIO + DMA), or a CPLD for glue and ports | Only if the bench shows the dual-port design cannot work |
+| Prototype | the Pico 2 W (A1) emulating the CPU + 74HCT buffers for the 5 V outputs + a DIP-40 plug (RE_PLAN §6b) | Nothing else: no external memory or logic |
+| Final board | an RP2350 (RP2350B for spare pins) + wireless module + 74HCT buffers on a DIP-40 plug, powered from the ECU's 5 V (KiCad, JLCPCB PCBA) | In-car use |
+| Fallback | external-memory designs: dual-port SRAM run by the Pico, or flash + CPLD | Only if emulation fails the bench validation |
 
 ---
 

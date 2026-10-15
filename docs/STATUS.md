@@ -303,7 +303,7 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
   - **Blocking the "Ross verified" gate:**
     1. **R-M09** (Tier B, 17070 MX2 map) is still PENDING and needs a 17070 dump. Owner decision: keep it as a gate item, or move it to `docs/variants.md` as out of scope for the 17140.
     2. `docs/ross/verification_report.md` (the P4 deliverable) is not written yet.
-    3. A re-check of the Verifier fixes (below) by an independent agent, then the gate sign-off.
+    3. The gate sign-off by an independent Verifier (the fixes' re-check is done: PASS WITH ISSUES, follow-ups applied).
 
     The PARTIAL items carry bench work but are not PENDING.
   - **Verifier (independent agent, 2026-10-14): PASS WITH ISSUES**, no blockers. Fixes applied:
@@ -312,7 +312,7 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
     - **R-I08 / Q2:** real tests for the P31 timer (off 20–21 s after P17 rises: 21 one-second ticks) and the PORT2 bit 2 hot-start output (low 0.18–92 s after a hot crank; stays high with Coolant above `$18`).
     - **Nits:** R-M02 status "CONTRADICTED (rpm axis)" plus the 17030 multiplier-10 hypothesis; the mixture high-load case at 115 kPa; R-I06 points to the 17140 conversion; R-F25 says P16 = IDL is LIKELY; the `DecelCutTbl` note gives the 42 used below the first site (asm and xref regenerated, asl round trip IDENTICAL); R-F26 test citation.
     - **Also:** `emu.cboard` now runs the step loop in C (`cb_run_until`) and keeps the next engine-event time on the C side, about 30× faster with identical results [EMU:tests/test_d151801_c.py, tests/test_loopback_engine.py].
-    - **Still needed:** a re-check of these fixes by an independent agent.
+    - **Re-check (second independent agent, 2026-10-15): PASS WITH ISSUES**, no blockers; follow-ups applied (see the summary at the top).
 - [ ] Bench and car anchors: Load at key-on, engine off, over the serial link (kPa scale); what ADC ch7 measures; timing-light readings with T open at idle and at a steady 2500–3000 rpm; PORT3 over the link (Q10), and with T–E1 shorted confirm P3-0 reads 0 (P30 polarity).
 - [x] Pico 2 W serial-link logger ([`../hardware/peek-logger/firmware/`](../hardware/peek-logger/firmware/)) and host decoder (`pcmre.peeklog`): the firmware's link logic runs against the simulated ECU [EMU:tests/test_peek_logger.py]; the UF2 builds warning-free. Not yet run on hardware; not Verifier-reviewed.
 - [ ] Logger on the spare ECU on the bench (after Q11; owner confirmation), then the Wi-Fi dashboard.

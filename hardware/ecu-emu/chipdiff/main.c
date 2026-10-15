@@ -276,6 +276,18 @@ static void cmd_rigcheck(void) {
             gpio_pull_up(g);
         }
     sleep_ms(5);
+    // All four rail-pulled pins low at once: the unplugged + rail itself is being held low (a chip
+    // left in, or something between the + and − rails). Report that once; don't blame every pin.
+    bool rail_low = true;
+    for (uint g = 0; g < 29; g++)
+        if ((RAIL_PULLUPS >> g & 1u) && gpio_get(g)) rail_low = false;
+    if (rail_low) {
+        printf("FAIL: the + rail is held low (GP12, GP13, GP20, GP21 all read low through their 10k).\n"
+               "      Is the chip still in? Otherwise measure + rail to - rail, unpowered: it must read open\n"
+               "      (megohms). About 10k, 5k or 3.3k means a strap resistor has both legs in the rails.\n");
+        faults++;
+        pins &= ~RAIL_PULLUPS;
+    }
     for (uint g = 0; g < 29; g++)
         if ((pins >> g & 1u) && !gpio_get(g)) {
             printf("FAIL: GP%u stuck low: shorted to GND, or a strap on the wrong rail\n", g);

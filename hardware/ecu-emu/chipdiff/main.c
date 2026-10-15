@@ -276,7 +276,17 @@ static void cmd_rigcheck(void) {
             gpio_pull_up(g);
         }
     sleep_ms(5);
-    // All four rail-pulled pins low at once: the unplugged + rail itself is being held low (a chip
+    // With the jumper out, the + rail only charges through the Pico's weak pull-ups (about 50k each,
+    // through the 10k straps) into its 10 uF capacitor: a time constant of roughly 0.15 s. Give it
+    // up to 2 s to read high before judging it.
+    for (uint32_t t0 = time_us_32(); time_us_32() - t0 < 2000000u;) {
+        bool all_high = true;
+        for (uint g = 0; g < 29; g++)
+            if ((RAIL_PULLUPS >> g & 1u) && !gpio_get(g)) all_high = false;
+        if (all_high) break;
+        sleep_ms(10);
+    }
+    // All four rail-pulled pins still low: the unplugged + rail itself is being held low (a chip
     // left in, or something between the + and − rails). Report that once; don't blame every pin.
     bool rail_low = true;
     for (uint g = 0; g < 29; g++)

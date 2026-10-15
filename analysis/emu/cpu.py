@@ -92,8 +92,51 @@ def _cycles(mnem: str, mode: str) -> int:
     return {IMM8: 2, IMM16: 2, DIR: 3, IDX: 4, EXT: 4}[mode] + extra
 
 
+# MC6801/6803 cycle counts per opcode (MAME m6801.cpp, cycles_6803; 0 = not a 6801 opcode).
+# The D151801 runs these, not the HD6301's: on the owner's chip the RAM-clear loop at $F336
+# (CLR idx / DEX / BNE) takes 3 more cycles per pass, exactly the 6801 counts
+# [BENCH: owner chip-in-isolation run 2, 2026-10-15]. The HD6301-only opcodes keep their own counts.
+CYCLES_6801 = (
+     0,  2,  0,  0,  3,  3,  2,  2,  3,  3,  2,  2,  2,  2,  2,  2,  # 0x
+     2,  2,  0,  0,  0,  0,  2,  2,  0,  2,  0,  2,  0,  0,  0,  0,  # 1x
+     3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  # 2x
+     3,  3,  4,  4,  3,  3,  3,  3,  5,  5,  3, 10,  4, 10,  9, 12,  # 3x
+     2,  0,  0,  2,  2,  0,  2,  2,  2,  2,  2,  0,  2,  2,  0,  2,  # 4x
+     2,  0,  0,  2,  2,  0,  2,  2,  2,  2,  2,  0,  2,  2,  0,  2,  # 5x
+     6,  0,  0,  6,  6,  0,  6,  6,  6,  6,  6,  0,  6,  6,  3,  6,  # 6x
+     6,  0,  0,  6,  6,  0,  6,  6,  6,  6,  6,  0,  6,  6,  3,  6,  # 7x
+     2,  2,  2,  4,  2,  2,  2,  2,  2,  2,  2,  2,  4,  6,  3,  3,  # 8x
+     3,  3,  3,  5,  3,  3,  3,  3,  3,  3,  3,  3,  5,  5,  4,  4,  # 9x
+     4,  4,  4,  6,  4,  4,  4,  4,  4,  4,  4,  4,  6,  6,  5,  5,  # Ax
+     4,  4,  4,  6,  4,  4,  4,  4,  4,  4,  4,  4,  6,  6,  5,  5,  # Bx
+     2,  2,  2,  4,  2,  2,  2,  2,  2,  2,  2,  2,  3,  0,  3,  3,  # Cx
+     3,  3,  3,  5,  3,  3,  3,  3,  3,  3,  3,  3,  4,  4,  4,  4,  # Dx
+     4,  4,  4,  6,  4,  4,  4,  4,  4,  4,  4,  4,  5,  5,  5,  5,  # Ex
+     4,  4,  4,  6,  4,  4,  4,  4,  4,  4,  4,  4,  5,  5,  5,  5,  # Fx
+)  # fmt: skip
+
+
+def access_offsets(mnem: str, mode: str, n: int, timing: str = "6801") -> tuple[int, int]:
+    """Cycle (0 = the opcode fetch) of an instruction's first and second data access.
+
+    The data accesses sit in the last bus cycles: one byte in cycle n-1, two bytes in n-2 and n-1.
+    Read-modify-write (and TST, a read with two internal cycles after it) reads in n-3 and writes in
+    n-1. On the 6801, ADDD/SUBD/CPX from memory end with an internal cycle: their reads are n-3, n-2.
+    Used to make I/O register accesses happen at their own cycle (Simulation, board.c).
+    """
+    if mode in (INH, REL, IMM8, IMM16) or mnem in ("jmp", "jsr"):
+        return n - 1, n - 1
+    if mnem in _RMW or mnem in ("aim", "oim", "eim") or (mnem == "tst" and timing == "6801"):
+        return n - 3, n - 1
+    if mnem in ("addd", "subd", "cpx") and timing == "6801":
+        return n - 3, n - 2
+    if mnem in _WIDE or mnem in _STORE16:
+        return n - 2, n - 1
+    return n - 1, n - 1
+
+
 class HD6301:
-    def __init__(self, bus: Bus):
+    def __init__(self, bus: Bus, timing: str = "6301"):
         self.bus = bus
         self.a = self.b = 0
         self.x = self.s = self.pc = 0
@@ -104,6 +147,8 @@ class HD6301:
         self.irq_inhibit = False  # one-instruction IRQ delay after CLI/TAP
         self._ops: dict[int, Callable[[], None]] = {}
         self._cyc: dict[int, int] = {}
+        self._acc: dict[int, tuple[int, int]] = {}  # data-access cycles (access_offsets)
+        self.timing = timing  # "6301" (HD6301 handbook, MAME-verified) or "6801" (the D151801)
         self._build()
 
     # -- registers -------------------------------------------------------------
@@ -328,7 +373,14 @@ class HD6301:
     def _build(self) -> None:
         for op, (mnem, mode) in OPCODES.items():
             self._ops[op] = self._make(mnem, mode)
-            self._cyc[op] = _cycles(mnem, mode)
+            n = _cycles(mnem, mode)
+            if self.timing == "6801" and CYCLES_6801[op]:
+                n = CYCLES_6801[op]
+            self._cyc[op] = n
+            self._acc[op] = access_offsets(mnem, mode, n, self.timing)
+
+    def access_offsets(self, op: int) -> tuple[int, int]:
+        return self._acc.get(op, (0, 0))
 
     def _make(self, mnem: str, mode: str) -> Callable[[], None]:
         cpu = self

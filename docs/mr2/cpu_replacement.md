@@ -36,9 +36,9 @@ All of this is from the 17140's own register use [xref], and all of it is alread
 
 | Block | Registers | Pins | Model status |
 |---|---|---|---|
-| CPU | — | — | **C core done**: matches the MAME-verified Python core on every opcode and on 200 000 steps of the 17140 ROM [EMU:tests/test_hd6301_c.py] |
+| CPU | — | — | **C core done**: matches the MAME-verified Python core on every opcode and on 200 000 steps of the 17140 ROM [EMU:tests/test_hd6301_c.py]. **The D151801 runs MC6801 instruction timing** (MAME `cycles_6803`), with each I/O register read or written on its own bus cycle [BENCH:analysis/captures/chipdiff_17140_run3_2026-10-15.log] |
 | Timer 1 | TCSR `$08`, FRC `$09`, OCR1 `$0B`, ICR1 `$0D` | IC1 ← P20 (ADC end), OC1 → P21 (injector) | **C done** (`d151801.c`), handbook-based |
-| Timer 2 (Denso) | TCSR2 `$18`, OCR2 `$1B`, ICR2 `$1D` | IC2 ← P10 (NE), OC2 → P11 (IGT) | **C done**; inferred from the ROM (GUESS until compared with the real chip) |
+| Timer 2 (Denso) | TCSR2 `$18`, OCR2 `$1B`, ICR2 `$1D` | IC2 ← P10 (NE), OC2 → P11 (IGT) | **C done**; inferred from the ROM; matches the real chip: all 318 spark edges of a 6 s run exact [BENCH: run 3] |
 | SCI | RMCR `$10`, TRCSR `$11`, RDR `$12`, TDR `$13` | P23/P24 | **C done** (UART line side via callbacks) |
 | Ports | `$00`–`$07`, P3CSR `$0F` (IS3 = IGF) | Port 1/2/3/4, SC1 | **C done** |
 | RAM, RAMCR | `$40`–`$FF`, `$14` | STBY | Python; standby (battery-backed fault codes) to design |
@@ -51,7 +51,11 @@ The emulated chip runs **locked to real time**:
 - **Inputs:** PIO timestamps every input edge (NE, ADC end, IGF) with a 1 MHz counter, so ICR1/ICR2 hold the exact capture time, as on the real chip.
 - **Outputs:** when the program writes OCR1/OCR2, the compare is handed to PIO or a hardware alarm, which switches the IGT or injector pin at that exact µs. Spark and injection timing therefore do not depend on how fast the emulation runs, only on it keeping up.
 - **Headroom:** on a PC the C core runs the 17140 ROM about **270×** faster than the real chip [EMU: host benchmark]. **On the owner's Pico 2 W at the stock 150 MHz it runs at 4.5× the real chip** (1.42 M instructions/s, E-clock equivalent 4.48 MHz) [BENCH: owner, ecu_emu_bench v1, 2026-10-14]. With a direct memory path for RAM/ROM (only `$00`–`$1F` through callbacks): **4.6× at 150 MHz and 7.7× at 250 MHz** (2.46 M instructions/s) [BENCH: owner, ecu_emu_bench v2, 2026-10-14]. CPU speed is not a risk; the peripheral model has to fit inside that margin.
-- **Open:** the D151801 showed 6801-like bus-cycle counts on the bench (STATUS). The emulator's per-instruction cycle table must match the real chip, so that the main-loop pacing is right. The chip-in-isolation test (validation step 5) settles it.
+- **Matched to the real chip** (chip-in-isolation test, [`chip_diff_test.md`](../hardware/chip_diff_test.md#results)):
+  - MC6801 cycle counts; I/O accesses on their own bus cycle;
+  - a counter write only presets `$FFF8`, and reading the counter's high byte latches the low byte;
+  - the port 4 data latch reads high at reset;
+  - an interrupt is taken after an instruction only if its flag counts at least 2 cycles before the instruction's end. A compare flag counts from the cycle after the match, a capture flag from the cycle before the input edge (LIKELY: fitted, see the results).
 
 ## Pins (about 22 signals)
 
@@ -73,7 +77,7 @@ The emulated chip runs **locked to real time**:
 2. **Speed on the RP2350:** the bench UF2 (below) on the owner's Pico 2 W.
 3. **C peripheral model against the Python simulator: done.** CPU + peripherals + memory in C (`board.c`), driven by the same engine model through `emu.cboard`: every spark, injector edge, ADC conversion, interrupt count and RAM byte identical at 8 operating points (idle, cruise, full load, rev limit, cranking, cold with map B, no IGF, test terminal) [EMU:tests/test_d151801_c.py]. A one-bit fault in the C output-compare logic fails all 8.
 4. **On the Pico, real time: done.** The loopback test (below): every output edge, RAM byte and injector pulse bit-exact with the simulator, in real time.
-5. **Against the real D151801:** the chip-in-isolation test ([`chip_diff_test.md`](../hardware/chip_diff_test.md)). The real chip runs its own ROM on the reader breadboard, the Pico plays the engine with the same model and schedule as the loopback, and its edges must give the same checksums. This settles timer 2, the cycle table, the reset latency and anything undocumented. No ECU board is needed: the emulator uses the car's ECU board unchanged, exactly as the chip does.
+5. **Against the real D151801:** the chip-in-isolation test ([`chip_diff_test.md`](../hardware/chip_diff_test.md)). The real chip runs its own ROM on the reader breadboard, the Pico plays the engine with the same model and schedule as the loopback, and its output edges must match the emulator's when the emulator is given exactly the chip's inputs. **Run 3: every output pin matches in edge count over 6 s; sparks, injector and ADC selects exactly; ADC hold on 2994 of 3001 edges** [BENCH: run 3; EMU:tests/test_chip_vs_emulator.py]. No ECU board is needed: the emulator uses the car's ECU board unchanged, exactly as the chip does.
 6. **The car** (below), with the car's own ECU kept as the known-good spare.
 
 ## Loopback test (no wiring)

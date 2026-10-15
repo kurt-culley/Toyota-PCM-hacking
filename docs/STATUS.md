@@ -282,7 +282,15 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
     - With the emulator's HD6301 timing, the first ADC cycle comes 414 E cycles late: the RAM-clear loop at `$F336` (136 passes of CLR idx / DEX / BNE) takes 3 more cycles per pass on the chip, exactly the MC6801 counts (CLR idx 6, DEX 3) [ROM:$F336-$F33A]. **The D151801 runs MC6801 instruction timing** (LIKELY; matches the earlier "6801-like bus cycles" bench note). The 17140 ROM uses no HD6301-only opcode.
     - With MAME's MC6803 cycle table **and** the MC6801 counter write (a write to the FRC only presets `$FFF8`; the low-byte write does not load a value), every output pin shows the same number of edges as the chip over the 1.3 s, including all 6 spark edges at a constant offset (EXPERIMENT, scratch build).
     - Remaining differences: 1-4 cycle variations in when port writes appear (the emulator applies a store at the start of the instruction, the chip in its last cycle), and P40 does not glitch low when DDR4 is written (the chip's port 4 data latch is not 0 at reset).
-    - To do: make the emulator's timing MC6801 (cycle table, FRC write, accesses at their bus cycle, port 4 latch reset value), regenerate expected values, re-run the loopback, then the full `run 6` on the fixed firmware.
+    - **Run 3 (full phase, 6 M cycles, owner 2026-10-15):** after the model fixes below, **every output pin matches the chip's edge count; all sparks, injector and ADC-select edges at a constant offset; the ADC hold line on 2994 of 3001 edges** [BENCH:analysis/captures/chipdiff_17140_run3_2026-10-15.log] [EMU:tests/test_chip_vs_emulator.py]. Details: [`hardware/chip_diff_test.md`](hardware/chip_diff_test.md#results).
+    - **Model fixes, in both `emu` and `hardware/ecu-emu/core`:**
+      - MC6801 cycle counts (`emu.cpu.CYCLES_6801`);
+      - I/O accesses on their bus cycle;
+      - counter write presets `$FFF8` only, and the counter LSB latches on an MSB read;
+      - port 4 latch high at reset;
+      - interrupt sampling window of 2 cycles, with compare flags counting a cycle after the match and capture flags a cycle before the edge.
+    - The loopback reference `expected.h` is regenerated, so the owner's earlier loopback PASS was against the old model. Re-run the loopback UF2 when convenient (no wiring).
+    - **Open:** 7 ADC-hold edges (two different effects); `run 6` (all three rpm/load points) for more cases; then the Verifier.
 - [ ] **In-car test rig: parts list proposed** ([`../hardware/BOM.md`](../hardware/BOM.md) section C1; about £30). Awaiting owner approval to order. The final PCB outline waits for a photo of the clearance above the CPU socket.
 - [x] **Ross Tier-B pass on the 17140** (2026-10-14; Verifier PASS WITH ISSUES, fixes applied, re-check pending). Every claim whose "Test on" includes `MR2 ROM` (43) has a 17140 status, evidence and a "P4 17140" note in [`ross/claims.md`](ross/claims.md). Simulator results are pinned in [`../tests/test_ross17140.py`](../tests/test_ross17140.py) (44 tests, about 3 s, on the C-backed simulator). The simulator has two inputs for them, `idl_closed` (P1-6, default throttle open) and `p37` (P3-7, default 0 = A/C off). `emu.loopback_ref` pins `p37=1`, the level `expected.h` and `engine.h` use, so the loopback reference is unchanged.
 

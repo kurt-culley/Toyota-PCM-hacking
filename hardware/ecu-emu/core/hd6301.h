@@ -37,10 +37,16 @@ typedef struct {
     // I/O registers $00-$1F go through the callbacks. NULL: every access uses the callbacks.
     uint8_t *mem;
     uint16_t rom_base;
+    // Cycle counts per opcode and the cycle of each instruction's 1st/2nd data access
+    // (hd6301_timing.inc). hd6301_init selects the HD6301 timing; the D151801 board uses MC6801.
+    const uint8_t *cyc;
+    const uint8_t (*acc)[2];
 } hd6301_t;
 
 void hd6301_init(hd6301_t *c, hd6301_read_fn rd, hd6301_write_fn wr, void *ctx);
 void hd6301_reset(hd6301_t *c);
+// 0: HD6301 handbook counts (default); 1: MC6801 counts (the D151801, emu.cpu.CYCLES_6801).
+void hd6301_set_timing(hd6301_t *c, int mc6801);
 // Execute one instruction; returns its E-clock cycles (0 while waiting or asleep).
 int hd6301_step(hd6301_t *c);
 // Request a maskable interrupt; returns 1 if taken. A masked request still ends SLP.

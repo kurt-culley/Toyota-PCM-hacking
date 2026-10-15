@@ -57,6 +57,10 @@ uint32_t cb_irq_count(board_t *b, int i) { return b->irq_counts[i]; }
 void cb_set_pin(board_t *b, int port, int bit, int level) { d_set_pin(&b->io, port, bit, level); }
 void cb_is3(board_t *b) { d_is3_edge(&b->io); }
 uint8_t cb_port_out(board_t *b, int i) { return d_port_out(&b->io, i); }
+void cb_set_irq_window(board_t *b, int op, int w) { b->irq_window[op & 0xFF] = (uint8_t)w; }
+void cb_rise(board_t *b, int64_t *o) {  /* when ICF1, ICF2, OCF1, OCF2 last rose */
+    o[0] = b->io.t1.icf_t; o[1] = b->io.t2.icf_t; o[2] = b->io.t1.ocf_t; o[3] = b->io.t2.ocf_t;
+}
 """
 
 OUTPUT_FN = ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int64)
@@ -69,7 +73,7 @@ def library() -> ctypes.CDLL:
     if cc is None:
         raise RuntimeError("no host C compiler")
     h = hashlib.sha256(SHIM.encode())
-    for name in (*SOURCES, "hd6301.h", "d151801.h", "board.h", "hd6301_ops.inc"):
+    for name in (*SOURCES, "hd6301.h", "d151801.h", "board.h", "hd6301_ops.inc", "hd6301_timing.inc"):
         h.update((CORE / name).read_bytes())
     so = CACHE / f"board-{h.hexdigest()[:16]}.so"
     if not so.exists():

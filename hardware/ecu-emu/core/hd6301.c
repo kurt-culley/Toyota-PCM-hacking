@@ -2,6 +2,8 @@
 
 #include "hd6301.h"
 
+#include "hd6301_timing.inc"
+
 #define F_H 0x20
 #define F_I 0x10
 #define F_N 0x08
@@ -180,6 +182,12 @@ void hd6301_init(hd6301_t *c, hd6301_read_fn rd, hd6301_write_fn wr, void *ctx) 
     c->write = wr;
     c->ctx = ctx;
     c->cc = CC_FIXED | F_I;
+    hd6301_set_timing(c, 0);
+}
+
+void hd6301_set_timing(hd6301_t *c, int mc6801) {
+    c->cyc = mc6801 ? CYC_6801 : CYC_6301;
+    c->acc = mc6801 ? ACC_6801 : ACC_6301;
 }
 
 void hd6301_reset(hd6301_t *c) {

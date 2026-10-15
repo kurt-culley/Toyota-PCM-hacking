@@ -180,6 +180,27 @@ PYTHONPATH=analysis uv run python -m emu.chipdiff analyse run1.log
 
 **FAIL:** the first differing edge points at the instruction or timer behaviour to fix. The C and Python models are fixed together, the loopback's `expected.h` is regenerated, and both tests are re-run.
 
+## Results
+
+**Run 3** (owner, 2026-10-15; one 800 rpm phase, 6 M E cycles):
+- **Log:** [`analysis/captures/chipdiff_17140_run3_2026-10-15.log`](../../analysis/captures/chipdiff_17140_run3_2026-10-15.log). All 6 000 000 cycles were sampled in 47 999 ms against 48 000 expected; nothing was dropped.
+- **Edge counts:** with the emulator given exactly the chip's inputs, every output pin shows the same number of edges.
+- **Timing:**
+  - all 318 spark edges (P11) and 162 injector edges (P21) at a constant 2 cycles;
+  - all ADC-select and port edges at a constant 3 cycles;
+  - the ADC hold line (P15) at 3 cycles on 2994 of 3001 edges.
+
+  The constant offsets are the chip's start-up after /RES plus where in the cycle the Pico samples [EMU:tests/test_chip_vs_emulator.py].
+
+**What the chip showed** (now in both models, `emu` and `hardware/ecu-emu/core`):
+1. **MC6801 instruction timing, not HD6301.** The RAM-clear loop at `$F336` takes 3 cycles more per pass on the chip.
+2. **A counter write only presets `$FFF8`**; the low byte is not loaded.
+3. **I/O registers are read and written on their own bus cycle**, the last cycle(s) of the instruction (`emu.cpu.access_offsets`).
+4. **The port 4 data latch reads high at reset.**
+5. **Interrupt sampling:** an interrupt is taken after an instruction only if its flag counts at least 2 cycles before the instruction's end. A compare flag counts from the cycle after the match, a capture flag from the cycle before the input edge. This is fitted to the interrupts of run 3 (LIKELY).
+
+**Open:** 7 ADC-hold edges where the chip's output-compare routine runs 3-5 cycles off the emulator's. The first, at cycle 322 048, is an interrupt the chip took one instruction earlier. Another, at 661 883, comes later on the chip although the interrupt had a 6-cycle margin, so a second effect is involved. More runs (other rpm and load points) will show the pattern.
+
 ## Steps (each powered step needs the owner's OK on the day)
 
 1. **Unpowered:** make the wiring changes above; check each new wire against the table with the multimeter.

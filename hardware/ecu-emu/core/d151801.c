@@ -70,6 +70,7 @@ void d_init(d151801_t *d) {
     d->t1.ocr = d->t2.ocr = 0xFFFF;
     d->t1.pin_out = d->t2.pin_out = 1;
     for (int i = 0; i < 4; i++) d->pins[i] = 0xFF;  // external pins default high
+    d->latch[3] = 0xFF;  // port 4 data latch reads back high at reset (owner chip run 2; emu.periph)
     d->trcsr = TDRE;
     for (int i = 0; i < 4; i++) d->last_out[i] = d_port_out(d, i);
     recalc_match(d, &d->t1);
@@ -105,8 +106,13 @@ uint8_t d_read(d151801_t *d, uint16_t a) {
             d->tof = 0;
             d->t1.armed &= (uint8_t)~TOF;
         }
+        d->frc_lo_latch = (uint16_t)(0x100 | (d_frc(d) & 0xFF));  // the LSB is latched on an MSB read
         return (uint8_t)(d_frc(d) >> 8);
-    case FRC_L: return (uint8_t)d_frc(d);
+    case FRC_L: {
+        uint16_t l = d->frc_lo_latch;
+        d->frc_lo_latch = 0;
+        return (uint8_t)(l ? l : d_frc(d));
+    }
     case OCR1_H: return (uint8_t)(d->t1.ocr >> 8);
     case OCR1_L: return (uint8_t)d->t1.ocr;
     case ICR1_H: return (uint8_t)(read_icr(&d->t1) >> 8);
@@ -150,7 +156,7 @@ void d_write(d151801_t *d, uint16_t a, uint8_t v) {
     case PORT4: d->latch[3] = v; outputs_changed(d); break;
     case TCSR1: ch_write_tcsr(&d->t1, v); d->oc_dirty = 1; break;
     case FRC_H: d->frc_hi_written = v; set_frc(d, 0xFFF8); break;
-    case FRC_L: set_frc(d, (uint16_t)((d->frc_hi_written << 8) | v)); break;
+    case FRC_L: break;  // MC6801: a counter write only presets $FFF8 (FRC_H); the low byte is not loaded
     case OCR1_H: write_ocr(d, &d->t1, 1, v); break;
     case OCR1_L: write_ocr(d, &d->t1, 0, v); break;
     case OCR2_H: write_ocr(d, &d->t2, 1, v); break;
@@ -178,6 +184,7 @@ static void compare_match(d151801_t *d) {
     d_channel_t *chs[2] = {&d->t1, &d->t2};
     for (int k = 0; k < 2; k++)
         if (chs[k]->ocr == d_frc(d)) {
+            if (!(chs[k]->tcsr & OCF)) chs[k]->ocf_t = d->now + 1;  // counts for interrupts a cycle after the match
             chs[k]->tcsr |= OCF;
             chs[k]->pin_out = (chs[k]->tcsr & OLVL) ? 1 : 0;
             chs[k]->next_match = d->now + 0x10000;
@@ -203,10 +210,13 @@ void d_advance(d151801_t *d, int64_t n, d_next_event_fn next_ev, d_run_event_fn 
         }
     }
     d->now = end;
-    if (d_frc(d) < f0 || n >= 0x10000) d->tof = 1;  // wrapped through $0000
+    if (d_frc(d) < f0 || n >= 0x10000) {  // wrapped through $0000
+        if (!d->tof) d->tof_t = d->now - d_frc(d);
+        d->tof = 1;
+    }
 }
 
-static void set_pin_frc(d151801_t *d, int port, int bit, int level, uint16_t frc) {
+static void set_pin_frc(d151801_t *d, int port, int bit, int level, uint16_t frc, int64_t t) {
     int i = port - 1;
     uint8_t mask = (uint8_t)(1 << bit);
     int old = (d->pins[i] & mask) ? 1 : 0;
@@ -218,18 +228,34 @@ static void set_pin_frc(d151801_t *d, int port, int bit, int level, uint16_t frc
         ch->pin_in = (uint8_t)level;
         if (((ch->tcsr & IEDG) != 0) == (level != 0)) {
             ch->icr = frc;
+            if (!(ch->tcsr & ICF)) ch->icf_t = t - 1;  // counts for interrupts from the cycle before the edge
             ch->tcsr |= ICF;
         }
     }
 }
 
-void d_set_pin(d151801_t *d, int port, int bit, int level) { set_pin_frc(d, port, bit, level, d_frc(d)); }
+void d_set_pin(d151801_t *d, int port, int bit, int level) { set_pin_frc(d, port, bit, level, d_frc(d), d->now); }
 
 void d_set_pin_at(d151801_t *d, int port, int bit, int level, int64_t t) {
-    set_pin_frc(d, port, bit, level, (uint16_t)(t + d->frc_offset));
+    set_pin_frc(d, port, bit, level, (uint16_t)(t + d->frc_offset), t);
 }
 
 void d_is3_edge(d151801_t *d) { d->p3csr |= IS3F; }
+
+uint16_t d_irq_vector_at(const d151801_t *d, int64_t t) {
+    const d_channel_t *chs[2] = {&d->t1, &d->t2};
+    uint8_t p = 0;
+    for (int k = 0; k < 2; k++) {
+        uint8_t q = ch_pending(chs[k]);
+        if ((q & ICF) && chs[k]->icf_t <= t) p |= ICF;
+        if ((q & OCF) && chs[k]->ocf_t <= t) p |= OCF;
+    }
+    if (p & ICF) return HD6301_VEC_ICF;
+    if (p & OCF) return HD6301_VEC_OCF;
+    if (d->tof && (d->t1.tcsr & ETOI) && d->tof_t <= t) return HD6301_VEC_TOF;
+    if ((d->trcsr & RIE) && (d->trcsr & (RDRF | ORFE)) && d->sci_t <= t) return HD6301_VEC_SCI;
+    return 0;
+}
 
 uint16_t d_irq_vector(const d151801_t *d) {
     uint8_t p = ch_pending(&d->t1) | ch_pending(&d->t2);
@@ -245,6 +271,7 @@ void d_sci_tx_done(d151801_t *d) { d->trcsr |= TDRE; }
 void d_sci_rx(d151801_t *d, uint8_t byte) {
     if (!(d->trcsr & RE)) return;
     if (d->trcsr & RDRF) d->trcsr |= ORFE;
+    else if (!(d->trcsr & ORFE)) d->sci_t = d->now;
     d->rdr = byte;
     d->trcsr |= RDRF;
 }

@@ -20,7 +20,7 @@ import pytest
 
 from emu.cpu import HD6301
 from emu.engine17140 import ROM_17140
-from pcmre.gen_hd6301_c import OUT, build
+from pcmre.gen_hd6301_c import OUT, OUT_TIMING, build, build_timing
 from pcmre.roundtrip import ROOT
 
 CC = shutil.which("cc") or shutil.which("gcc")
@@ -139,6 +139,7 @@ class LazyBus:
 
 def test_generated_switch_is_current():
     assert OUT.read_text() == build(), "stale: rerun python -m pcmre.gen_hd6301_c --write"
+    assert OUT_TIMING.read_text() == build_timing(), "stale: rerun python -m pcmre.gen_hd6301_c --write"
 
 
 @pytest.mark.parametrize("op", range(256))

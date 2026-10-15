@@ -19,6 +19,12 @@ typedef struct {
     d_run_event_fn run_ev;
     void *ev_ctx;
     uint32_t irq_counts[8];  // per vector, index (vector - $FFF0) / 2
+    int64_t insn_start;  // time the current instruction began (-1: between instructions)
+    const uint8_t *insn_acc;  // its data-access cycles (hd6301_t.acc)
+    int insn_n_acc;
+    // Interrupt sampling, per opcode: an interrupt is taken after an instruction only if its flag
+    // rose at least irq_window[op] cycles before the instruction's end (see board_step).
+    uint8_t irq_window[256];
 } board_t;
 
 // Load the ROM image (ending at $FFFF) and reset the CPU.

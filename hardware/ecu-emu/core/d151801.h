@@ -16,6 +16,7 @@ typedef struct {
     uint8_t tcsr, armed, pin_in, pin_out;
     uint16_t ocr, icr;
     int64_t next_match;  // absolute time of this channel's next compare match (cached)
+    int64_t icf_t, ocf_t;  // when ICF / OCF last rose (d_irq_vector_at)
 } d_channel_t;
 
 // Output pin change: port 1..4, bit 0..7, level 0/1, time.
@@ -30,8 +31,10 @@ typedef struct {
     int64_t now;
     uint16_t frc_offset;
     uint8_t frc_hi_written;
+    uint16_t frc_lo_latch;  // 0x100 | LSB latched by an MSB read; 0 = none
     d_channel_t t1, t2;
     uint8_t tof;
+    int64_t tof_t, sci_t;  // when TOF / the SCI receive flag last rose
     uint8_t ddr[4], latch[4], pins[4], last_out[4];
     uint8_t p3csr, is3_armed;
     uint8_t rmcr, trcsr, rdr, sci_armed;
@@ -57,6 +60,8 @@ void d_set_pin_at(d151801_t *d, int port, int bit, int level, int64_t t);
 void d_is3_edge(d151801_t *d);
 // Highest-priority pending maskable interrupt vector, or 0 (ICF > OCF > TOF > SCI).
 uint16_t d_irq_vector(const d151801_t *d);
+// The vector that was pending at time t (only flags that had risen by then count).
+uint16_t d_irq_vector_at(const d151801_t *d, int64_t t);
 // SCI line side: the transmitted byte has left (TDRE set again); a byte arrives in RDR.
 void d_sci_tx_done(d151801_t *d);
 void d_sci_rx(d151801_t *d, uint8_t byte);

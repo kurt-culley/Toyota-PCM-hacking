@@ -246,6 +246,43 @@ def phase_stats(ne: list[int], sparks: list[int], inj: list[tuple[int, int]], ph
             "pulse": (min(pulses), round(sum(pulses) / len(pulses)), max(pulses)) if pulses else None}  # fmt: skip
 
 
+def closed_loop(log: Log) -> dict[str, tuple[int, int, Counter]]:
+    """Every output edge of the chip against the emulator running closed loop through the same schedule.
+
+    The emulator gets on-time engine reactions from its own outputs; with ``late=0`` the chip got
+    the same, so the two should agree edge for edge (at each pin's constant sampling offset).
+    Returns pin -> (chip edges, emulator edges, Counter of chip - emulator offsets).
+    """
+    from .loopback_ref import PHASE_US, SCENARIOS
+
+    rpm, kpa, tps = SCENARIOS[0]
+    sim = CSimulation(inputs=Inputs17140(rpm=rpm, map_kpa=kpa, tps_v=tps, p37=1))
+    sim.engine.update_sensors()
+    em: dict[int, list[tuple[int, int]]] = {p.gpio: [] for p in PINS if not p.is_input}
+    lvl = {g: 1 for g in em}
+
+    def on(name: str, lv: int, t: int) -> None:
+        p = BY_PORTBIT.get((int(name[1]), int(name[3])))
+        if p and lv != lvl[p.gpio]:
+            lvl[p.gpio] = lv
+            em[p.gpio].append((t, lv))
+
+    def switch(k: int) -> None:
+        sim.inputs.rpm, sim.inputs.map_kpa, sim.inputs.tps_v = SCENARIOS[k % len(SCENARIOS)]
+
+    sim.periph.listeners.append(on)
+    for k in range(1, log.end // PHASE_US):
+        sim.periph.at(k * PHASE_US, lambda k=k: switch(k))
+    sim.run_until(log.end)
+    chip = chip_edges(log, log.end)
+    out = {}
+    for p in PINS:
+        if not p.is_input:
+            a, b = chip[p.gpio], em[p.gpio]
+            out[p.name] = (len(a), len(b), Counter(x[0] - y[0] for x, y in zip(a, b, strict=False) if x[1] == y[1]))
+    return out
+
+
 def summary(log: Log) -> str:
     """The chip's log against the emulator running closed loop with the same engine model (as in the car).
 
@@ -290,6 +327,15 @@ def summary(log: Log) -> str:
         off = f"{c['offset']}/{e['offset']}"
         lines.append(f"{ph + 1:5}  {SCENARIOS[ph % 3][0]:4}   {c['sparks']:6}/{e['sparks']:<6}   {off:>24}"
                      f"   {c['pulses']:5}/{e['pulses']:<5}   {c['pulse']} | {e['pulse']}")  # fmt: skip
+    lines += ["", "closed loop, edge for edge (chip - emulator offset: count; a pin is exact if it has one offset):"]
+    for name, (nc, ne_, lat) in closed_loop(log).items():
+        top = ", ".join(f"{d}: {n}" for d, n in lat.most_common(3))
+        exact = (
+            "EXACT"
+            if nc == ne_ and len(lat) == 1
+            else f"{lat.most_common(1)[0][1] if lat else 0}/{nc} at the main offset"
+        )
+        lines.append(f"  {name:4} {nc:6}/{ne_:<6} {exact:28} {top}")
     return "\n".join(lines)
 
 

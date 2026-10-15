@@ -209,6 +209,14 @@ PYTHONPATH=analysis uv run python -m emu.chipdiff analyse run1.log
   - the injector pulse is 0.3-0.8 % shorter on the chip.
 - **Rig caveat:** the Pico applied 3420 engine reactions late in run 4 (`late=3420`), mostly the quick ADC conversions. Late ADC-end edges change the chip's readings, so a closed-loop comparison is only fair with `late=0`. The firmware now looks ahead 8 cycles instead of 16 (USB no longer runs on that core), so the reactions land on time.
 
+**Run 5** (owner, 2026-10-15; all 6 phases, look-ahead 8, **`late=0`**): **the validation result.**
+- **Log:** [`analysis/captures/chipdiff_17140_run5_6phase_2026-10-15.log`](../../analysis/captures/chipdiff_17140_run5_6phase_2026-10-15.log).
+- **Closed loop, edge for edge** (`python -m emu.chipdiff summary`, the emulator running as in the car), over 36 s at 800, 2000 and 5000 rpm [EMU:tests/test_chip_vs_emulator.py]:
+  - **every spark edge (6 238) and every injector edge (3 130) of the real chip, at a constant 2-cycle offset;**
+  - injector pulse widths equal to the cycle in every phase;
+  - the ADC channel sequence on 99.4-99.6 % of edges. The rest are a few conversions shifted by one slot: the interrupt-sampling detail below. It changes no spark or injector edge.
+- **Replay** (the chip's exact inputs) matches through phases 1 and 2; it drifts in phase 3 after the same small ADC-start differences.
+
 **Open:** 7 ADC-hold edges where the chip's output-compare routine runs 3-5 cycles off the emulator's. The first, at cycle 322 048, is an interrupt the chip took one instruction earlier. Another, at 661 883, comes later on the chip although the interrupt had a 6-cycle margin, so a second effect is involved. More runs (other rpm and load points) will show the pattern.
 
 ## Steps (each powered step needs the owner's OK on the day)

@@ -43,3 +43,20 @@ def test_sparks_injector_and_adc_selects_are_exact(result):
 def test_adc_hold_line_nearly_exact(result):
     lat = result["P15"].latency
     assert lat[3] >= 2994 and sum(lat.values()) == 3001
+
+
+RUN5 = ROOT / "analysis/captures/chipdiff_17140_run5_6phase_2026-10-15.log"
+
+
+def test_closed_loop_spark_and_fuel_identical_to_the_chip():
+    """Run 5 (all three points, 36 s, every engine reaction on time): the emulator running closed loop, as
+    in the car, gives every spark and injector edge of the real chip at a constant offset."""
+    log = chipdiff.parse_log(RUN5.read_text())
+    assert log.end == 36_000_000 and "late=0" in log.summary and "dropped=0" in log.summary
+    res = chipdiff.closed_loop(log)
+    for pin, n in (("P11", 6238), ("P21", 3130)):
+        nc, ne, lat = res[pin]
+        assert nc == ne == n and set(lat) == {2}, pin
+    for pin in ("P12", "P13", "P14", "P15"):  # ADC sequencing: all but a few conversions (open item)
+        nc, ne, lat = res[pin]
+        assert nc == ne and lat[3] >= 0.99 * nc, pin

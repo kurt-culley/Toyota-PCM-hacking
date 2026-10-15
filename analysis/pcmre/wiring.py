@@ -279,14 +279,24 @@ def breadboard_table() -> str:
 
 
 def draw_breadboard(
-    out: Path, layout=None, head=None, dip=None, wire_colour=None, part_colour=None, chip=True, extra=None
+    out: Path,
+    layout=None,
+    head=None,
+    dip=None,
+    wire_colour=None,
+    part_colour=None,
+    chip=True,
+    extra=None,
+    rows=63,
+    height=None,
 ) -> None:
     """A top view in portrait, as the common 830-point board is printed: row 1 at the top, a-e on the left.
 
     Rail order follows that board: on the left the + strip is outermost and the - strip sits beside
     column a; on the right the + strip sits beside column j and the - strip is outermost.
     The reader layout by default; pcmre.chipdiff_wiring passes its own layout, title lines, chip pin
-    names and colours. chip=False leaves the chip out; extra(draw, xy, key_x, key_end_y) draws more.
+    names and colours. chip=False leaves the chip out; extra(draw, xy, key_x, key_end_y) draws more;
+    rows sets the board length (30 for a half-size board); height the picture's, if taller.
     """
     from PIL import Image, ImageDraw, ImageFont
 
@@ -304,7 +314,7 @@ def draw_breadboard(
             "j+": 16, "j-": 17}  # fmt: skip
     f10, f12, f13b, f15, f15b, f22b = font(10), font(12), font(13, True), font(15), font(15, True), font(22, True)
     board_w = 18 * p
-    img = Image.new("RGB", (left + board_w + 960, top + 64 * p + 40), "white")
+    img = Image.new("RGB", (left + board_w + 960, max(height or 0, top + (rows + 1) * p + 40)), "white")
     d = ImageDraw.Draw(img)
 
     def xy(hole: str) -> tuple[int, int]:
@@ -325,9 +335,9 @@ def draw_breadboard(
         d.text((20, 15 + i * 30), t, fill=c, font=fnt)
     # board, rails, holes, labels
     d.rounded_rectangle(
-        [left - 22, top - 30, left + board_w - 4, top + 64 * p], 10, fill=(245, 243, 236), outline="grey"
+        [left - 22, top - 30, left + board_w - 4, top + (rows + 1) * p], 10, fill=(245, 243, 236), outline="grey"
     )
-    d.rectangle([left + 7 * p + 6, top, left + 10 * p - 6, top + 63 * p], fill=(225, 222, 212))
+    d.rectangle([left + 7 * p + 6, top, left + 10 * p - 6, top + rows * p], fill=(225, 222, 212))
     for name in ("a+", "a-", "j+", "j-"):
         x = left + lane[name] * p
         c = (200, 0, 0) if "+" in name else (0, 150, 210)
@@ -336,21 +346,21 @@ def draw_breadboard(
             dx = -12
         if name == "a-":
             dx = 12
-        d.line([x + dx, top + p // 2, x + dx, top + 63 * p], fill=c, width=2)
-        for y in (top - 16, top + 63 * p + 14):
+        d.line([x + dx, top + p // 2, x + dx, top + rows * p], fill=c, width=2)
+        for y in (top - 16, top + rows * p + 14):
             d.text((x, y), "+" if "+" in name else "−", fill=c, font=f13b, anchor="mm")
     for key, x_lane in lane.items():
         x = left + x_lane * p
         if len(key) == 1:
-            for y in (top - 16, top + 63 * p + 14):
+            for y in (top - 16, top + rows * p + 14):
                 d.text((x, y), key, fill="black", font=f13b, anchor="mm")
-        for r in range(1, 64):
+        for r in range(1, rows + 1):
             d.rectangle([x - 3, top + r * p - 3, x + 3, top + r * p + 3], fill=(150, 150, 150))
-    for name in ("a+", "a-", "j+", "j-"):  # typical mid-board break in each rail strip
+    for name in ("a+", "a-", "j+", "j-") if rows > 32 else ():  # typical mid-board break in each rail strip
         x, y = left + lane[name] * p, top + 31 * p + p // 2
         d.line([x - 6, y - 6, x + 6, y + 6], fill="black", width=2)
         d.line([x - 6, y + 6, x + 6, y - 6], fill="black", width=2)
-    for r in [1, *range(5, 64, 5)]:
+    for r in [1, *range(5, rows + 1, 5)]:
         for x in (left + 2 * p, left + 15 * p):
             d.text((x, top + r * p), str(r), fill="black", font=f10, anchor="mm")
     # Pico 2 W, face up, USB off the row-1 end (top)

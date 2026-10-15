@@ -39,13 +39,13 @@ Bought as each measurement is needed: resistors, clamps (TVS/Zener) and, for any
 
 ### C1. In-car test rig: proposed; order only after the strict bench gate passes
 
-The chip-test breadboard becomes the rig ([`../docs/mr2/cpu_replacement.md`](../docs/mr2/cpu_replacement.md#in-car-test-rig)); it runs from the laptop's USB.
+The rig is the Pico on a half-size breadboard (owned) with three 1 kΩ (A4 assortment) ([`../docs/mr2/cpu_replacement.md`](../docs/mr2/cpu_replacement.md#in-car-test-rig)); it runs from the laptop's USB.
 
 | # | Item | Qty | Why | Where | Approx. |
 |---|---|---|---|---|---|
 | C1 | Only if the supply-current check shows a CMOS chip: **74HCT541N** | 2 | 5 V CMOS levels on the 12 outputs | CPC | ~£2 |
 
-**Total: nothing, or about £2 for the buffers.** The link to the ECU is 26 of the male-to-male jumpers already owned, into the spare turned-pin socket (A6) pressed into the ECU's CPU socket. No buck module, stripboard or headers: the PCB (C2 below) follows directly.
+**Total: nothing, or about £2 for the buffers.** The link to the ECU is 26 of the male-to-male jumpers already owned, from the Pico's strips into the spare turned-pin socket (A6) pressed into the ECU's CPU socket. No buck module, stripboard or headers: the PCB (C2 below) follows directly.
 
 ### C2. Final board: DO NOT ORDER
 

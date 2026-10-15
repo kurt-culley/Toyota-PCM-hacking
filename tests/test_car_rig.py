@@ -1,9 +1,10 @@
-"""The in-car test rig's wire table (pcmre.car_rig_diagram) against chipdiff.h and the doc."""
+"""The in-car test rig (pcmre.car_rig_diagram) against chipdiff.h and the doc."""
 
 from __future__ import annotations
 
 from pcmre import car_rig_diagram as R
 from pcmre import chipdiff_wiring as C
+from pcmre import wiring as BB
 from pcmre.roundtrip import ROOT
 
 
@@ -22,12 +23,29 @@ def test_every_used_pin_once():
     assert not set(pins) & {2, 4, 5, 7, 21, 31}  # supplies and straps stay the ECU board's
 
 
-def test_car_layout_has_no_5v():
-    """The reworked board carries nothing on the + rails, and no EXTAL wire, strap or pull-up."""
+def test_each_jumper_starts_on_its_gpio():
+    """Each jumper's hole is in its Pico pin's strip, or past the 1 kΩ for GP26-28; holes unique."""
+    wires, parts = R.car_layout()
+    holes = [h for *_, h in R.car_wires()]
+    assert len(holes) == len(set(holes))
+    by_pin = {pin: g for g, (pin, _) in C.gpio_pins().items()}
+    for pin, _, _, hole in R.car_wires():
+        if pin == 1:
+            assert hole == BB._free(BB.pico_hole(R.GND_PICO_PIN)) and BB.PICO[R.GND_PICO_PIN] == "GND"
+            continue
+        g = by_pin[pin]
+        if g in C.SERIES_ROWS:
+            r = C.SERIES_ROWS[g]
+            assert hole == f"j{r}" and (f"1 kΩ (GP{g})", f"e{r}", f"f{r}") in parts
+            assert any(a == BB._free(BB.pico_hole(BB.PICO_PIN[f"GP{g}"])) and b == f"b{r}" for _, a, b, _ in wires)
+        else:
+            col, row = BB.pico_hole(BB.PICO_PIN[f"GP{g}"])
+            assert int(hole[1:]) == row and (hole[0] in "ab") == (col == "c")
+
+
+def test_small_board_has_no_rails():
     wires, parts = R.car_layout()
     holes = [h for _, a, b, _ in wires for h in (a, b)] + [h for _, a, b in parts for h in (a, b)]
-    assert not any(R.BB.is_rail(h) and "+" in h for h in holes)
-    assert not any("EXTAL" in w or t.startswith("S") or t == "P36" for t, _, _, w in wires)
-    assert [p for p, _, _ in parts] == [f"1 kΩ (GP{g})" for g in (26, 27, 28)]
-    signals = [t for t, a, b, _ in wires if not R.BB.is_rail(b)]
-    assert len(signals) == 25 + 3  # every GPIO but EXTAL, plus the three 1 kΩ second halves
+    holes += [h for *_, h in R.car_wires()]
+    assert not any(BB.is_rail(h) for h in holes)
+    assert all(int(h[1:]) <= R.ROWS for h in holes)

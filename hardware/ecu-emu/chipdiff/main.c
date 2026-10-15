@@ -32,7 +32,7 @@
 #define EXTAL_HZ 500000u
 #define E_HZ (EXTAL_HZ / 4u)
 #define HOLD_CYCLES (E_HZ / 20u)  // /RES low for 50 ms of E cycles (>= 20 ms needed)
-#define LOOKAHEAD 8               // input words computed ahead of the DMA
+#define LOOKAHEAD 12              // input words computed ahead of the DMA (reactions come >= 20 cycles later)
 #define TX_N 1024u                // words; ring of 4 KB
 #define RX_N 8192u                // words; ring of 32 KB (65 ms at E = 125 kHz)
 #define LOG_N 16384u
@@ -50,6 +50,7 @@ static struct {
     uint32_t k, w;
 } log_q[LOG_N];
 static volatile uint32_t log_head, log_tail, log_dropped;
+static volatile bool run_active, key_stop;
 
 static PIO pio_clk = pio0, pio_io = pio1;
 static uint sm_clk, sm_io, off_io;
@@ -58,8 +59,17 @@ static cd_t cd;
 
 // ---- core 1: the log printer ------------------------------------------------------------
 
+// Core 1 owns USB: stdio is started here, so the USB interrupts run on this core and never
+// delay core 0's per-cycle loop. During a run core 1 also watches for a key press.
 static void core1_printer(void) {
+    stdio_init_all();
+    multicore_fifo_push_blocking(1);
+    uint32_t t_key = 0;
     for (;;) {
+        if (run_active && time_us_32() - t_key > 50000u) {
+            t_key = time_us_32();
+            if (getchar_timeout_us(0) != PICO_ERROR_TIMEOUT) key_stop = true;
+        }
         if (log_tail != log_head) {
             uint32_t i = log_tail % LOG_N;
             if (log_q[i].w == PROGRESS)  // a progress note, not a pin change: "#" lines are ignored by the parser
@@ -231,7 +241,9 @@ static void __not_in_flash_func(run)(uint32_t phases) {
     const char *abort = NULL;
     uint64_t k = 0;
     uint32_t last = 0xFFFFFFFFu;
-    uint32_t last_avail = 0, t_avail = time_us_32(), t_key = time_us_32(), changes = 0;
+    uint32_t last_avail = 0, t_avail = time_us_32(), changes = 0;
+    key_stop = false;
+    run_active = true;
     while (k < total && !abort) {
         uint32_t avail = dma_done(dma_rx);
         uint32_t now = time_us_32();
@@ -241,10 +253,7 @@ static void __not_in_flash_func(run)(uint32_t phases) {
         } else if (now - t_avail > STALL_US) {
             abort = "no E cycles for 200 ms (E stopped? 5 V jumper out?)";
         }
-        if (now - t_key > 50000u) {  // any key stops the run
-            t_key = now;
-            if (getchar_timeout_us(0) != PICO_ERROR_TIMEOUT) abort = "stopped by a key press";
-        }
+        if (key_stop) abort = "stopped by a key press";
         if (avail - (uint32_t)k > RX_N - 256) abort = "sample ring overflow (core 0 too slow)";
         if (!t_run && avail) t_run = time_us_32();
         while ((uint32_t)k != avail && k < total) {
@@ -270,6 +279,7 @@ static void __not_in_flash_func(run)(uint32_t phases) {
     }
 
     uint32_t t_end = time_us_32();
+    run_active = false;
     // stop: /RES low first, then the PIO and the DMA
     res_assert();
     pio_sm_set_enabled(pio_io, sm_io, false);
@@ -369,11 +379,11 @@ static void help(void) {
 }
 
 int main(void) {
-    pins_init();
-    stdio_init_all();
+    pins_init();  // /RES low first
+    multicore_launch_core1(core1_printer);
+    multicore_fifo_pop_blocking();  // core 1 has started stdio (USB)
     clock_init();
     chipio_init();
-    multicore_launch_core1(core1_printer);
     while (!stdio_usb_connected()) sleep_ms(50);
     help();
     char line[32];

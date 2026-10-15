@@ -39,6 +39,11 @@
 #define DMA_COUNT 0x0FFFFFFFu     // longest plain transfer: 2147 s at E = 125 kHz
 #define RAIL_PULLUPS ((1u << 12) | (1u << 13) | (1u << 20) | (1u << 21))  // 10k to the 5 V rail (P20-P22, P24)
 
+#define PROGRESS 0xFFFFFFFFu        // log entry marking a progress note (never a pin word: GP29-31 unused)
+#define PROGRESS_EVERY 1000000u     // E cycles (8 s at E = 125 kHz)
+#define MAX_CHANGES_PER_PHASE 60000u  // the emulator makes about 9000 per phase; far more = something is wrong
+#define STALL_US 200000u            // no samples for this long: E has stopped
+
 static uint32_t tx_ring[TX_N] __attribute__((aligned(TX_N * 4)));
 static uint32_t rx_ring[RX_N] __attribute__((aligned(RX_N * 4)));
 static struct {
@@ -57,7 +62,11 @@ static void core1_printer(void) {
     for (;;) {
         if (log_tail != log_head) {
             uint32_t i = log_tail % LOG_N;
-            printf("%lx %lx\n", (unsigned long)log_q[i].k, (unsigned long)log_q[i].w);
+            if (log_q[i].w == PROGRESS)  // a progress note, not a pin change: "#" lines are ignored by the parser
+                printf("# progress: cycle %lu of the run, %lu pin changes so far\n", (unsigned long)log_q[i].k,
+                       (unsigned long)log_tail);
+            else
+                printf("%lx %lx\n", (unsigned long)log_q[i].k, (unsigned long)log_q[i].w);
             __dmb();
             log_tail = log_tail + 1;
         } else {
@@ -221,17 +230,35 @@ static void __not_in_flash_func(run)(uint32_t phases) {
     const char *abort = NULL;
     uint64_t k = 0;
     uint32_t last = 0xFFFFFFFFu;
+    uint32_t last_avail = 0, t_avail = time_us_32(), t_key = time_us_32(), changes = 0;
     while (k < total && !abort) {
         uint32_t avail = dma_done(dma_rx);
+        uint32_t now = time_us_32();
+        if (avail != last_avail) {
+            last_avail = avail;
+            t_avail = now;
+        } else if (now - t_avail > STALL_US) {
+            abort = "no E cycles for 200 ms (E stopped? 5 V jumper out?)";
+        }
+        if (now - t_key > 50000u) {  // any key stops the run
+            t_key = now;
+            if (getchar_timeout_us(0) != PICO_ERROR_TIMEOUT) abort = "stopped by a key press";
+        }
         if (avail - (uint32_t)k > RX_N - 256) abort = "sample ring overflow (core 0 too slow)";
         while ((uint32_t)k != avail && k < total) {
             uint32_t pins = rx_ring[k % RX_N];
             uint32_t w = (pins & CD_OUT_MASK) | (tx_ring[k % TX_N] & CD_IN_MASK);
             cd_sample(&cd, (int64_t)k, pins);
-            if (w != last) log_push((uint32_t)k, w);
+            if (w != last) {
+                log_push((uint32_t)k, w);
+                changes++;
+            }
+            if (k % PROGRESS_EVERY == 0 && k) log_push((uint32_t)k, PROGRESS);
             last = w;
             k++;
         }
+        if (changes > MAX_CHANGES_PER_PHASE * phases)
+            abort = "far more pin changes than the emulator makes: a pin is toggling (check the log's last lines)";
         uint32_t reads = dma_done(dma_tx);
         if ((int64_t)reads >= filled) abort = "input ring underrun (core 0 too slow)";
         while (filled < (int64_t)reads + LOOKAHEAD) {
@@ -329,7 +356,7 @@ static void cmd_rigcheck(void) {
 static void help(void) {
     printf("ecu_chipdiff: the real D151801 against the emulator (docs/hardware/chip_diff_test.md)\n");
     printf("/RES is held low. Plug the chip's 5 V jumper in only now; unplug it before USB.\n");
-    printf("Commands: rigcheck  clock  run [phases, 1-6, default 6]  help\n");
+    printf("Commands: rigcheck  clock  run [phases, 1-6, default 6; any key stops it]  help\n");
 }
 
 int main(void) {

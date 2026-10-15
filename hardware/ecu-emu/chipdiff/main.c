@@ -226,6 +226,7 @@ static void __not_in_flash_func(run)(uint32_t phases) {
     printf("BEGIN\n");
     sleep_ms(20);
     pio_sm_set_enabled(pio_io, sm_io, true);
+    uint32_t t_run = 0;  // when cycle 0 was sampled
 
     const char *abort = NULL;
     uint64_t k = 0;
@@ -245,6 +246,7 @@ static void __not_in_flash_func(run)(uint32_t phases) {
             if (getchar_timeout_us(0) != PICO_ERROR_TIMEOUT) abort = "stopped by a key press";
         }
         if (avail - (uint32_t)k > RX_N - 256) abort = "sample ring overflow (core 0 too slow)";
+        if (!t_run && avail) t_run = time_us_32();
         while ((uint32_t)k != avail && k < total) {
             uint32_t pins = rx_ring[k % RX_N];
             uint32_t w = (pins & CD_OUT_MASK) | (tx_ring[k % TX_N] & CD_IN_MASK);
@@ -267,6 +269,7 @@ static void __not_in_flash_func(run)(uint32_t phases) {
         }
     }
 
+    uint32_t t_end = time_us_32();
     // stop: /RES low first, then the PIO and the DMA
     res_assert();
     pio_sm_set_enabled(pio_io, sm_io, false);
@@ -276,6 +279,12 @@ static void __not_in_flash_func(run)(uint32_t phases) {
     pio_sm_restart(pio_io, sm_io);
     while (log_tail != log_head) tight_loop_contents();
     sleep_ms(50);
+    // Every E cycle must be sampled: the samples must take k E periods of real time
+    uint64_t want_us = k * 1000000ull / E_HZ, took_us = (uint32_t)(t_end - t_run);
+    if (!abort && k > E_HZ && (took_us > want_us * 102 / 100 || took_us < want_us * 98 / 100))
+        abort = "the sample count does not match real time: E cycles were missed (firmware fault)";
+    printf("# %llu E cycles sampled in %llu ms (expected %llu ms)\n", (unsigned long long)k,
+           (unsigned long long)(took_us / 1000), (unsigned long long)(want_us / 1000));
     if (abort)
         printf("ABORT %s at cycle %llu\n", abort, (unsigned long long)k);
     else

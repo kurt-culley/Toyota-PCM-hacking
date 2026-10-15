@@ -5,13 +5,13 @@
 ; PIO clocks; after that one input word per E cycle (DMA). Cycle k starts when E rises: the
 ; inputs for cycle k are driven at once, and all pins are sampled mid-way through E high,
 ; well away from the chip's own output changes (which follow E falling).
+; Autopull is on (threshold 29), so the two set-up words are taken with OUT, not PULL: with
+; autopull, a PULL is a no-op while the OSR is full, so `pull; mov x; pull; mov y` would load the
+; same word twice and shift every later word by one.
 .program chipio
 .side_set 1 opt pindirs
-    pull block
-    mov x, osr              ; E cycles to hold /RES low
-    pull block
-    mov y, osr              ; sample delay after E rises
-    out null, 32            ; empty the OSR: the next `out` autopulls input word 0
+    out x, 32               ; E cycles to hold /RES low (autopull: no explicit PULL, see below)
+    out y, 32               ; sample delay after E rises
 hold:
     wait 0 gpio 19 side 1   ; /RES driven low (its output value is 0)
     wait 1 gpio 19

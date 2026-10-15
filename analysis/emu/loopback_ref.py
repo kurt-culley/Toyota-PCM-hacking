@@ -31,8 +31,8 @@ PHASES = 6
 
 def run() -> list[dict]:
     rpm, kpa, tps = SCENARIOS[0]
-    # p37=1 (A/C on) is the P3-7 level the reference was generated with, and the level engine.h
-    # leaves the pin at; it must not change, because the Pico runs were checked against expected.h.
+    # p37=1 (A/C on) is the P3-7 level engine.h leaves the pin at. P37 only matters with the throttle
+    # closed or T shorted, so it has no effect on this schedule; it is pinned so it stays that way.
     sim = CSimulation(inputs=Inputs17140(rpm=rpm, map_kpa=kpa, tps_v=tps, p37=1))
     sim.engine.update_sensors()
     edges: list[tuple[int, int, int, int]] = []

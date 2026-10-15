@@ -48,7 +48,7 @@ The structure matches the Bluetop's design: crank interrupts set event flags, an
 | PORT2 bit 1 (P21, Tout1) | timer-1 output-compare pin, driven by OC1 | [ROM:$FE9B-$FEB0] | LIKELY |
 | PORT2 bits 2–4 | outputs set and cleared in the main loop (bit 2 low after a hot crank (coolant and intake air both hot) for about 90 s, a fuel-pressure-up-like output (GUESS), bit 3 by a fault-dependent timer compare (`$69` against `$A6`, 8 with a stored fault), bit 4 = the fault-code flasher; bits 3–4 are also the serial link's RX/TX, [`serial_link.md`](serial_link.md)) | [ROM:$F478-$F49F, $F654-$F672, $FC1C-$FC28, $F7DF-$F7E9] [EMU:tests/test_ross17140.py::test_hot_crank_p31_timer_and_port2_bit2, ::test_warmer_crank_keeps_port2_bit2_high] | bits 3–4 LIKELY, bit 2 GUESS |
 | PORT3 bit 5 | G (cam reference): resets the NE edge count | [ROM:$FED2] | LIKELY |
-| PORT3 bits 0, 3, 6, 7 | switch inputs (bit 0 tested before the self-test and the fault logic; bit 3 counted as edges into $B5) | [ROM:$F2F5, $F70D, $FBD0-$FBE3] | GUESS |
+| PORT3 bits 0, 3, 6 | switch inputs (bit 0 tested before the self-test and the fault logic; bit 3 counted as edges into $B5); bit 7 is the A/C switch, see its own row | [ROM:$F2F5, $F70D, $FBD0-$FBE3] | GUESS |
 | PORT4 bits 0–1, 2–3 | outputs bits 0–1 (set from an rpm compare); inputs bits 2–3 select an offset table at $F01A | [ROM:$FB9E-$FBB6, $FDE6-$FDF8] | GUESS |
 | SCI | RAM-peek diagnostic link only (not the ADC): 7812.5 baud, read-only, `$00`–`$FF`, off after about 1 s without a request ([`serial_link.md`](serial_link.md)) | [ROM:$F403-$F41E, $F62E-$F641] [EMU:tests/test_peek17140.py] | CONFIRMED |
 
@@ -59,7 +59,7 @@ In expanded mode 2 these pins become the address/data bus, so whatever the ROM u
 | Pin | Use in the ROM | Evidence | Meaning |
 |---|---|---|---|
 | P30 | input: fixed spark sum, flasher pattern, self-test, spark-skip; all act on 0 | [ROM:$F2F0, $F771, $F7FA, $FF7C] | test terminal T, active low, LIKELY |
-| P31 | **output**: on while P17 is low and for about 20.5 s after it rises (`$71` < `$15`), and during a decel fuel cut (`ModeFlags` bit 1) above the return rpm + 7 RpmIndex counts, with hysteresis (read back from its own pin) | [ROM:$F3A2-$F3CC] [EMU:tests/test_ross17140.py::test_hot_crank_p31_timer_and_port2_bit2] | an idle-up (`VISC`) output is the best fit, GUESS; STATUS Q2 |
+| P31 | **output**: on while P17 is low and for 20–21 s after it rises (`$71` < `$15`: 21 one-second ticks, so the delay depends on where the rise falls between ticks), and during a decel fuel cut (`ModeFlags` bit 1) above the return rpm + 7 RpmIndex counts, with hysteresis (read back from its own pin) | [ROM:$F3A2-$F3CC] [EMU:tests/test_ross17140.py::test_hot_crank_p31_timer_and_port2_bit2] | an idle-up (`VISC`) output is the best fit, GUESS; STATUS Q2 |
 | P32 | not used | [ROM: DDR3, every PORT3 read] | — |
 | P33 | input: edges counted into `$B5` (speed-like) | [ROM:$FBD0-$FBE3] | vehicle-speed sensor (`SPD`), GUESS |
 | P34 | input: map select, fuel correction | [ROM:$FAC2, $FDCC] | jumper J8, CONFIRMED (bench) |

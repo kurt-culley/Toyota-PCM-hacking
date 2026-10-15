@@ -447,7 +447,8 @@ def last_edge(ev, pin: str, level: int, after: float = 0.01) -> list[float]:
 
 @needs_cc
 def test_hot_crank_p31_timer_and_port2_bit2():
-    """R-I08 / Q2: P31 is on until about 20.5 s after P1-7 rises [ROM:$F3A2-$F3CC]; after a hot crank
+    """R-I08 / Q2: P31 is on until 20-21 s after P1-7 rises (21 one-second ticks of $71; 20.5 s for
+    a rise at 1.5 s, as here) [ROM:$F3A2-$F3CC]; after a hot crank
     (Coolant 15, Tha 51) PORT2 bit 2 goes low at about 0.18 s and back high at about 92 s [ROM:$F478-$F49F,
     $F654-$F672]."""
     s, rise, ev = crank_then_idle(93, thw_v=0.3, tha_v=1.0)

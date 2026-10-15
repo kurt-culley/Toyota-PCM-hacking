@@ -151,7 +151,7 @@ The 17140 ROM runs in the whole-ROM simulator with its own I/O model, [`analysis
 **What the Ross pass added (2026-10-14):**
 - The reference table `$F044` is exactly ratiometric: (AdcRef + 410) × the ch7 time is constant to 0.1 %, so every reading is 153.7 × V / V_ch7 [EMU:tests/test_ross17140.py::test_adc_reference_table_is_ratiometric]. In the simulator, AdcRef sits at the end of that table for any `ref_v` above about 3.7 V, so the default scale actually rests on the GUESS converter constant `adc_k`, not on ch7 being 5 V.
 - With **256 counts per 5 V** (`ref_v=3.0` in the simulator), 101.3 kPa reads Load 745: exactly the top row of both ignition maps and the top density site [EMU:tests/test_ross17140.py::test_load_tables_top_out_at_one_atmosphere_on_a_256_per_5v_scale]. The mixture screw then reads 128 (zero correction) at mid travel, and both end-stop checks (10 and 248) can be reached; on the default scale a 5 V input reads only about 207. The high-load staircase starts at 93 kPa.
-- So **Load ≈ 6.14 × kPa + 123 is LIKELY**. The simulator default and `ignition_maps.md` still use the old scale until a Verifier agrees.
+- So **Load ≈ 6.14 × kPa + 123 is LIKELY**. The simulator default keeps the old scale until the key-on measurement; `ignition_maps.md` shows both.
 
 Two ways to settle it:
 - read Load over the serial link with the key on and the engine off (barometric pressure, about 100 kPa);

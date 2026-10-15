@@ -106,3 +106,17 @@ jobs:
         with:
           name: ecu_emu_loopback_pico2_w
           path: build-loopback/ecu_emu_loopback_pico2_w.uf2
+
+      - name: Build the chip-in-isolation test UF2 (Pico 2 W only; warnings are errors)
+        if: matrix.board == 'pico2_w'
+        env:
+          PICO_SDK_PATH: ${{ runner.temp }}/pico-sdk
+        run: |
+          cmake -S hardware/ecu-emu/chipdiff -B build-chipdiff -G Ninja -DPICO_BOARD=pico2_w
+          cmake --build build-chipdiff
+
+      - uses: actions/upload-artifact@v4
+        if: matrix.board == 'pico2_w'
+        with:
+          name: ecu_chipdiff_pico2_w
+          path: build-chipdiff/ecu_chipdiff_pico2_w.uf2

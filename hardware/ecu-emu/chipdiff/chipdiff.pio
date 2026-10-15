@@ -1,0 +1,34 @@
+; chipio: one pass per E cycle of the real D151801 (docs/hardware/chip_diff_test.md).
+;   out pins: GP0-28 (only the chip-input pins have their direction set to output)
+;   in pins:  GP0-31, autopush every pass;  side-set: /RES (GP8) pin direction
+; The TX FIFO first gives the number of E cycles to hold /RES low, then the sample delay in
+; PIO clocks; after that one input word per E cycle (DMA). Cycle k starts when E rises: the
+; inputs for cycle k are driven at once, and all pins are sampled mid-way through E high,
+; well away from the chip's own output changes (which follow E falling).
+.program chipio
+.side_set 1 opt pindirs
+    pull block
+    mov x, osr              ; E cycles to hold /RES low
+    pull block
+    mov y, osr              ; sample delay after E rises
+    out null, 32            ; empty the OSR: the next `out` autopulls input word 0
+hold:
+    wait 0 gpio 19 side 1   ; /RES driven low (its output value is 0)
+    wait 1 gpio 19
+    jmp x-- hold
+.wrap_target
+    wait 0 gpio 19 side 0   ; /RES released (pull-up to 5 V) before cycle 0
+    wait 1 gpio 19          ; E rises: cycle k
+    out pins, 29            ; the chip's inputs for cycle k
+    mov x, y
+delay:
+    jmp x-- delay
+    in pins, 32             ; sample every pin
+.wrap
+
+; extal_od: open-drain square wave for EXTAL (pin 3, 470R pull-up to 5 V), as in the reader.
+.program extal_od
+.wrap_target
+    set pindirs, 1
+    set pindirs, 0
+.wrap

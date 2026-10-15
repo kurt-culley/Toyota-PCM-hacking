@@ -5,9 +5,9 @@
 **Method:**
 1. The real D151801 runs its own 17140 program in its normal single-chip mode (mode 7) on the breadboard.
 2. The Pico 2 W plays the engine around it: crank signals, the ADC hybrid and the IGF echo. It uses the same engine model (`engine.h`) and the same 6-phase schedule as the [loopback test](../mr2/cpu_replacement.md#loopback-test-no-wiring).
-3. The Pico records every output edge of the chip, timed in the chip's own E cycles.
+3. The Pico logs every change on every pin, inputs and outputs, timed in the chip's own E cycles.
 
-The loopback test already showed that the emulator produces checksums identical to `expected.h` [BENCH: owner, loopback v2/v2.1, 2026-10-14]. If the real chip produces the same checksums, the emulator is identical to the chip, edge for edge.
+On the PC, `analysis/emu/chipdiff.py` replays exactly the inputs the chip received into the emulator and compares every output edge, pin by pin. If they all match, the emulator is identical to the chip, edge for edge.
 
 **Every powered step needs the owner's confirmation at the time** (CLAUDE.md hardware safety). The power order is the reader's:
 - powering up: USB into the Pico, then the 5 V jumper in **last**;
@@ -16,18 +16,18 @@ The loopback test already showed that the emulator produces checksums identical 
 ```mermaid
 flowchart LR
   subgraph PICO["Pico 2 W"]
-    CLK["PIO: EXTAL 1 MHz<br/>(E = 250 kHz)"]
+    CLK["PIO: EXTAL 500 kHz<br/>(E = 125 kHz)"]
     IO["PIO, once per E cycle:<br/>drive the chip's inputs,<br/>sample its outputs"]
     ENG["Core 0: engine.h<br/>crank schedule, ADC hybrid,<br/>IGF echo 20 E cycles after a spark"]
-    CMP["Per-phase CRC32s<br/>compared with expected.h"]
+    LOG["Core 1: every pin change<br/>to USB"]
     IO --> ENG --> IO
-    IO --> CMP
+    IO --> LOG
   end
   CHIP["Real D151801<br/>mode 7, own ROM"]
   CLK --> CHIP
   IO -->|NE, G, ADC end, IGF, T, IDL, J8 ...| CHIP
   CHIP -->|IGT, injector, ADC select/hold, P22-P24, P31, P40, P41| IO
-  CMP --> USB["USB serial: PASS/FAIL per phase,<br/>first 256 edges for the host diff"]
+  LOG --> PC["PC: emu.chipdiff replays the inputs<br/>into the emulator, compares every output edge"]
 ```
 
 ## Why this is enough
@@ -42,12 +42,11 @@ flowchart LR
 
 ## Clock and timing
 
-- **Clock:** EXTAL is driven at 1 MHz, the reader's proven clock on this breadboard, so E = 250 kHz.
-- **Time base:** the emulator and `expected.h` count time in E cycles, so the slower clock changes nothing in the comparison. It gives the Pico 4 µs per E cycle.
-- **Faster run:** once the test passes, it can be repeated at EXTAL 4 MHz (E = 1 MHz).
-- **Per E cycle:** one PIO state machine waits for E to rise, drives the chip's input pins from a DMA ring, and samples all pins into a second DMA ring.
-- **Reactions:** core 0 scans the samples for output edges, runs `engine.h`, and writes the input levels a few E cycles ahead. The fastest reaction in the model is the IGF echo, 20 E cycles after a spark (80 µs at E = 250 kHz), so the look-ahead has room to spare.
-- **Time zero:** the cycle when /RES is released, as in the simulator. If the real chip takes a different number of cycles to reach its first instruction, every edge is shifted by the same amount. The host diff (below) reports that shift instead of failing silently.
+- **Clock:** EXTAL is driven at 500 kHz, the reader's proven clock on this breadboard, so E = 125 kHz. The emulator counts time in E cycles, so the slower clock changes nothing in the comparison, and it gives the Pico 8 µs per E cycle. A full run (6 phases, 36 M cycles) takes about 5 minutes.
+- **Per E cycle:** one PIO state machine waits for E to rise, drives the chip's inputs from a DMA ring, and a quarter period later samples every pin into a second DMA ring.
+- **Reactions:** core 0 scans the samples for output edges, runs the engine model, and writes the input levels 8 E cycles ahead. The fastest reaction is the IGF echo, 20 E cycles after a spark, so it always lands on time; the log's `late=` count proves it.
+- **Time zero:** the first E cycle after /RES is released (the PIO releases it itself, so it is the same cycle every run). If the real chip takes a different number of cycles than the emulator to reach its first instruction, every input is shifted by the same amount; the PC tool finds that offset first.
+- **Latency:** the chip's pins are sampled once per E cycle, so each output pin may show a constant offset from the emulator's edge time. A constant offset is fine; an offset that varies, a missing edge or a different level is a real difference.
 
 ## Wiring: changes from the reader breadboard
 
@@ -97,23 +96,30 @@ Unchanged: pin 1 GND; pins 21, 7 (STBY), 4 (NMI) and 5 (IRQ1) on the 5 V rail; 1
 | 10 | P22 (mode bit 2) | out | GP20 | New (was R/W); 10 kΩ pull-up |
 | 11 | P23 | out | GP22 | New; 10 kΩ pull-up |
 
-That is 26 GPIOs in all. **New parts:** three 1 kΩ resistors plus 10 kΩ ones (7 straps and the P23 pull-up); everything else is already on the board. A generated wiring picture and a checklist come with the firmware.
+That is 26 GPIOs in all, defined once in [`chipdiff.h`](../../hardware/ecu-emu/chipdiff/chipdiff.h). **New parts:** three 1 kΩ resistors and eight 10 kΩ (the seven straps and the P23 pull-up); everything else is already on the board.
 
-## Firmware and pass criteria
+## Firmware and the PC tool
 
-`hardware/ecu-emu/chipdiff/` builds `ecu_chipdiff_pico2_w.uf2`, sharing `engine.h` and `expected.h` with the loopback. Over USB serial it offers:
+[`hardware/ecu-emu/chipdiff/`](../../hardware/ecu-emu/chipdiff/) builds `ecu_chipdiff_pico2_w.uf2` (CI artefact). It shares `engine.h` and `expected.h` with the loopback. On the USB serial port it offers:
+- **`rigcheck`** (chip out, 5 V jumper out): no line stuck low, no two lines shorted.
+- **`clock`:** E frequency.
+- **`run [phases]`:** the schedule (1–6 phases of 6 s chip time; default 6). It prints `BEGIN`, one line per pin change (`<cycle hex> <pin word hex>`), then `END cycles=… late=… qfull=… dropped=…`. All three counts must be 0. It prints `ABORT …` instead if the Pico ever fell behind the chip.
 
-1. **`rigcheck`** (chip out, 5 V jumper out): checks for stuck or shorted lines, and that the straps read the expected levels.
-2. **`clock`:** E frequency and duty, as in the reader.
-3. **`run`:** the 6-phase schedule, 36 s of chip time (144 s at E = 250 kHz). For each phase the chip's edge count, edge CRC32 and injector totals are compared with `expected.h`, giving PASS/FAIL per phase. The first 256 output edges are printed as a log.
-4. **`peek`:** the same run with P23 held low at reset, so the chip's serial link is on. The Pico reads RAM `$40`–`$FF` at each phase end and compares it with the simulator's RAM CRC.
+**PC side** ([`analysis/emu/chipdiff.py`](../../analysis/emu/chipdiff.py)):
+```
+PYTHONPATH=analysis uv run --with pyserial python -m emu.chipdiff capture /dev/ttyACM0 run1.log
+PYTHONPATH=analysis uv run python -m emu.chipdiff analyse run1.log
+```
+`analyse` finds the input offset, replays the logged inputs into the C emulator and prints, for each output pin: edge counts (chip, emulator), the latencies seen, and the first difference. `tests/test_chipdiff.py` runs the same pipeline with the emulator standing in for the chip: an exact match, and a single spark moved by one cycle is caught.
 
-**Host diff:** `analysis/emu/chipdiff.py` takes a pasted log. It runs the C emulator through the same schedule and prints the first edge that differs, or the constant offset if every edge is shifted. This tells us exactly what to fix in the model.
+**PASS:** every output pin has the same edges at a constant latency over the full run, `late`, `qfull` and `dropped` are 0, and a second run gives the same log. Then the car (see [`cpu_replacement.md`](../mr2/cpu_replacement.md#in-car-test-rig)).
 
-**PASS:**
-- all 6 phases identical, with the peek RAM CRCs matching;
-- the emulator's own loopback already matches the same `expected.h`.
+**FAIL:** the first differing edge points at the instruction or timer behaviour to fix. The C and Python models are fixed together, the loopback's `expected.h` is regenerated, and both tests are re-run.
 
-Together these mean the emulator is identical to the D151801 for this ROM. Then the car (see [`cpu_replacement.md`](../mr2/cpu_replacement.md#in-car-test-rig)).
+## Steps (each powered step needs the owner's OK on the day)
 
-**FAIL:** the host diff names the first differing edge. The C and Python models are fixed together, `expected.h` is regenerated, and both the loopback and this test are re-run.
+1. **Unpowered:** make the wiring changes above; check each new wire against the table with the multimeter.
+2. Chip out, 5 V jumper out: flash the UF2, run `rigcheck`.
+3. Chip in (notch the same way as for the dump), USB first, then the 5 V jumper: `clock` should read 125 000 Hz.
+4. `run 1` as a short first try; capture it with `emu.chipdiff capture … --phases 1`, and send the log (or the `analyse` output).
+5. Then `run 6` twice. Unplug the 5 V jumper before USB.

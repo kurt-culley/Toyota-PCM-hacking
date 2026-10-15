@@ -278,13 +278,15 @@ def breadboard_table() -> str:
     return "\n".join(rows)
 
 
-def draw_breadboard(out: Path, layout=None, head=None, dip=None, wire_colour=None, part_colour=None) -> None:
+def draw_breadboard(
+    out: Path, layout=None, head=None, dip=None, wire_colour=None, part_colour=None, chip=True, extra=None
+) -> None:
     """A top view in portrait, as the common 830-point board is printed: row 1 at the top, a-e on the left.
 
     Rail order follows that board: on the left the + strip is outermost and the - strip sits beside
     column a; on the right the + strip sits beside column j and the - strip is outermost.
     The reader layout by default; pcmre.chipdiff_wiring passes its own layout, title lines, chip pin
-    names and colours.
+    names and colours. chip=False leaves the chip out; extra(draw, xy, key_x, key_end_y) draws more.
     """
     from PIL import Image, ImageDraw, ImageFont
 
@@ -366,17 +368,18 @@ def draw_breadboard(out: Path, layout=None, head=None, dip=None, wire_colour=Non
                anchor="lm" if col == "c" else "rm")  # fmt: skip
     # 6301, face up, notch towards row 44 (down)
     xd = left + lane["d"] * p
-    ya, yb = top + CHIP_ROW0 * p - p // 2, top + (CHIP_ROW0 + 19) * p + p // 2
-    d.rectangle([xd - 12, ya, xh + 12, yb], fill=(40, 40, 40), outline="black")
-    d.pieslice([(xd + xh) // 2 - 18, yb - 18, (xd + xh) // 2 + 18, yb + 18], 180, 360, fill=(245, 243, 236))
-    d.text(((xd + xh) // 2, (ya + yb) // 2), "D151801\n(face up)\nnotch ↓", fill="white", font=f15, anchor="mm",
-           align="center")  # fmt: skip
-    for pin, name in dip.items():
-        col, r = chip_hole(pin)
-        x, y = left + lane[col] * p, top + r * p
-        d.ellipse([x - 5, y - 5, x + 5, y + 5], fill=(200, 200, 200), outline="black")
-        d.text((x + 9, y) if col == "d" else (x - 9, y), f"{pin} {name}", fill="white", font=f10,
-               anchor="lm" if col == "d" else "rm")  # fmt: skip
+    if chip:
+        ya, yb = top + CHIP_ROW0 * p - p // 2, top + (CHIP_ROW0 + 19) * p + p // 2
+        d.rectangle([xd - 12, ya, xh + 12, yb], fill=(40, 40, 40), outline="black")
+        d.pieslice([(xd + xh) // 2 - 18, yb - 18, (xd + xh) // 2 + 18, yb + 18], 180, 360, fill=(245, 243, 236))
+        d.text(((xd + xh) // 2, (ya + yb) // 2), "D151801\n(face up)\nnotch ↓", fill="white", font=f15, anchor="mm",
+               align="center")  # fmt: skip
+        for pin, name in dip.items():
+            col, r = chip_hole(pin)
+            x, y = left + lane[col] * p, top + r * p
+            d.ellipse([x - 5, y - 5, x + 5, y + 5], fill=(200, 200, 200), outline="black")
+            d.text((x + 9, y) if col == "d" else (x - 9, y), f"{pin} {name}", fill="white", font=f10,
+                   anchor="lm" if col == "d" else "rm")  # fmt: skip
     # parts
     for part, a, b in parts:
         (xa_, ya_), (xb_, yb_) = xy(a), xy(b)
@@ -434,6 +437,8 @@ def draw_breadboard(out: Path, layout=None, head=None, dip=None, wire_colour=Non
     lines += [f"{part}: {hole_name(a)} ↔ {hole_name(b)}" for part, a, b in parts]
     for i, t in enumerate(lines):
         d.text((kx, ky2 + 28 + i * 22), t, fill="black", font=f12 if len(t) > 95 else f15)
+    if extra:
+        extra(d, xy, kx, ky2 + 28 + len(lines) * 22)
     out.parent.mkdir(parents=True, exist_ok=True)
     img.save(out, optimize=True)
 

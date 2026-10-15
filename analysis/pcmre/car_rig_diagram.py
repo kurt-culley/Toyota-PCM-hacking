@@ -1,11 +1,13 @@
 # ruff: noqa: E501  (a drawing: long literal label lists)
 """Picture of the proposed in-car test rig (docs/mr2/cpu_replacement.md, "In-car test rig").
 
-    PYTHONPATH=analysis uv run python -m pcmre.car_rig_diagram
+    PYTHONPATH=analysis uv run python -m pcmre.car_rig_diagram            # both pictures
+    PYTHONPATH=analysis uv run python -m pcmre.car_rig_diagram --table    # the wire table
 
 The chip-in-isolation breadboard, with the D151801 out and one jumper wire per used pin from its
 empty hole to a spare turned-pin DIP-40 socket pressed into the spare ECU's CPU socket; the Pico runs
-the emulator. Writes docs/hardware/photos/car_rig/car_rig.png; --table prints the wire table for
+the emulator. Writes docs/hardware/photos/car_rig/car_rig.png (overview) and breadboard_car.png (hole by hole);
+--table prints the wire table for
 docs/mr2/cpu_replacement.md.
 """
 
@@ -18,6 +20,7 @@ from . import wiring as BB
 from .roundtrip import ROOT
 
 OUT = ROOT / "docs/hardware/photos/car_rig/car_rig.png"
+BREADBOARD = ROOT / "docs/hardware/photos/car_rig/breadboard_car.png"
 W, H = 1900, 1140
 BG, INK = (250, 250, 247), (30, 30, 30)
 RED, BLUE, GREY, ORANGE, GREEN, PURPLE = (
@@ -50,6 +53,81 @@ def table() -> str:
     rows = ["| ECU socket pin | Signal | Pico end | Breadboard hole (where the chip pin sat) |", "|---|---|---|---|"]
     rows += [f"| {p} | {n} | {g} | {h} |" for p, n, g, h in car_wires()]
     return "\n".join(rows)
+
+
+def car_layout() -> tuple[list[tuple[str, str, str, str]], list[tuple[str, str, str]]]:
+    """The chip-test layout (pcmre.chipdiff_wiring) as reworked for the car: the EXTAL wire, the 5 V
+    jumper and everything on the + rails (chip supply, decoupling, pull-ups, mode straps, the P4x
+    strap resistor) come off, as do the P4x links and the P36 wire. The signal wires, the ground
+    wiring and the three 1 kΩ stay."""
+    wires, parts, _ = C.layout()
+    extal = next(t for t, a, b, w in wires if "EXTAL" in w and not BB.is_rail(b))
+    plus = lambda h: BB.is_rail(h) and "+" in h  # noqa: E731
+    wires = [w for w in wires if w[0] != extal and not w[0].startswith("S") and w[0] != "P36"
+             and not plus(w[1]) and not plus(w[2])]  # fmt: skip
+    wires = [(t, a, b, w.split("   [")[0]) for t, a, b, w in wires]  # the chip test's move notes
+    parts = [pt for pt in parts if pt[0].startswith("1 kΩ")]
+    return wires, parts
+
+
+def draw_breadboard_car(out=BREADBOARD) -> None:
+    wires, parts = car_layout()
+    jumpers = car_wires()
+    purple = (130, 50, 170)
+    head = [
+        ("In-car test rig: breadboard layout (the chip-test board, reworked; D151801 out)", font(22, True), "black"),
+        ("Generated from chipdiff.h (python -m pcmre.car_rig_diagram). Unpowered work only: USB out, ECU out of the car.",
+         font(15), "black"),
+        ("GREY = the chip test's wires, unchanged.  Everything on the + rails is gone: no 5 V on this board.", font(15, True),
+         "black"),
+        ("PURPLE E# = a jumper from the hole where chip pin # sat to pin # of the spare socket in the ECU.", font(15, True),
+         purple),
+        ("Check each purple jumper by continuity (breadboard hole to ECU socket pin) before anything is powered.",
+         font(15, True), (190, 0, 0)),
+        ("Power order in the car: USB in, then key on; key off, then USB out.", font(15, True), (190, 0, 0)),
+    ]  # fmt: skip
+
+    def extra(d, xy, kx, ky):
+        f12, f15, f15b = font(12), font(15), font(15, True)
+        for pin, _, _, hole in jumpers:
+            x, y = xy(hole if pin != 1 else "".join(map(str, BB.chip_hole(1))))
+            d.ellipse([x - 12, y - 12, x + 12, y + 12], fill=purple, outline="black")
+            d.text((x, y), f"E{pin}", fill="white", font=font(9, True), anchor="mm")
+        ky += 30
+        d.text((kx, ky), "Jumpers to the ECU (26, male-to-male, ~20 cm)", fill=purple, font=f15b)
+        d.text((kx, ky + 24), "into the spare turned-pin DIP-40 socket pressed into the ECU's CPU socket,",
+               fill="black", font=f15)  # fmt: skip
+        d.text(
+            (kx, ky + 46),
+            "never straight into the ECU's own socket. Socket top view, notch up:",
+            fill="black",
+            font=f15,
+        )
+        used = {pin: name for pin, name, _, _ in jumpers}
+        sx, sy, pitch = kx + 260, ky + 90, 24
+        d.rectangle([sx, sy - 14, sx + 150, sy + 19 * pitch + 14], fill=(60, 60, 60), outline="black")
+        d.pieslice([sx + 57, sy - 32, sx + 93, sy + 4], 0, 180, fill="white")
+        d.text((sx + 75, sy + 9.5 * pitch), "ECU CPU\nsocket\n(spare\nsocket in)", fill="white", font=f12, anchor="mm",
+               align="center")  # fmt: skip
+        for i in range(20):
+            for pin, x, side in ((i + 1, sx, -1), (40 - i, sx + 150, 1)):
+                y = sy + i * pitch
+                on = pin in used
+                fill = purple if on else (200, 200, 200)
+                d.ellipse([x - 11, y - 11, x + 11, y + 11], fill=fill, outline="black")
+                d.text(
+                    (x, y),
+                    f"E{pin}" if on else str(pin),
+                    fill="white" if on else "black",
+                    font=font(9, True),
+                    anchor="mm",
+                )
+                label = used.get(pin, "no wire (the ECU board's)")
+                d.text((x + side * 18, y), label, fill="black" if on else (140, 140, 140), font=f12,
+                       anchor="rm" if side < 0 else "lm")  # fmt: skip
+
+    BB.draw_breadboard(out, layout=(wires, parts), head=head, dip=C.DIP7, wire_colour=lambda t, w: (110, 110, 110),
+                       part_colour=lambda pt: (60, 190, 90), chip=False, extra=extra)  # fmt: skip
 
 
 def font(size: int, bold: bool = False):
@@ -137,8 +215,8 @@ def draw() -> Image.Image:
     for i in range(7):  # the existing signal wires, Pico to the plug's holes
         d.line([(bx0 + 70 + i * 28, by0 + 330), (bx0 + 70 + i * 28, by0 + 360)], fill=GREY, width=4)
     keep = ["KEEP (grey): the signal wires (not", "EXTAL), ground, the 1 kΩ on GP26-28", "", "REMOVE (red):"]
-    rem = ["5 V jumper; pins 21, 4, 5, 7 to + rail", "EXTAL wire + pull-up; /RES pull-up", "3 mode straps; P42-P47 jumpers +",
-           "resistor; P36 ground wire", "(the ECU board sets all of these)"]  # fmt: skip
+    rem = ["5 V jumper and everything on the + rails:", "pins 21/4/5/7 wires, both capacitors,", "every pull-up and mode strap;",
+           "EXTAL wire; P42-P47 links; P36 wire", "(the ECU board provides all of these)"]  # fmt: skip
     for i, s in enumerate(keep):
         d.text((bx0 + 320, by0 + 70 + i * 25), s, font=font(17, i == 3), fill=GREY if i < 2 else RED)
     for i, s in enumerate(rem):
@@ -177,7 +255,8 @@ def main() -> int:
         return 0
     OUT.parent.mkdir(parents=True, exist_ok=True)
     draw().save(OUT, optimize=True)
-    print(f"wrote {OUT.relative_to(ROOT)}")
+    draw_breadboard_car()
+    print(f"wrote {OUT.relative_to(ROOT)}, {BREADBOARD.relative_to(ROOT)}")
     return 0
 
 

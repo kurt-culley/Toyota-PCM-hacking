@@ -3,14 +3,18 @@
 
     PYTHONPATH=analysis uv run python -m pcmre.car_rig_diagram
 
-The chip-in-isolation breadboard, with the D151801 replaced by a DIP-40 ribbon jumper to the spare
-ECU's CPU socket and the Pico running the emulator. Writes docs/hardware/photos/car_rig/car_rig.png.
+The chip-in-isolation breadboard, with the D151801 out and one jumper wire per used pin from its
+empty hole to a spare turned-pin DIP-40 socket pressed into the spare ECU's CPU socket; the Pico runs
+the emulator. Writes docs/hardware/photos/car_rig/car_rig.png; --table prints the wire table for
+docs/mr2/cpu_replacement.md.
 """
 
 from __future__ import annotations
 
 from PIL import Image, ImageDraw, ImageFont
 
+from . import chipdiff_wiring as C
+from . import wiring as BB
 from .roundtrip import ROOT
 
 OUT = ROOT / "docs/hardware/photos/car_rig/car_rig.png"
@@ -24,6 +28,28 @@ RED, BLUE, GREY, ORANGE, GREEN, PURPLE = (
     (20, 140, 70),
     (120, 60, 160),
 )
+
+
+UNUSED = {3: "EXTAL: the ECU's crystal drives it; the car firmware makes its own clock"}
+
+
+def car_wires() -> list[tuple[int, str, str, str]]:
+    """(ECU socket pin, signal, Pico end, breadboard hole): one jumper each, from the hole where
+    that chip pin sat to the same pin of the socket. Every GPIO the chip test wires, except EXTAL,
+    plus ground."""
+    rows = [(1, "GND", "ground (the existing GND wire)", BB.hole_name("".join(map(str, BB.chip_hole(1)))))]
+    for g, (pin, name) in C.gpio_pins().items():
+        if pin in UNUSED:
+            continue
+        pico = f"GP{g}" + (" via 1 kΩ" if g in C.SERIES_ROWS else "")
+        rows.append((pin, name, pico, "".join(map(str, BB.chip_hole(pin)))))
+    return sorted(rows)
+
+
+def table() -> str:
+    rows = ["| ECU socket pin | Signal | Pico end | Breadboard hole (where the chip pin sat) |", "|---|---|---|---|"]
+    rows += [f"| {p} | {n} | {g} | {h} |" for p, n, g, h in car_wires()]
+    return "\n".join(rows)
 
 
 def font(size: int, bold: bool = False):
@@ -85,15 +111,15 @@ def draw() -> Image.Image:
         y = sy0 + 10 + i * 14.5
         d.rectangle((sx0 - 10, y, sx0, y + 7), fill=(200, 200, 200))
         d.rectangle((sx0 + 200, y, sx0 + 210, y + 7), fill=(200, 200, 200))
-    d.text((sx0 + 100, sy0 + 120), "CPU socket\n(chip out)\n\nDIP-40 plug\nof the ribbon", font=font(18, True), fill="white",
+    d.text((sx0 + 100, sy0 + 120), "CPU socket\n(chip out)\n\nspare turned-pin\nDIP-40 socket\npressed in", font=font(18, True), fill="white",
            anchor="mm", align="center")  # fmt: skip
 
-    # ribbon
+    # jumper wires
     for k in range(6):
-        d.line([(sx0 + 210, sy0 + 60 + 14 * k), (1220, 560 + 14 * k)], fill=(150, 150, 150), width=5)
+        d.line([(sx0 + 210, sy0 + 60 + 14 * k), (1220, 510 + 14 * k)], fill=(150, 150, 150), width=4)
     d.text(
-        (990, 250),
-        "40-way ribbon\n~30 cm, DIP-40\nplug at both\nends: the one\nnew part",
+        (990, 230),
+        "26 jumper wires\n(25 signals +\nGND), ~20 cm,\nbreadboard hole\nto socket pin:\nno new parts",
         font=font(16, True),
         fill=(90, 90, 90),
     )
@@ -106,11 +132,11 @@ def draw() -> Image.Image:
     d.text((bx0 + 150, by0 + 195), "Pico 2 W\nemulator\nfirmware\n(17140 ROM\n+ your tune)", font=font(18, True), fill="white",
            anchor="mm", align="center")  # fmt: skip
     d.rectangle((bx0 + 40, by0 + 360, bx0 + 260, by0 + 560), fill=(70, 70, 70), outline=INK, width=2)
-    d.text((bx0 + 150, by0 + 460), "ribbon's DIP-40\nplug, where\nthe chip sat\n(notch down)", font=font(17, True),
+    d.text((bx0 + 150, by0 + 460), "chip's empty\nholes: one\njumper per\nused pin", font=font(17, True),
            fill="white", anchor="mm", align="center")  # fmt: skip
     for i in range(7):  # the existing signal wires, Pico to the plug's holes
         d.line([(bx0 + 70 + i * 28, by0 + 330), (bx0 + 70 + i * 28, by0 + 360)], fill=GREY, width=4)
-    keep = ["KEEP (grey): all 26 signal wires,", "ground, the three 1 kΩ on GP26-28", "", "REMOVE (red):"]
+    keep = ["KEEP (grey): the signal wires (not", "EXTAL), ground, the 1 kΩ on GP26-28", "", "REMOVE (red):"]
     rem = ["5 V jumper; pins 21, 4, 5, 7 to + rail", "EXTAL wire + pull-up; /RES pull-up", "3 mode straps; P42-P47 jumpers +",
            "resistor; P36 ground wire", "(the ECU board sets all of these)"]  # fmt: skip
     for i, s in enumerate(keep):
@@ -131,7 +157,7 @@ def draw() -> Image.Image:
     box(d, (40, 780, 1120, 1110), (232, 242, 255), "Use, in order (each powered step: owner's OK on the day)", [
         "0. Strict bench gate passed first: every pin exact, replay passes, repeat runs identical,",
         "   plus a run covering idle contact, cranking, rev limit, missing IGF and the T terminal.",
-        "1. Unpowered: rework the breadboard (red items), fit the ribbon, check by continuity.",
+        "1. Unpowered: rework the breadboard (red items), fit the 26 jumpers by the wire table, check by continuity.",
         "2. USB in. Key on, engine off: fault lamp, fuel-pump prime, live coolant/MAP/TPS",
         "   values over USB against the stock ECU's readings (serial link).",
         "3. Crank and idle: timing light shows 16° BTDC (T open) and 10° (T to E1 shorted).",
@@ -144,6 +170,11 @@ def draw() -> Image.Image:
 
 
 def main() -> int:
+    import sys
+
+    if "--table" in sys.argv:
+        print(table())
+        return 0
     OUT.parent.mkdir(parents=True, exist_ok=True)
     draw().save(OUT, optimize=True)
     print(f"wrote {OUT.relative_to(ROOT)}")

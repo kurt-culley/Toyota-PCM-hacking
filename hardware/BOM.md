@@ -43,10 +43,9 @@ The chip-test breadboard becomes the rig ([`../docs/mr2/cpu_replacement.md`](../
 
 | # | Item | Qty | Why | Where | Approx. |
 |---|---|---|---|---|---|
-| C1 | **DIP-40 ribbon jumper**: 40-way ribbon, about 30 cm, with a DIP-40 IDC plug at each end (or two 40-way IDC DIP plugs and 0.5 m of ribbon, crimped in a vice) | 1 | From the ECU's CPU socket to where the chip sat on the breadboard | CPC / Farnell, eBay | ~£10 |
-| C2 | Only if the supply-current check shows a CMOS chip: **74HCT541N** | 2 | 5 V CMOS levels on the 12 outputs | CPC | ~£2 |
+| C1 | Only if the supply-current check shows a CMOS chip: **74HCT541N** | 2 | 5 V CMOS levels on the 12 outputs | CPC | ~£2 |
 
-**Total about £10.** No buck module, stripboard or headers: the PCB (C2 below) follows directly.
+**Total: nothing, or about £2 for the buffers.** The link to the ECU is 26 of the male-to-male jumpers already owned, into the spare turned-pin socket (A6) pressed into the ECU's CPU socket. No buck module, stripboard or headers: the PCB (C2 below) follows directly.
 
 ### C2. Final board: DO NOT ORDER
 

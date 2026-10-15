@@ -3,12 +3,14 @@
 // and by tests/test_loopback_engine.py (on the host, as fast as it runs), which must both
 // reproduce the simulator's checksums in expected.h. Include once, after board.h and expected.h.
 //
+// Schedule: one REF row per 6 s phase (emu.loopback_ref.SCHEDULE): rpm, MAP, TPS and the switch
+// inputs (idle contact P16, T terminal P30, IGF present), changing at exactly k x 6 s.
 // Crank: NE rises every 30 deg (T = round(5e6 / rpm) us), falls half a tooth later; G is high
-// for the first half of every 6th tooth. Producer: eng_crank_fill() queues these edges in time
-// order into a single-producer / single-consumer ring.
-// Reactions: the ADC hybrid (P20 falls 20 us + 200 us/V after the hold line P15 drops, for the
-// channel on P12-P14, unless the hold line came back first) and the IGF echo 20 us after each
-// spark (P11 falling).
+// for the first half of every 6th tooth. Producer: eng_crank_fill() queues these edges, and the
+// phase changes, in time order into a single-producer / single-consumer ring.
+// Reactions: the ADC hybrid (P20 rises REF_ADC_START_DELAY us after the hold line P15 rises, and
+// falls REF_ADC_OFFSET + 200 us/V after P15 drops, for the channel on P12-P14, unless the hold line came
+// back first) and, when the phase has IGF, the echo REF_IGF_DELAY us after each spark (P11 falling).
 
 #ifndef LOOPBACK_ENGINE_H
 #define LOOPBACK_ENGINE_H
@@ -20,7 +22,10 @@
 #define ENG_DMB()
 #endif
 
-static int eng_scenario_at(int64_t t) { return (int)((t / REF_PHASE_US) % 3); }
+static int eng_scenario_at(int64_t t) {
+    int64_t k = t / REF_PHASE_US;
+    return (int)(k < REF_PHASES ? k : REF_PHASES - 1);
+}
 
 static uint32_t eng_crc32(uint32_t crc, const uint8_t *p, unsigned n) {
     crc = ~crc;
@@ -35,8 +40,8 @@ typedef struct {
     int64_t t;
     uint8_t kind, g;
 } eng_ev_t;
-enum { EV_TOOTH, EV_GLOW, EV_NELOW };
-enum { LEV_ADC_END, LEV_IS3 };
+enum { EV_TOOTH, EV_GLOW, EV_NELOW, EV_PHASE };
+enum { LEV_ADC_END, LEV_IS3, LEV_ADC_START };
 #define ENG_RING 1024u
 
 typedef struct {
@@ -50,10 +55,10 @@ typedef struct {
     eng_ev_t ring[ENG_RING];
     volatile uint32_t head, tail;
     volatile int64_t queued_until;  // every crank edge up to this time is in the ring
-    int64_t tooth, pend_glow, pend_nelow;
+    int64_t tooth, pend_glow, pend_nelow, next_phase;
     int edge;
     // consumer side (core 1)
-    struct { int64_t t; uint8_t kind; } local[8];
+    struct { int64_t t; uint8_t kind; } local[16];
     int n_local, adc_hold;
     int64_t inj_on;
     uint32_t w_edges, w_crc, w_inj_n, w_inj_sum;
@@ -65,6 +70,7 @@ static void eng_init(eng_t *e, board_t *b) {
     e->b = b;
     e->tooth = 1000;
     e->pend_glow = e->pend_nelow = -1;
+    e->next_phase = REF_PHASES > 1 ? REF_PHASE_US : -1;
     e->adc_hold = 1;
     e->inj_on = -1;
 }
@@ -75,9 +81,13 @@ static void eng_crank_fill(eng_t *e, int64_t until) {
         int64_t t = e->tooth;
         if (e->pend_glow >= 0 && e->pend_glow < t) t = e->pend_glow;
         if (e->pend_nelow >= 0 && e->pend_nelow < t) t = e->pend_nelow;
+        if (e->next_phase >= 0 && e->next_phase <= t) t = e->next_phase;  // ties: the phase change first
         if (t > until) break;
         eng_ev_t ev;
-        if (e->pend_glow >= 0 && e->pend_glow == t) {
+        if (e->next_phase >= 0 && e->next_phase == t) {
+            ev = (eng_ev_t){t, EV_PHASE, 0};
+            e->next_phase = t + REF_PHASE_US < (int64_t)REF_PHASES * REF_PHASE_US ? t + REF_PHASE_US : -1;
+        } else if (e->pend_glow >= 0 && e->pend_glow == t) {
             ev = (eng_ev_t){t, EV_GLOW, 0};
             e->pend_glow = -1;
         } else if (e->pend_nelow >= 0 && e->pend_nelow == t) {
@@ -134,6 +144,8 @@ static void eng_run_ev(void *ctx) {
         e->n_local--;
         if (kind == LEV_ADC_END) {
             if (!e->adc_hold) d_set_pin(io, 2, 0, 0);
+        } else if (kind == LEV_ADC_START) {
+            d_set_pin(io, 2, 0, 1);
         } else {
             d_is3_edge(io);
         }
@@ -147,6 +159,10 @@ static void eng_run_ev(void *ctx) {
         d_set_pin(io, 1, 0, 1);
     } else if (ev.kind == EV_GLOW) {
         d_set_pin(io, 3, 5, 0);
+    } else if (ev.kind == EV_PHASE) {
+        const ref_t *r = &REF[eng_scenario_at(ev.t)];
+        d_set_pin(io, 3, 0, r->tterm ? 0 : 1);  // T terminal
+        d_set_pin(io, 1, 6, r->idl ? 0 : 1);    // idle contact
     } else {
         d_set_pin(io, 1, 0, 0);
     }
@@ -178,15 +194,15 @@ static void eng_on_output(void *ctx, int port, int bit, int level, int64_t t) {
     if (port == 1 && bit == 5) {
         if (level) {
             e->adc_hold = 1;
-            d_set_pin(&e->b->io, 2, 0, 1);
+            eng_local_push(e, t + REF_ADC_START_DELAY, LEV_ADC_START);
         } else if (e->adc_hold) {
             e->adc_hold = 0;
             int ch = (d_port_out(&e->b->io, 0) >> 2) & 7;
-            double dt = rint(20.0 + 200.0 * eng_channel_volts(ch, t));
+            double dt = rint(REF_ADC_OFFSET + 200.0 * eng_channel_volts(ch, t));
             eng_local_push(e, t + (dt > 1 ? (int64_t)dt : 1), LEV_ADC_END);
         }
     } else if (port == 1 && bit == 1 && !level) {
-        eng_local_push(e, t + 20, LEV_IS3);
+        if (REF[eng_scenario_at(t)].igf) eng_local_push(e, t + REF_IGF_DELAY, LEV_IS3);
     } else if (port == 2 && bit == 1) {
         if (!level) {
             e->inj_on = t;
@@ -210,7 +226,8 @@ static void eng_attach(eng_t *e, board_t *b) {
 
 static void eng_set_switches(eng_t *e) {
     d151801_t *io = &e->b->io;
-    d_set_pin(io, 3, 0, 1);  // T open
+    d_set_pin(io, 3, 0, REF[0].tterm ? 0 : 1);  // T terminal
+    d_set_pin(io, 1, 6, REF[0].idl ? 0 : 1);    // idle contact
     d_set_pin(io, 3, 4, 1);  // J8: P34 = 1
     d_set_pin(io, 3, 6, 0);
     d_set_pin(io, 3, 5, 0);  // G low

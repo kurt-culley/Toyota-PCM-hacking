@@ -230,7 +230,7 @@ static void __not_in_flash_func(run)(uint32_t phases) {
     channel_config_set_dreq(&cr, pio_get_dreq(pio_io, sm_io, false));
     dma_channel_configure(dma_rx, &cr, rx_ring, &pio_io->rxf[sm_io], DMA_COUNT, true);
 
-    printf("# chipdiff v1 e_hz=%lu phases=%lu cycles=%llu lookahead=%d\n", (unsigned long)E_HZ,
+    printf("# chipdiff v2 e_hz=%lu phases=%lu cycles=%llu lookahead=%d\n", (unsigned long)E_HZ,
            (unsigned long)phases, (unsigned long long)total, LOOKAHEAD);
     printf("BEGIN\n");
     sleep_ms(20);

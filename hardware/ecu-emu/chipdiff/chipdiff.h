@@ -6,8 +6,9 @@
 // firmware drives the chip's inputs with cd_word(k), computed a few cycles ahead, and samples
 // all pins; cd_sample(k, pins) turns output edges into the engine's reactions. The crank
 // schedule and the reactions are engine.h's (the loopback's model of engine17140.py):
-//   NE / G from eng_crank_fill; ADC end on P20 20 + 200 x volts cycles after P15 (hold) falls;
-//   IGF: SC1 pulled low 20 cycles after each spark (P11 falling), for IGF_LOW_CYCLES.
+//   NE / G and the phase's switch inputs from eng_crank_fill; P20 up REF_ADC_START_DELAY after P15
+//   rises and down REF_ADC_OFFSET + 200 x volts after it falls; IGF: SC1 pulled low REF_IGF_DELAY
+//   after each spark (P11 falling), for IGF_LOW_CYCLES, in phases with IGF.
 // The chip's reaction times are its own (observed), so the log records the inputs as actually
 // applied; analysis/emu/chipdiff.py replays exactly those into the emulator and compares the
 // outputs. Include once, after board.h, expected.h and engine.h.
@@ -63,12 +64,26 @@
 #define CD_G_IS3 18
 #define CD_ADC_SEL_SHIFT 15  // P12-P14 on GP15-17: the channel number
 
-// Input levels before and at reset, as the simulator starts: every pin high except G
-// (eng_set_switches). The P36 strap (pin 31) is a resistor to GND, P42-P47 resistors to 5 V.
-#define CD_IN_INIT (CD_IN_MASK & ~(1u << CD_G_P35))
+#define CD_G_P30 0   // T terminal
+#define CD_G_P16 27  // idle contact
+// Input levels before and at reset, as the simulator starts: every pin high except G and the
+// switches of the first phase (eng_set_switches). The P36 strap (pin 31) is a wire to GND, P42-P47
+// a resistor to 5 V.
+#define CD_IN_INIT                                                                                                     \
+    (CD_IN_MASK & ~(1u << CD_G_P35) & ~(REF[0].tterm ? 1u << CD_G_P30 : 0u) & ~(REF[0].idl ? 1u << CD_G_P16 : 0u))
+
+// The chip's output edges are sampled this many cycles after the emulator's time for them: port
+// writes 3, compare outputs 2 (chip runs 3-5, constant over every edge). Reactions are timed from
+// the corrected edge, so they reach the chip at the model's times (engine.h). The host self-test,
+// whose "chip" is the emulator itself, sets both to 0.
+#ifndef CD_LAT_PORT
+#define CD_LAT_PORT 3
+#endif
+#ifndef CD_LAT_OC
+#define CD_LAT_OC 2
+#endif
 
 #define IGF_LOW_CYCLES 8
-#define IGF_DELAY 20
 
 enum { CD_ADC_START, CD_ADC_END, CD_IS3_LOW, CD_IS3_HIGH };
 #define CD_QN 16
@@ -102,7 +117,7 @@ static void cd_push(cd_t *c, int64_t t, int kind) {
         return;
     }
     if (t < c->filled) {
-        if (kind != CD_ADC_START) c->late++;
+        c->late++;
         t = c->filled;
     }
     int i = c->nq++;
@@ -130,6 +145,10 @@ static uint32_t cd_word(cd_t *c, int64_t k) {
             cd_set(c, CD_G_P10, 1);
         } else if (ev.kind == EV_GLOW) {
             cd_set(c, CD_G_P35, 0);
+        } else if (ev.kind == EV_PHASE) {
+            const ref_t *r = &REF[eng_scenario_at(ev.t)];
+            cd_set(c, CD_G_P30, !r->tterm);
+            cd_set(c, CD_G_P16, !r->idl);
         } else {
             cd_set(c, CD_G_P10, 0);
         }
@@ -154,19 +173,23 @@ static void cd_sample(cd_t *c, int64_t k, uint32_t pins) {
     c->out_prev = out;
     if (!ch) return;
     if (ch & (1u << CD_G_P15)) {
+        int64_t t = k - CD_LAT_PORT;  // the model's time of this edge
         if (out & (1u << CD_G_P15)) {
             c->adc_hold = 1;
-            cd_push(c, k, CD_ADC_START);
+            cd_push(c, t + REF_ADC_START_DELAY, CD_ADC_START);
         } else if (c->adc_hold) {
             c->adc_hold = 0;
             int chn = (int)((out >> CD_ADC_SEL_SHIFT) & 7u);
-            double dt = rint(20.0 + 200.0 * eng_channel_volts(chn, k));
-            cd_push(c, k + (dt > 1 ? (int64_t)dt : 1), CD_ADC_END);
+            double dt = rint(REF_ADC_OFFSET + 200.0 * eng_channel_volts(chn, t));
+            cd_push(c, t + (dt > 1 ? (int64_t)dt : 1), CD_ADC_END);
         }
     }
     if ((ch & (1u << CD_G_P11)) && !(out & (1u << CD_G_P11))) {
-        cd_push(c, k + IGF_DELAY, CD_IS3_LOW);
-        cd_push(c, k + IGF_DELAY + IGF_LOW_CYCLES, CD_IS3_HIGH);
+        int64_t t = k - CD_LAT_OC;
+        if (REF[eng_scenario_at(t)].igf) {
+            cd_push(c, t + REF_IGF_DELAY, CD_IS3_LOW);
+            cd_push(c, t + REF_IGF_DELAY + IGF_LOW_CYCLES, CD_IS3_HIGH);
+        }
     }
 }
 

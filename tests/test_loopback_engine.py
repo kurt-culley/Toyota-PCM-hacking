@@ -14,7 +14,7 @@ import subprocess
 import pytest
 
 from emu.engine17140 import ROM_17140
-from emu.loopback_ref import OUT, header, run
+from emu.loopback_ref import OUT, PHASES, header, run
 from pcmre.roundtrip import ROOT
 
 CC = shutil.which("cc") or shutil.which("gcc")
@@ -69,4 +69,4 @@ def test_engine_model_reproduces_the_simulator_bit_for_bit(tmp_path):
                     "-lm"], check=True)  # fmt: skip
     p = subprocess.run([str(exe), str(ROM_17140)], capture_output=True, text=True)
     assert p.returncode == 0, p.stdout
-    assert p.stdout.count("PASS") == 6
+    assert p.stdout.count("PASS") == PHASES

@@ -77,6 +77,11 @@ class Inputs17140:
 class Engine17140:
     adc_k = 200.0  # us per volt (GUESS)
     adc_offset = 20  # us (GUESS)
+    # When P20 rises after the ROM raises the hold line P1-5: at once (0, the default) or this many
+    # µs later. The chip-in-isolation test uses 20 so the Pico can meet it exactly (P20 is captured
+    # on its falling edge, so the rise only re-arms the conversion).
+    adc_start_delay = 0
+    igf_delay = 20  # µs from a spark to its IGF echo
 
     def __init__(self, periph: Peripherals, rom: bytes, inputs: Inputs17140 | None = None, profile=None):
         self.p = periph
@@ -138,7 +143,10 @@ class Engine17140:
         if name == "P1-5":  # ADC hold (high) / start (falling)
             if level:
                 self._adc_hold = True
-                p.set_pin(2, 0, 1)
+                if self.adc_start_delay:
+                    p.at(t + self.adc_start_delay, lambda: p.set_pin(2, 0, 1))
+                else:
+                    p.set_pin(2, 0, 1)
             elif self._adc_hold:
                 self._adc_hold = False
                 ch = (p._out(0) >> 2) & 7
@@ -149,7 +157,7 @@ class Engine17140:
             if level == 0:
                 self.sparks.append(t)
                 if self.inputs.igf:
-                    p.at(t + 20, p.is3_falling_edge)
+                    p.at(t + self.igf_delay, p.is3_falling_edge)
             else:
                 self.dwell_starts.append(t)
         elif name == "P2-1":  # Tout1: injector drive (level logged both ways)

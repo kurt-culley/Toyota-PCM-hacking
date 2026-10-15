@@ -23,8 +23,8 @@ pytestmark = pytest.mark.skipif(CC is None, reason="no host C compiler")
 CORE = ROOT / "hardware/ecu-emu/core"
 LOOP = ROOT / "hardware/ecu-emu/loopback"
 CD = ROOT / "hardware/ecu-emu/chipdiff"
-CYCLES = 400_000  # 0.4 s of chip time: start-up, cranking and the first 800 rpm teeth
-LOOKAHEAD = 16  # longer than any instruction, so every input is queued before it is due
+CYCLES = 7_000_000  # the 6 s cranking phase and the first second of idle (emu.loopback_ref.SCHEDULE)
+LOOKAHEAD = 16  # longer than any instruction, so every input is queued before it is due; reactions come >= 30 later
 
 HOST = r"""
 #include <stdio.h>
@@ -32,6 +32,8 @@ HOST = r"""
 #include "board.h"
 #include "expected.h"
 #include "engine.h"
+#define CD_LAT_PORT 0  /* the "chip" here is the emulator: its edges are seen at their own time */
+#define CD_LAT_OC 0
 #include "chipdiff.h"
 
 typedef struct { int64_t t; uint32_t w; } iw_t;
@@ -158,3 +160,10 @@ def test_one_spark_moved_by_a_cycle_fails(host_log):
     igt = next(r for r in res if r.pin.name == "P11")
     assert not igt.ok and igt.first_bad[0] == k_spark + 1
     assert "FAIL" in chipdiff.report(offset, res)
+
+
+def test_closed_loop_of_the_emulator_as_chip_is_exact(host_log):
+    """With on-time reactions the chip's run equals the emulator running closed loop through the schedule."""
+    log = chipdiff.parse_log(host_log)
+    for name, (nc, ne, lat) in chipdiff.closed_loop(log).items():
+        assert nc == ne and set(lat) <= {0}, name

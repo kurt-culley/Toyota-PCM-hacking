@@ -4,7 +4,19 @@
 
 **Method:**
 1. The real D151801 runs its own 17140 program in its normal single-chip mode (mode 7) on the breadboard.
-2. The Pico 2 W plays the engine around it: crank signals, the ADC hybrid and the IGF echo. It uses the same engine model (`engine.h`) and the same 6-phase schedule as the [loopback test](../mr2/cpu_replacement.md#loopback-test-no-wiring).
+2. The Pico 2 W plays the engine around it: crank signals, the ADC hybrid and the IGF echo. It uses the same engine model (`engine.h`) and the same schedule as the [loopback test](../mr2/cpu_replacement.md#loopback-test-no-wiring).
+
+   **The schedule** (`emu.loopback_ref.SCHEDULE`, 6 s each):
+   1. cranking at 200 rpm, 100 kPa;
+   2. warm idle at 800 rpm, 35 kPa, throttle closed (idle contact);
+   3. 800 rpm with the idle contact open;
+   4. 2000 rpm, 50 kPa;
+   5. 5000 rpm, 95 kPa;
+   6. 7700 rpm, above the rev limit;
+   7. 2000 rpm with IGF missing (the ROM's safety cut);
+   8. 800 rpm idle with the T terminal shorted.
+
+   Runs 3-5 used an earlier schedule of three points twice; `emu.chipdiff` reads the version from the log header.
 3. The Pico logs every change on every pin, inputs and outputs, timed in the chip's own E cycles.
 
 On the PC, `analysis/emu/chipdiff.py` replays exactly the inputs the chip received into the emulator and compares every output edge, pin by pin. If they all match, the emulator is identical to the chip, edge for edge.
@@ -42,7 +54,13 @@ flowchart LR
 
 ## Clock and timing
 
-- **Clock:** EXTAL is driven at 500 kHz, the reader's proven clock on this breadboard, so E = 125 kHz. The emulator counts time in E cycles, so the slower clock changes nothing in the comparison, and it gives the Pico 8 µs per E cycle. A full run (6 phases, 36 M cycles) takes about 5 minutes.
+- **Reactions on the model's time:**
+  - the chip's outputs are sampled 3 cycles (port writes) or 2 cycles (compare outputs) after the emulator's time for them, so the Pico times each reaction from the corrected edge;
+  - ADC-start has a fixed 20-cycle delay in the model and on the Pico, so the Pico can always meet it;
+  - the schedule's ADC-end and IGF delays are 30 cycles (the simulator's defaults are 20);
+  - every reaction, ADC-start included, counts toward `late`, which must be 0.
+
+- **Clock:** EXTAL is driven at 500 kHz, the reader's proven clock on this breadboard, so E = 125 kHz. The emulator counts time in E cycles, so the slower clock changes nothing in the comparison, and it gives the Pico 8 µs per E cycle. A full run (8 phases, 48 M cycles) takes about 6.5 minutes.
 - **Per E cycle:** one PIO state machine waits for E to rise, drives the chip's inputs from a DMA ring, and a quarter period later samples every pin into a second DMA ring.
 - **Reactions:** core 0 scans the samples for output edges, runs the engine model, and writes the input levels 8 E cycles ahead. The fastest reaction is the IGF echo, 20 E cycles after a spark, so it always lands on time; the log's `late=` count proves it.
 - **Time zero:** the first E cycle after /RES is released (the PIO releases it itself, so it is the same cycle every run). If the real chip takes a different number of cycles than the emulator to reach its first instruction, every input is shifted by the same amount; the PC tool finds that offset first.
@@ -167,7 +185,7 @@ Grey wires stay as on the reader; orange ones keep their Pico hole and move thei
 [`hardware/ecu-emu/chipdiff/`](../../hardware/ecu-emu/chipdiff/) builds `ecu_chipdiff_pico2_w.uf2` (CI artefact). It shares `engine.h` and `expected.h` with the loopback. On the USB serial port it offers:
 - **`rigcheck`** (chip out, 5 V jumper out): no line stuck low, no two lines shorted.
 - **`clock`:** E frequency.
-- **`run [phases]`:** the schedule (1–6 phases of 6 s chip time; default 6). It prints `BEGIN`, one line per pin change (`<cycle hex> <pin word hex>`), then `END cycles=… late=… qfull=… dropped=…`. All three counts must be 0. It prints `ABORT …` instead if the Pico ever fell behind the chip.
+- **`run [phases]`:** the schedule (1-8 phases of 6 s chip time; default 8). It prints `BEGIN`, one line per pin change (`<cycle hex> <pin word hex>`), then `END cycles=… late=… qfull=… dropped=…`. All three counts must be 0. It prints `ABORT …` instead if the Pico ever fell behind the chip.
 
 **PC side** ([`analysis/emu/chipdiff.py`](../../analysis/emu/chipdiff.py)):
 ```
@@ -236,4 +254,4 @@ PYTHONPATH=analysis uv run python -m emu.chipdiff analyse run1.log
 2. Chip out, 5 V jumper out: flash the UF2, run `rigcheck`.
 3. Chip in (notch the same way as for the dump), USB first, then the 5 V jumper: `clock` should read 125 000 Hz.
 4. `run 1` as a short first try; capture it with `emu.chipdiff capture … --phases 1`, and send the log (or the `analyse` output).
-5. Then `run 6` twice. Unplug the 5 V jumper before USB.
+5. Then a full `run` twice (two identical logs are part of PASS). Unplug the 5 V jumper before USB.

@@ -246,6 +246,22 @@ def phase_stats(ne: list[int], sparks: list[int], inj: list[tuple[int, int]], ph
             "pulse": (min(pulses), round(sum(pulses) / len(pulses)), max(pulses)) if pulses else None}  # fmt: skip
 
 
+def schedule_of(log: Log):
+    """The schedule a log ran: v1 (runs 3-5: three points twice, P20 rising at once) or the current one."""
+    from . import loopback_ref as L
+
+    v1 = any(m.startswith("# chipdiff v1") for m in log.meta)
+    return (L.SCHEDULE_V1, 0) if v1 else (L.SCHEDULE, L.ADC_START_DELAY)
+
+
+def schedule_sim(log: Log, listener, until: int) -> CSimulation:
+    """The emulator running closed loop through the log's schedule (emu.loopback_ref.simulate)."""
+    from .loopback_ref import simulate
+
+    sched, delay = schedule_of(log)
+    return simulate(sched, delay, listener, until)
+
+
 def closed_loop(log: Log) -> dict[str, tuple[int, int, Counter]]:
     """Every output edge of the chip against the emulator running closed loop through the same schedule.
 
@@ -253,11 +269,6 @@ def closed_loop(log: Log) -> dict[str, tuple[int, int, Counter]]:
     the same, so the two should agree edge for edge (at each pin's constant sampling offset).
     Returns pin -> (chip edges, emulator edges, Counter of chip - emulator offsets).
     """
-    from .loopback_ref import PHASE_US, SCENARIOS
-
-    rpm, kpa, tps = SCENARIOS[0]
-    sim = CSimulation(inputs=Inputs17140(rpm=rpm, map_kpa=kpa, tps_v=tps, p37=1))
-    sim.engine.update_sensors()
     em: dict[int, list[tuple[int, int]]] = {p.gpio: [] for p in PINS if not p.is_input}
     lvl = {g: 1 for g in em}
 
@@ -267,13 +278,7 @@ def closed_loop(log: Log) -> dict[str, tuple[int, int, Counter]]:
             lvl[p.gpio] = lv
             em[p.gpio].append((t, lv))
 
-    def switch(k: int) -> None:
-        sim.inputs.rpm, sim.inputs.map_kpa, sim.inputs.tps_v = SCENARIOS[k % len(SCENARIOS)]
-
-    sim.periph.listeners.append(on)
-    for k in range(1, log.end // PHASE_US):
-        sim.periph.at(k * PHASE_US, lambda k=k: switch(k))
-    sim.run_until(log.end)
+    schedule_sim(log, on, log.end)
     chip = chip_edges(log, log.end)
     out = {}
     for p in PINS:
@@ -289,7 +294,7 @@ def summary(log: Log) -> str:
     Unlike ``analyse``, the emulator gets its own on-time engine reactions, so this shows whether the two
     behave alike (spark timing, injector pulses) rather than whether they match edge for edge.
     """
-    from .loopback_ref import PHASE_US, SCENARIOS
+    from .loopback_ref import PHASE_US
 
     g = {p.name: p.gpio for p in PINS}
     ne, sp, inj, prev = [], [], [], None
@@ -304,28 +309,21 @@ def summary(log: Log) -> str:
                 inj.append((k, w >> g["P21"] & 1))
         prev = w
     phases = log.end // PHASE_US
-    rpm, kpa, tps = SCENARIOS[0]
-    sim = CSimulation(inputs=Inputs17140(rpm=rpm, map_kpa=kpa, tps_v=tps, p37=1))
-    sim.engine.update_sensors()
+    sched, _ = schedule_of(log)
     esp, einj = [], []
-    sim.periph.listeners.append(
-        lambda n, lv, t: (
-            esp.append(t) if n == "P1-1" and not lv else None,
-            einj.append((t, lv)) if n == "P2-1" else None,
-        )
-    )
 
-    def switch(k: int) -> None:
-        sim.inputs.rpm, sim.inputs.map_kpa, sim.inputs.tps_v = SCENARIOS[k % len(SCENARIOS)]
+    def on(n: str, lv: int, t: int) -> None:
+        if n == "P1-1" and not lv:
+            esp.append(t)
+        if n == "P2-1":
+            einj.append((t, lv))
 
-    for k in range(1, phases):
-        sim.periph.at(k * PHASE_US, lambda k=k: switch(k))
-    sim.run_until(phases * PHASE_US)
+    sim = schedule_sim(log, on, phases * PHASE_US)
     lines = ["phase  rpm    sparks chip/emu  spark offset chip/emu  pulses chip/emu  pulse min/mean/max chip | emu"]
     for ph in range(phases):
         c, e = phase_stats(ne, sp, inj, ph), phase_stats(sim.engine.teeth, esp, einj, ph)
         off = f"{c['offset']}/{e['offset']}"
-        lines.append(f"{ph + 1:5}  {SCENARIOS[ph % 3][0]:4}   {c['sparks']:6}/{e['sparks']:<6}   {off:>24}"
+        lines.append(f"{ph + 1:5}  {sched[ph].rpm:4}   {c['sparks']:6}/{e['sparks']:<6}   {off:>24}"
                      f"   {c['pulses']:5}/{e['pulses']:<5}   {c['pulse']} | {e['pulse']}")  # fmt: skip
     lines += ["", "closed loop, edge for edge (chip - emulator offset: count; a pin is exact if it has one offset):"]
     for name, (nc, ne_, lat) in closed_loop(log).items():

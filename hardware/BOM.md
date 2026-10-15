@@ -22,7 +22,7 @@
 | A10 | **Full-size breadboard, 830 points** (or two half-size joined) | 1 | The Pico and the DIP-40 need 20 rows each | Amazon UK | ~£5 |
 | opt | ESD wrist strap | 1 | Protects the only D151801 | Amazon UK | ~£5 |
 
-Already owned: male-to-male jumpers, multimeter, and an older **Raspberry Pi Pico WH (RP2040)**: not 5 V tolerant, so not used. No scope or logic analyser is needed: the reader firmware measures the chip's E clock itself.
+Already owned: male-to-male and female-to-male jumpers, multimeter, and an older **Raspberry Pi Pico WH (RP2040)**: not 5 V tolerant, so not used. No scope or logic analyser is needed: the reader firmware measures the chip's E clock itself.
 
 **Chip-in-isolation test** ([`../docs/hardware/chip_diff_test.md`](../docs/hardware/chip_diff_test.md)) on the same breadboard: only **1 kΩ ×3 and 10 kΩ ×8** more (A4 assortment).
 
@@ -39,13 +39,13 @@ Bought as each measurement is needed: resistors, clamps (TVS/Zener) and, for any
 
 ### C1. In-car test rig: proposed; order only after the strict bench gate passes
 
-The rig is the Pico on a half-size breadboard (owned) with three 1 kΩ (A4 assortment) ([`../docs/mr2/cpu_replacement.md`](../docs/mr2/cpu_replacement.md#in-car-test-rig)); it runs from the laptop's USB.
+The rig is the Pico wired straight into the ECU's CPU socket, no breadboard ([`../docs/mr2/cpu_replacement.md`](../docs/mr2/cpu_replacement.md#in-car-test-rig)); it runs from the laptop's USB.
 
 | # | Item | Qty | Why | Where | Approx. |
 |---|---|---|---|---|---|
 | C1 | Only if the supply-current check shows a CMOS chip: **74HCT541N** | 2 | 5 V CMOS levels on the 12 outputs | CPC | ~£2 |
 
-**Total: nothing, or about £2 for the buffers.** The link to the ECU is 26 of the male-to-male jumpers already owned, from the Pico's strips into the spare turned-pin socket (A6) pressed into the ECU's CPU socket. No buck module, stripboard or headers: the PCB (C2 below) follows directly.
+**Total: nothing, or about £2 for the buffers.** The link to the ECU is 26 of the female-to-male jumpers already owned, from the Pico's header pins into the spare turned-pin socket (A6) pressed into the ECU's CPU socket. No resistors: the pin map keeps every pin the ECU can drive on a 5 V-tolerant GPIO. No buck module, stripboard or headers: the PCB (C2 below) follows directly.
 
 ### C2. Final board: DO NOT ORDER
 

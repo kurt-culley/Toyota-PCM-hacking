@@ -1,26 +1,27 @@
 # ruff: noqa: E501  (a drawing: long literal label lists)
-"""Pictures of the proposed in-car test rig (docs/mr2/cpu_replacement.md, "In-car test rig").
+"""Pictures and wire table of the proposed in-car test rig (docs/mr2/cpu_replacement.md, "In-car test rig").
 
     PYTHONPATH=analysis uv run python -m pcmre.car_rig_diagram            # both pictures
     PYTHONPATH=analysis uv run python -m pcmre.car_rig_diagram --table    # the wire table
 
-The Pico on a half-size breadboard, with one jumper wire per used CPU pin from the Pico's own strip
-to a spare turned-pin DIP-40 socket pressed into the spare ECU's CPU socket; the Pico runs the
-emulator. The pin map is the chip test's (chipdiff.h), so the same firmware pins serve both, and
-the chip-test board stays as it is. Writes docs/hardware/photos/car_rig/car_rig.png (overview) and
-breadboard_car.png (hole by hole); --table prints the wire table for docs/mr2/cpu_replacement.md.
+No breadboard: one female-to-male jumper per signal from the Pico 2 W's header straight to a spare
+turned-pin DIP-40 socket pressed into the spare ECU's CPU socket. The pin map is the car firmware's
+hardware/ecu-emu/car/pins.h; tests/test_car_rig.py checks it against the ROM's port directions and the
+5 V rule. Writes docs/hardware/photos/car_rig/car_rig.png (overview) and wiring_car.png (pin by pin).
 """
 
 from __future__ import annotations
 
+import re
+
 from PIL import Image, ImageDraw, ImageFont
 
-from . import chipdiff_wiring as C
 from . import wiring as BB
 from .roundtrip import ROOT
 
+PINS_H = ROOT / "hardware/ecu-emu/car/pins.h"
 OUT = ROOT / "docs/hardware/photos/car_rig/car_rig.png"
-BREADBOARD = ROOT / "docs/hardware/photos/car_rig/breadboard_car.png"
+WIRING = ROOT / "docs/hardware/photos/car_rig/wiring_car.png"
 W, H = 1900, 1140
 BG, INK = (250, 250, 247), (30, 30, 30)
 RED, BLUE, GREY, ORANGE, GREEN, PURPLE = (
@@ -31,98 +32,119 @@ RED, BLUE, GREY, ORANGE, GREEN, PURPLE = (
     (20, 140, 70),
     (120, 60, 160),
 )
+NOT_5V = (26, 27, 28)  # the Pico 2 W's ADC pins: not 5 V tolerant
 
-ROWS = 30  # a half-size (400-point) breadboard: the Pico takes rows 1-20
-UNUSED = {3: "EXTAL: the ECU's crystal drives it; the car firmware makes its own clock"}
-GND_PICO_PIN = 3
+
+def pins() -> dict[int, tuple[int, str, str]]:
+    """GPIO -> (CPU pin, signal, CPU direction IN/OUT/IO), from pins.h, plus /RES and E."""
+    text = PINS_H.read_text()
+    out = {}
+    for m in re.finditer(r"X\((\d+), \d, \d, (IN|OUT|IO)\)\s*/\*\s*(.+?)\s+pin (\d+)", text):
+        out[int(m[1])] = (int(m[4]), " ".join(m[3].split()), m[2])
+    out[int(re.search(r"CAR_GPIO_RES (\d+)u", text)[1])] = (6, "/RES", "IN")
+    out[int(re.search(r"CAR_GPIO_E (\d+)u", text)[1])] = (40, "E", "OUT")
+    return out
+
+
+def gnd_pico_pin() -> int:
+    return int(re.search(r"CAR_GND_PICO_PIN (\d+)", PINS_H.read_text())[1])
 
 
 def car_wires() -> list[tuple[int, str, str, str]]:
-    """(ECU socket pin, signal, Pico end, breadboard hole): one jumper each, from a free hole in the
-    Pico pin's strip (or, for GP26-28, the far side of its 1 kΩ) to the same pin of the socket. Every
-    GPIO the chip test wires, except EXTAL, plus ground."""
-    rows = [(1, "GND", f"GND (Pico pin {GND_PICO_PIN})", BB._free(BB.pico_hole(GND_PICO_PIN)))]
-    for g, (pin, name) in C.gpio_pins().items():
-        if pin in UNUSED:
-            continue
-        if g in C.SERIES_ROWS:
-            rows.append((pin, name, f"GP{g} via 1 kΩ", f"j{C.SERIES_ROWS[g]}"))
-        else:
-            pp = BB.PICO_PIN[f"GP{g}"]
-            rows.append((pin, name, f"GP{g} (Pico pin {pp})", BB._free(BB.pico_hole(pp))))
+    """(ECU socket pin, signal, CPU direction, Pico end): one jumper each, sorted by socket pin."""
+    rows = [(1, "GND", "", f"GND (Pico pin {gnd_pico_pin()})")]
+    rows += [(pin, name, d, f"GP{g} (Pico pin {BB.PICO_PIN[f'GP{g}']})") for g, (pin, name, d) in pins().items()]
     return sorted(rows)
 
 
 def table() -> str:
-    rows = ["| ECU socket pin | Signal | Pico end | Breadboard hole |", "|---|---|---|---|"]
-    rows += [f"| {p} | {n} | {g} | {h} |" for p, n, g, h in car_wires()]
+    word = {"IN": "in", "OUT": "out", "IO": "in/out", "": ""}
+    rows = ["| ECU socket pin | Signal | CPU direction | Pico end |", "|---|---|---|---|"]
+    rows += [f"| {p} | {n} | {word[d]} | {g} |" for p, n, d, g in car_wires()]
     return "\n".join(rows)
 
 
-def car_layout() -> tuple[list[tuple[str, str, str, str]], list[tuple[str, str, str]]]:
-    """What sits on the small board besides the Pico: GP26-28 (ADC pins, not 5 V tolerant) each run
-    to a row below the Pico, through a 1 kΩ across the centre gap, as on the chip-test board. No
-    rails, no 5 V."""
-    wires, parts = [], []
-    for g, r in C.SERIES_ROWS.items():
-        pp = BB.PICO_PIN[f"GP{g}"]
-        pin, name = C.gpio_pins()[g]
-        wires.append(
-            (f"R{g - 25}", BB._free(BB.pico_hole(pp)), f"b{r}", f"GP{g} (Pico pin {pp}) → 1 kΩ in row {r} → {name}")
-        )
-        parts.append((f"1 kΩ (GP{g})", f"e{r}", f"f{r}"))
-    return wires, parts
-
-
-def draw_breadboard_car(out=BREADBOARD) -> None:
-    wires, parts = car_layout()
-    jumpers = car_wires()
-    purple = (130, 50, 170)
-    head = [
-        ("In-car test rig: breadboard layout (Pico 2 W on a half-size breadboard)", font(22, True), "black"),
-        ("Generated from chipdiff.h (python -m pcmre.car_rig_diagram). Unpowered work only: USB out, ECU out of the car.",
-         font(15), "black"),
-        ("The chip-test board stays as it is. Nothing on the rails: this board carries no 5 V.", font(15, True), "black"),
-        ("PURPLE E# = a jumper from this hole to pin # of the spare socket in the ECU.", font(15, True), purple),
-        ("Check each purple jumper by continuity (breadboard hole to ECU socket pin) before anything is powered.",
-         font(15, True), (190, 0, 0)),
-        ("Power order in the car: USB in, then key on; key off, then USB out.", font(15, True), (190, 0, 0)),
+def draw_wiring(out=WIRING) -> None:
+    """The Pico's header (top view, USB up) and the CPU socket (top view, notch up), each pin tagged."""
+    img = Image.new("RGB", (1900, 1230), "white")
+    d = ImageDraw.Draw(img)
+    purple, orange, grey = (130, 50, 170), (220, 110, 0), (150, 150, 150)
+    f9b, f13, f15, f15b = font(9, True), font(13), font(15), font(15, True)
+    lines = [
+        ("In-car test rig: wiring (Pico 2 W straight to the ECU's CPU socket, no breadboard)", font(22, True), "black"),
+        ("Generated from hardware/ecu-emu/car/pins.h (python -m pcmre.car_rig_diagram). Wire it unpowered: USB out, ECU out of the car.",
+         f15, "black"),
+        ("PURPLE E# = one female-to-male jumper: female end on that Pico pin, male end into pin # of the spare socket.",
+         f15b, purple),
+        ("ORANGE = GP26-28, not 5 V tolerant: they carry only P12-P14, which the ROM always drives as outputs.", f15b, orange),
+        ("Before the first power-up: continuity of every jumper, and the meter check of socket pins 15-17 (see the doc).",
+         f15b, (190, 0, 0)),
     ]  # fmt: skip
+    for i, (t, f, c) in enumerate(lines):
+        d.text((20, 15 + i * 30), t, fill=c, font=f)
 
-    def extra(d, xy, kx, ky):
-        f12, f15, f15b = font(12), font(15), font(15, True)
-        for pin, _, _, hole in jumpers:
-            x, y = xy(hole)
-            d.ellipse([x - 12, y - 12, x + 12, y + 12], fill=purple, outline="black")
-            d.text((x, y), f"E{pin}", fill="white", font=font(9, True), anchor="mm")
-        ky += 30
-        d.text((kx, ky), "Jumpers to the ECU (26, male-to-male, ~20 cm)", fill=purple, font=f15b)
-        d.text((kx, ky + 24), "into the spare turned-pin DIP-40 socket pressed into the ECU's CPU socket,",
-               fill="black", font=f15)  # fmt: skip
-        d.text((kx, ky + 46), "never straight into the ECU's own socket. Socket top view, notch up:",
-               fill="black", font=f15)  # fmt: skip
-        used = {pin: (name, hole) for pin, name, _, hole in jumpers}
-        sx, sy, pitch = kx + 300, ky + 90, 24
-        d.rectangle([sx, sy - 14, sx + 150, sy + 19 * pitch + 14], fill=(60, 60, 60), outline="black")
-        d.pieslice([sx + 57, sy - 32, sx + 93, sy + 4], 0, 180, fill="white")
-        d.text((sx + 75, sy + 9.5 * pitch), "ECU CPU\nsocket\n(spare\nsocket in)", fill="white", font=f12, anchor="mm",
-               align="center")  # fmt: skip
-        for i in range(20):
-            for pin, x, side in ((i + 1, sx, -1), (40 - i, sx + 150, 1)):
-                y = sy + i * pitch
-                on = pin in used
-                d.ellipse([x - 11, y - 11, x + 11, y + 11], fill=purple if on else (200, 200, 200), outline="black")
-                d.text((x, y), f"E{pin}" if on else str(pin), fill="white" if on else "black", font=font(9, True),
-                       anchor="mm")  # fmt: skip
-                label = f"{used[pin][0]}  ← {used[pin][1]}" if on else "no wire (the ECU board's)"
-                if on and side > 0:
-                    label = f"{used[pin][1]} →  {used[pin][0]}"
-                d.text((x + side * 18, y), label, fill="black" if on else (140, 140, 140), font=f12,
-                       anchor="rm" if side < 0 else "lm")  # fmt: skip
+    by_gpio = pins()
+    gnd = gnd_pico_pin()
+    pitch, top = 44, 230
+    # Pico 2 W, top view, USB at the top: pins 1-20 down the left, 21-40 up the right
+    px0, px1 = 380, 640
+    d.rectangle([px0, top - 30, px1, top + 19 * pitch + 30], fill=(30, 110, 60), outline="black", width=2)
+    d.rectangle(
+        [(px0 + px1) // 2 - 28, top - 52, (px0 + px1) // 2 + 28, top - 22], fill=(190, 190, 190), outline="black"
+    )
+    d.text(((px0 + px1) // 2, top - 37), "USB", fill="black", font=f13, anchor="mm")
+    d.text(((px0 + px1) // 2, top + 9.5 * pitch), "Pico 2 W\n(top view)", fill="white", font=f15b, anchor="mm",
+           align="center")  # fmt: skip
+    for pin, label in BB.PICO.items():
+        left = pin <= 20
+        x, y = (px0, top + (pin - 1) * pitch) if left else (px1, top + (40 - pin) * pitch)
+        g = int(label[2:]) if label.startswith("GP") else None
+        wired = (g in by_gpio) or pin == gnd
+        d.ellipse([x - 7, y - 7, x + 7, y + 7], fill=(230, 190, 60), outline="black")
+        short = {"3V3(OUT)": "3V3", "ADC_VREF": "VREF", "3V3_EN": "EN"}.get(label, label)
+        d.text(
+            (x + 12, y) if left else (x - 12, y),
+            f"{pin} {short}",
+            fill="white",
+            font=f13,
+            anchor="lm" if left else "rm",
+        )
+        if not wired:
+            continue
+        cpu, name, _ = by_gpio[g] if g is not None else (1, "GND", "")
+        colour = orange if g in NOT_5V else purple
+        tx = x - 22 if left else x + 22
+        d.ellipse([tx - 15, y - 15, tx + 15, y + 15], fill=colour, outline="black")
+        d.text((tx, y), f"E{cpu}", fill="white", font=f9b, anchor="mm")
+        d.text((tx - 20, y) if left else (tx + 20, y), name, fill="black", font=f13, anchor="rm" if left else "lm")
+        d.line([x - 7 if left else x + 7, y, tx + 15 if left else tx - 15, y], fill=colour, width=3)
 
-    BB.draw_breadboard(out, layout=(wires, parts), head=head, wire_colour=lambda t, w: (110, 110, 110),
-                       part_colour=lambda pt: (60, 190, 90), chip=False, extra=extra, rows=ROWS,
-                       height=1180)  # fmt: skip
+    # the spare socket in the ECU's CPU socket, top view, notch up
+    sx0, sx1 = 1300, 1450
+    d.rectangle([sx0, top - 30, sx1, top + 19 * pitch + 30], fill=(60, 60, 60), outline="black", width=2)
+    d.pieslice([(sx0 + sx1) // 2 - 22, top - 52, (sx0 + sx1) // 2 + 22, top - 8], 0, 180, fill="white")
+    d.text(((sx0 + sx1) // 2, top + 9.5 * pitch), "ECU CPU\nsocket\n(spare socket\npressed in,\nnotch up)",
+           fill="white", font=f13, anchor="mm", align="center")  # fmt: skip
+    ends = {p: (n, g) for p, n, _, g in car_wires()}
+    to_5v = {pin: g for g, (pin, _, _) in by_gpio.items()}
+    for i in range(20):
+        for cpu, x, side in ((i + 1, sx0, -1), (40 - i, sx1, 1)):
+            y = top + i * pitch
+            on = cpu in ends
+            colour = (orange if to_5v.get(cpu) in NOT_5V else purple) if on else (205, 205, 205)
+            d.ellipse([x - 15, y - 15, x + 15, y + 15], fill=colour, outline="black")
+            d.text((x, y), f"E{cpu}" if on else str(cpu), fill="white" if on else "black", font=f9b, anchor="mm")
+            label = f"{ends[cpu][0]}  ←  {ends[cpu][1]}" if on else "no wire (the ECU board's)"
+            if on and side > 0:
+                label = f"{ends[cpu][1]}  →  {ends[cpu][0]}"
+            d.text((x + side * 22, y), label, fill="black" if on else grey, font=f13, anchor="rm" if side < 0 else "lm")
+    d.text((20, top + 19 * pitch + 60), "The Pico is drawn from the top (USB up, pin 1 top left). Its header pins stick out underneath: turned over, "
+           "pin 1 is top RIGHT. Count pins from the USB end, or check the GP numbers printed on the underside.\n"
+           "Arrows read 'jumper from the Pico pin to the socket pin'. GP9 is free in the car "
+           "(EXTAL has no wire). P36 and P42-P47 have no wire either: the car firmware uses the spare ECU's strap values (Q12).",
+           fill="black", font=f13)  # fmt: skip
+    out.parent.mkdir(parents=True, exist_ok=True)
+    img.save(out, optimize=True)
 
 
 def font(size: int, bold: bool = False):
@@ -158,7 +180,7 @@ def draw() -> Image.Image:
     img = Image.new("RGB", (W, H), BG)
     d = ImageDraw.Draw(img)
     d.text(
-        (40, 22), "In-car test rig (proposed): a Pico on a small breadboard as the CPU", font=font(34, True), fill=INK
+        (40, 22), "In-car test rig (proposed): a Pico wired straight into the CPU socket", font=font(34, True), fill=INK
     )
     d.text((40, 70), "Only after the strict bench gate passes. Stationary tests only (key-on, idle with a timing light). "
            "The car's own ECU stays untouched as the spare.", font=font(19), fill=INK)  # fmt: skip
@@ -192,28 +214,22 @@ def draw() -> Image.Image:
     # jumper wires
     for k in range(6):
         d.line([(sx0 + 210, sy0 + 60 + 14 * k), (1220, 290 + 14 * k)], fill=(150, 150, 150), width=4)
-    d.text((990, 420), "26 jumper wires\n(25 signals +\nGND), ~20 cm,\nPico strip to\nsocket pin:\nno new parts",
+    d.text((990, 420), "26 female-to-\nmale jumpers\n(25 signals +\nGND), ~20 cm,\nPico pin to\nsocket pin",
            font=font(16, True), fill=(90, 90, 90))  # fmt: skip
 
-    # breadboard
+    # Pico, no breadboard
     bx0, by0, bx1, by1 = 1180, 150, 1860, 760
     d.rounded_rectangle((bx0, by0, bx1, by1), radius=16, fill=(245, 243, 236), outline=GREY, width=3)
-    d.text((bx0 + 16, by0 + 10), "Half-size breadboard", font=font(24, True), fill=INK)
-    d.rectangle((bx0 + 40, by0 + 60, bx0 + 260, by0 + 400), fill=(30, 110, 60), outline=INK, width=2)
-    d.text((bx0 + 150, by0 + 230), "Pico 2 W\nemulator\nfirmware\n(17140 ROM\n+ your tune)", font=font(18, True), fill="white",
+    d.text((bx0 + 16, by0 + 10), "Pico 2 W (no breadboard)", font=font(24, True), fill=INK)
+    d.rectangle((bx0 + 40, by0 + 60, bx0 + 260, by0 + 480), fill=(30, 110, 60), outline=INK, width=2)
+    d.text((bx0 + 150, by0 + 270), "Pico 2 W\nemulator\nfirmware\n(17140 ROM\n+ your tune)", font=font(18, True), fill="white",
            anchor="mm", align="center")  # fmt: skip
-    for i in range(3):  # the three 1 kΩ below the Pico
-        y = by0 + 440 + i * 34
-        d.line([(bx0 + 60, y), (bx0 + 240, y)], fill=(90, 90, 90), width=3)
-        d.rectangle((bx0 + 125, y - 8, bx0 + 175, y + 8), fill=(60, 190, 90), outline=INK)
-    d.text((bx0 + 150, by0 + 555), "1 kΩ on GP26-28", font=font(16, True), fill=INK, anchor="mm")
-    notes = ["On this board: the Pico and three", "1 kΩ (GP26-28 are ADC pins, not 5 V", "tolerant). Nothing on the rails:",
-             "no 5 V here. Each jumper starts", "in its Pico pin's own strip.", "",
-             "The chip-test board stays as it is,", "ready to re-run the bench gate."]  # fmt: skip
+    notes = ["Jumpers straight from its header.", "Every pin the ECU drives is on", "GP0-22 (5 V tolerant while the",
+             "Pico is powered); GP26-28 carry", "only P12-P14, always outputs.", "So no resistors are needed."]  # fmt: skip
     for i, s in enumerate(notes):
         d.text((bx0 + 300, by0 + 70 + i * 25), s, font=font(17), fill=INK)
     box(d, (bx0 + 300, by0 + 300, bx1 - 20, by0 + 470), (255, 244, 225), "Only if the chip is CMOS:",
-        ["2x 74HCT541 on the 12 outputs,", "powered by one more wire", "from ECU pin 21",
+        ["2x 74HCT541 on the 12 outputs (on", "a small breadboard), powered by one", "more wire from ECU pin 21",
          "(decided by the supply-current check)"], tsize=18, outline=ORANGE)  # fmt: skip
 
     # laptop + power order
@@ -226,12 +242,12 @@ def draw() -> Image.Image:
     box(d, (40, 780, 1120, 1110), (232, 242, 255), "Use, in order (each powered step: owner's OK on the day)", [
         "0. Strict bench gate passed first: every pin exact, replay passes, repeat runs identical,",
         "   plus a run covering idle contact, cranking, rev limit, missing IGF and the T terminal.",
-        "1. Unpowered: Pico + 3x 1 kΩ on the small board, 26 jumpers by the wire table, check by continuity.",
+        "1. Unpowered: meter check of socket pins 15-17; read the P36/P42-P47 straps (Q12);",
+        "   fit the 26 jumpers by the wire table; check each by continuity.",
         "2. USB in. Key on, engine off: fault lamp, fuel-pump prime, live coolant/MAP/TPS",
         "   values over USB against the stock ECU's readings (serial link).",
         "3. Crank and idle: timing light shows 16° BTDC (T open) and 10° (T to E1 shorted).",
-        "4. Key off, then USB out. Driving waits for the PCB (a breadboard can shake loose).",
-        "",
+        "4. Key off, then USB out. Driving waits for the PCB (jumpers can shake loose).",
         "Still to write: the car firmware: emulator on real ECU pins (PIO-timed inputs,",
         "hardware-timed spark and injector, /RES from the ECU, E at 1 MHz on pin 40, USB logging).",
     ], tsize=21, outline=BLUE)  # fmt: skip
@@ -246,8 +262,8 @@ def main() -> int:
         return 0
     OUT.parent.mkdir(parents=True, exist_ok=True)
     draw().save(OUT, optimize=True)
-    draw_breadboard_car()
-    print(f"wrote {OUT.relative_to(ROOT)}, {BREADBOARD.relative_to(ROOT)}")
+    draw_wiring()
+    print(f"wrote {OUT.relative_to(ROOT)}, {WIRING.relative_to(ROOT)}")
     return 0
 
 

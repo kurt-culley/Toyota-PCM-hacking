@@ -34,10 +34,14 @@ DIP7 = {
 }
 SERIES_ROWS = {26: 21, 27: 22, 28: 23}  # GP26-28 (ADC pins, not 5 V tolerant): 1 kΩ across the gap in this row
 RAIL_BREAK = range(30, 33)  # rail holes left alone where the strips usually break
-STRAPS_HIGH = (22, 23, 24, 25, 26, 27)  # P47-P42: 10 kΩ to + (the simulator's default level)
-STRAP_LOW = 31  # P36: 10 kΩ to −
-MODE_PINS = (8, 9, 10)  # P20-P22: 10 kΩ to + (mode 7), were to − (mode 0) for the reader
-PULLUP_NEW = 11  # P23: 10 kΩ to + (serial link off)
+# P47-P42 are inputs only (the ROM writes DDR4 = $03): short jumpers join their strips and ONE
+# resistor (any value 1-100 kΩ) pulls them all high, the simulator's default level. The resistor
+# (not a bare wire) limits the current if the chip were ever strapped into a bus mode by mistake.
+STRAPS_HIGH = (22, 23, 24, 25, 26, 27)
+STRAP_LOW = 31  # P36, input only (DDR3 = $02): a plain wire to −
+MODE_PINS = (8, 9, 10)  # P20-P22: the reader's three 10 kΩ, moved from − to + (mode 7)
+# P23 (pin 11) needs no resistor: the firmware enables the Pico's own pull-up on GP22, so the chip
+# reads it high at reset and the serial link stays off.
 
 KEEP, MOVE, NEW = "keep", "MOVE", "NEW"
 COLOUR = {KEEP: (110, 110, 110), MOVE: (230, 120, 0), NEW: (0, 150, 60)}
@@ -129,12 +133,21 @@ def layout() -> tuple[list[tuple[str, str, str, str]], list[tuple[str, str, str]
             used.add(W._rail(rail, r))
             status[lab] = st
 
-    to_rail("j+", [*MODE_PINS, PULLUP_NEW], 1,
-            lambda p: f"10 kΩ, {DIP7[p]} (pin {p}) " + ("pull-up" if p == PULLUP_NEW else "mode strap, now to +"),
-            MOVE)  # fmt: skip
-    status[f"10 kΩ, {DIP7[PULLUP_NEW]} (pin {PULLUP_NEW}) pull-up"] = NEW
-    to_rail("a+", list(STRAPS_HIGH), 2, lambda p: f"10 kΩ, {DIP7[p]} (pin {p}) strap to +", NEW)
-    to_rail("a-", [STRAP_LOW], 2, lambda p: f"10 kΩ, {DIP7[p]} (pin {p}) strap to −", NEW)
+    to_rail("j+", list(MODE_PINS), 1, lambda p: f"10 kΩ, {DIP7[p]} (pin {p}) mode strap, now to +", MOVE)
+
+    # P47-P42: a zigzag of short jumpers (b, a, b, a, b) joins the six strips; one resistor to +
+    rows = [W.chip_hole(p)[1] for p in sorted(STRAPS_HIGH)]
+    for i, (r0, r1) in enumerate(itertools.pairwise(rows)):
+        col = "ba"[i % 2]
+        tag = f"S{i + 1}"
+        wires.append((tag, f"{col}{r0}", f"{col}{r1}", f"link the P4 strap strips: row {r0} ↔ row {r1}"))
+        status[tag] = NEW
+    lab = "1 resistor, any 1–100 kΩ: P42–P47 (pins 22–27) to +"
+    to_rail("a+", [STRAPS_HIGH[0]], 2, lambda p: lab, NEW)
+    # P36: a plain wire to −
+    hole = W._free(W.chip_hole(STRAP_LOW), 2)
+    wires.append(("P36", hole, W._rail("a-", W._row(hole)), f"{DIP7[STRAP_LOW]} (pin {STRAP_LOW}) → − rail beside a"))
+    status["P36"] = NEW
     return wires, parts, status
 
 
@@ -142,7 +155,7 @@ def table() -> str:
     wires, parts, status = layout()
     rows = ["| Wire | Change | From | To | What |", "|---|---|---|---|---|"]
     rows += [f"| {t} | {status[t]} | {W.hole_name(a)} | {W.hole_name(b)} | {w} |" for t, a, b, w in wires
-             if not W.is_rail(b)]  # fmt: skip
+             if not W.is_rail(b) or status.get(t) == NEW]  # fmt: skip
     rows += ["", "| Part | Change | From | To |", "|---|---|---|---|"]
     rows += [f"| {p} | {status.get(p, KEEP)} | {W.hole_name(a)} | {W.hole_name(b)} |" for p, a, b in parts]
     return "\n".join(rows)

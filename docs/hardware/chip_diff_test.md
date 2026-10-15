@@ -60,9 +60,12 @@ Most existing wires therefore stay, and every reader GPIO is reused. The changes
 1. **Move 8 wire ends.** For GP6, GP12–GP17 and GP20 the Pico end stays where it is; only the chip end moves, from the old bus pin to its new port pin (orange in the picture, "MOVE" in the table).
 2. **Mode straps:** move the far end of the three 10 kΩ resistors on pins 8, 9 and 10 from the − rail to the + rail (mode 7 = HHH).
 3. **Add 4 signals** (green): GP22 to pin 11 (P23), and GP26–GP28 to pins 13, 19 and 20 (P10, P16, P17), each through a 1 kΩ that bridges the centre gap in rows 21–23. GP26–GP28 are the Pico's ADC pins and are **not 5 V tolerant**, so they only drive chip inputs, and only through 1 kΩ.
-4. **Add 8 resistors of 10 kΩ:**
-   - pin 11 (P23) pull-up to +, so the serial link stays off;
-   - pins 22–27 (P47–P42) to +, and pin 31 (P36) to −. These levels match the simulator's defaults.
+4. **Straps, almost no new parts:**
+   - pins 22–27 (P47–P42): join their six strips with five short jumpers, then **one** resistor (any value from 1 kΩ to 100 kΩ) to +. They are inputs only (the ROM sets DDR4 = `$03`), so one pull-up serves all six; the resistor rather than a bare wire limits the current if the chip were ever strapped into a bus mode by mistake.
+   - pin 31 (P36): a plain wire to − (input only, DDR3 = `$02`).
+   - pin 11 (P23): nothing. The firmware turns on the Pico's own pull-up on GP22, so the chip reads it high at reset and the serial link stays off.
+
+   These levels match the simulator's defaults.
 
 Unchanged: pin 1 GND; pins 21, 7 (STBY), 4 (NMI) and 5 (IRQ1) on the 5 V rail; 100 nF + 10 µF across pins 21/1; XTAL (pin 2) open.
 
@@ -93,15 +96,15 @@ Unchanged: pin 1 GND; pins 21, 7 (STBY), 4 (NMI) and 5 (IRQ1) on the 5 V rail; 1
 | 8 | P20 (ADC end, mode bit 0) | in | GP12 | New (was A10); 10 kΩ pull-up; the Pico holds it high through reset |
 | 9 | P21 (injector, mode bit 1) | out | GP13 | New (was A11); 10 kΩ pull-up |
 | 10 | P22 (mode bit 2) | out | GP20 | New (was R/W); 10 kΩ pull-up |
-| 11 | P23 | out | GP22 | New; 10 kΩ pull-up |
+| 11 | P23 | out | GP22 | New; the Pico's own pull-up keeps it high at reset |
 
-That is 26 GPIOs in all, defined once in [`chipdiff.h`](../../hardware/ecu-emu/chipdiff/chipdiff.h). **New parts:** three 1 kΩ resistors and eight 10 kΩ (the seven straps and the P23 pull-up); everything else is already on the board.
+That is 26 GPIOs in all, defined once in [`chipdiff.h`](../../hardware/ecu-emu/chipdiff/chipdiff.h). **New parts:** three 1 kΩ resistors and one more resistor of any value from 1 kΩ to 100 kΩ; everything else is already on the board or is wire.
 
 ### Breadboard layout
 
 ![Breadboard layout for the chip-in-isolation test](photos/chip_diff_test/breadboard_chipdiff.png)
 
-Grey wires stay as on the reader; orange ones keep their Pico hole and move their chip end; green ones are new. The left-hand straps run at a slant to the nearest free hole on the + rail, because the reader's capacitors and rail bridges already use some rail holes level with the chip.
+Grey wires stay as on the reader; orange ones keep their Pico hole and move their chip end; green ones are new. The jumpers S1–S5 zigzag between holes a and b to join pins 22–27; their single resistor goes from a26 to the + rail.
 
 <!-- generated: python -m pcmre.chipdiff_wiring; tests/test_chipdiff_wiring.py checks this table -->
 
@@ -136,6 +139,12 @@ Grey wires stay as on the reader; orange ones keep their Pico hole and move thei
 | 25' | NEW | j22 | i26 | … 1 kΩ in row 22 → P16 (pin 19) |
 | 26 | NEW | i7 | b23 | GP28 (Pico pin 34) → 1 kΩ in row 23 → P17 (pin 20) |
 | 26' | NEW | j23 | i25 | … 1 kΩ in row 23 → P17 (pin 20) |
+| S1 | NEW | b26 | b27 | link the P4 strap strips: row 26 ↔ row 27 |
+| S2 | NEW | a27 | a28 | link the P4 strap strips: row 27 ↔ row 28 |
+| S3 | NEW | b28 | b29 | link the P4 strap strips: row 28 ↔ row 29 |
+| S4 | NEW | a29 | a30 | link the P4 strap strips: row 29 ↔ row 30 |
+| S5 | NEW | b30 | b31 | link the P4 strap strips: row 30 ↔ row 31 |
+| P36 | NEW | a35 | − rail beside a (row 35) | P36 (pin 31) → − rail beside a |
 
 | Part | Change | From | To |
 |---|---|---|---|
@@ -148,17 +157,10 @@ Grey wires stay as on the reader; orange ones keep their Pico hole and move thei
 | 220 Ω, EXTAL pull-up part 2 | keep | i45 | + rail beside j (row 45) |
 | 10 kΩ | keep | j39 | + rail beside j (row 39) |
 | 10 kΩ | keep | j33 | + rail beside j (row 33) |
-| 10 kΩ, P23 (pin 11) pull-up | NEW | j34 | + rail beside j (row 29) |
 | 10 kΩ, P22 (pin 10) mode strap, now to + | MOVE | j35 | + rail beside j (row 35) |
 | 10 kΩ, P21 (pin 9) mode strap, now to + | MOVE | j36 | + rail beside j (row 36) |
 | 10 kΩ, P20 (pin 8) mode strap, now to + | MOVE | j37 | + rail beside j (row 37) |
-| 10 kΩ, P47 (pin 22) strap to + | NEW | a26 | + rail beside a (row 22) |
-| 10 kΩ, P46 (pin 23) strap to + | NEW | a27 | + rail beside a (row 23) |
-| 10 kΩ, P45 (pin 24) strap to + | NEW | a28 | + rail beside a (row 27) |
-| 10 kΩ, P44 (pin 25) strap to + | NEW | a29 | + rail beside a (row 29) |
-| 10 kΩ, P43 (pin 26) strap to + | NEW | a30 | + rail beside a (row 33) |
-| 10 kΩ, P42 (pin 27) strap to + | NEW | a31 | + rail beside a (row 35) |
-| 10 kΩ, P36 (pin 31) strap to − | NEW | a35 | − rail beside a (row 35) |
+| 1 resistor, any 1–100 kΩ: P42–P47 (pins 22–27) to + | NEW | a26 | + rail beside a (row 27) |
 
 ## Firmware and the PC tool
 

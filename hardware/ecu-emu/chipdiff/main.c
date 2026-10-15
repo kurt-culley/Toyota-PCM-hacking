@@ -145,6 +145,23 @@ static bool power_good(void) {
     return ok;
 }
 
+// A mode-strap pin (P21, P22; the chip holds them as inputs while /RES is low) with its 10k pull-up
+// to 5 V rises within microseconds after a brief pull low; without it the pin stays low. The
+// Pico's own pull-up is switched off for the test, so it cannot hide a missing strap.
+static bool strap_high(uint g) {
+    gpio_init(g);
+    gpio_disable_pulls(g);
+    gpio_set_drive_strength(g, GPIO_DRIVE_STRENGTH_2MA);
+    gpio_put(g, 0);
+    gpio_set_dir(g, GPIO_OUT);
+    sleep_us(10);
+    gpio_set_dir(g, GPIO_IN);
+    sleep_us(50);  // 10k x ~30 pF: under 1 us to rise
+    bool high = gpio_get(g);
+    gpio_pull_up(g);
+    return high;
+}
+
 // ---- the run ----------------------------------------------------------------------------
 
 static inline uint32_t dma_done(int ch) { return DMA_COUNT - (dma_hw->ch[ch].transfer_count & 0x0FFFFFFFu); }
@@ -152,8 +169,8 @@ static inline uint32_t dma_done(int ch) { return DMA_COUNT - (dma_hw->ch[ch].tra
 static void __not_in_flash_func(run)(uint32_t phases) {
     uint64_t total = (uint64_t)phases * REF_PHASE_US;
     if (!power_good()) return;
-    if (!gpio_get(13) || !gpio_get(20)) {
-        printf("ABORT: P21 (GP13) or P22 (GP20) reads low: the mode-strap pull-ups to 5 V are missing\n");
+    if (!strap_high(13) || !strap_high(20)) {
+        printf("ABORT: P21 (GP13) or P22 (GP20) has no pull-up to 5 V: check the mode straps (pins 9, 10)\n");
         return;
     }
     cd_init(&cd);

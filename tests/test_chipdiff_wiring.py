@@ -50,14 +50,21 @@ def test_holes_unique_and_free():
 
 
 def test_straps_and_pullups():
-    _, parts, _ = C.layout()
+    wires, parts, _ = C.layout()
     to = {a: b for _, a, b in parts}
-    for pin in (*C.MODE_PINS, C.PULLUP_NEW, *C.STRAPS_HIGH):
-        hole = W._free(W.chip_hole(pin), 1 if pin < 21 else 2)
-        assert to[hole].split("@")[0] in ("j+", "a+"), pin
-    assert to[W._free(W.chip_hole(C.STRAP_LOW), 2)].startswith("a-")
-    # the reader's mode straps to − are gone
-    assert not any(b.startswith("j-") for _, a, b in parts)
+    for pin in C.MODE_PINS:  # the reader's three mode straps, now to +
+        assert to[W._free(W.chip_hole(pin), 1)].startswith("j+"), pin
+    assert not any(b.startswith("j-") for _, a, b in parts)  # none left on −
+    # P42-P47: the six strips joined by jumpers, one resistor to +
+    rows = sorted(W.chip_hole(p)[1] for p in C.STRAPS_HIGH)
+    links = {(int(a[1:]), int(b[1:])) for t, a, b, _ in wires if t.startswith("S")}
+    assert links == set(zip(rows, rows[1:], strict=False))
+    assert [b for _, a, b in parts if a == W._free(W.chip_hole(C.STRAPS_HIGH[0]), 2)][0].startswith("a+")
+    # P36: a wire to −; no resistor on P23 (the Pico's pull-up)
+    p36 = next(w for w in wires if w[0] == "P36")
+    assert same_strip(p36[1], W.chip_hole(C.STRAP_LOW)) and p36[2].startswith("a-")
+    assert not any(same_strip(a, W.chip_hole(11)) for _, a, _ in parts)
+    assert sum("kΩ" in p and "1 kΩ" not in p for p, _, _ in parts) == 2 + 3 + 1  # /RES, P24; mode straps; P4x
 
 
 def test_only_moves_and_additions():

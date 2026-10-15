@@ -249,7 +249,7 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
   - one address byte in, the word at `$00`–`$FF` out, high byte first;
   - read-only;
   - switched off after about 1 s without a request;
-  - about 130–200 words/s in the simulator, with no effect on spark or injection.
+  - about 100 words/s at 5000 rpm in the simulator (MC6801 timing), with no effect on spark or injection.
   
   Simulator host model: [`../analysis/emu/peek17140.py`](../analysis/emu/peek17140.py).
 - [x] **17140 rev limiter** ([`mr2/rev_limiter.md`](mr2/rev_limiter.md)) [ROM:$FA03-$FA3E, $FFB7] [EMU:tests/test_rev_limiter17140.py]:
@@ -295,7 +295,21 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
       - Bluetop spark-cut prototype: with the stock reload the cut engages after 15 spark windows above the limit, not 7, and releases within 5. The "6 passes" of `SatCount_97` are counter passes, not NE windows; `docs/bluetop/rev_limiter.md` to re-check;
       - every other simulation result is unchanged (full suite).
     - **Run 4 (all 6 phases):** the chip is deterministic (phase 1 identical to run 3). In replay it drifts apart early in phase 2. Closed loop (`emu.chipdiff summary`): same spark and pulse counts at every point; spark timing equal at 800/2000 rpm and 8 cycles early on the chip at 5000 rpm; injector pulses 0.3-0.8 % shorter on the chip. But 3420 engine reactions were late on the Pico, which shifts the chip's ADC readings, so that is not a fair comparison yet: the firmware look-ahead is now 8 cycles. Next: one more `run 6` with `late=0`.
-    - **Run 5 (all 6 phases, `late=0`): VALIDATION RESULT.** Closed loop (as in the car), over 36 s at 800/2000/5000 rpm, the emulator gives **every spark edge (6 238) and injector edge (3 130) of the real chip at a constant 2-cycle offset**, injector pulse widths equal to the cycle, ADC sequencing 99.4-99.6 % [BENCH:analysis/captures/chipdiff_17140_run5_6phase_2026-10-15.log] [EMU:tests/test_chip_vs_emulator.py]. **Awaiting independent Verifier review** (P7 step 3).
+    - **Run 5 (all 6 phases, `late=0`):** closed loop at three steady points (800/2000/5000 rpm, constant sensor voltages), the emulator gives **every spark edge (6 238) and injector edge (3 130) of the real chip at a constant 2-cycle offset**; ADC sequencing 99.3-99.6 % [BENCH:analysis/captures/chipdiff_17140_run5_6phase_2026-10-15.log] [EMU:tests/test_chip_vs_emulator.py]. LIKELY for spark and fuel at steady operating points.
+    - **Verifier (independent agent, 2026-10-15): PASS WITH ISSUES**, no blockers:
+      - **Out-of-sample:** run 5 is a genuine out-of-sample test. The interrupt rules were fitted on run 3 only; phases 2-6 are new operating points.
+      - **Sensitivity:** spark timing hardly tests the CPU model (it survives switching every interrupt rule off), but the injector does confirm the fitted rules (a window of 0, 1 or 3 drops it to about 74 %).
+      - **The gate's own PASS criterion is not met:**
+        - the replay fails;
+        - P12-P15 are not exact even in closed loop;
+        - there is no repeat `late=0` run.
+        
+        "Spark and fuel exact closed loop" is a narrower criterion. **The owner decides** whether that is the P7 step-3 gate, or the gate stays open.
+      - **Rig timing:** `late=0` does not cover ADC-start. The Pico applies it 12-15 cycles after the edge it sees, while the model applies it at once; ADC-end and IGF come 3 and 2 cycles later than the model, because the Pico times them from the edges it sees. With those latencies modelled, P15 goes from 17 921 to 17 978 of 18 002: most of the ADC residual is the rig, not the interrupt rules.
+      - **Scope:** steady points with constant sensor voltages only. Not tested: idle contact closed, cranking, rev limit, cold start, missing IGF, the test terminal, serial traffic, RP2350 I/O latency, or E = 1 MHz.
+      - Fixed in the docs: confidence levels, the knock-ons, 99.3 %.
+    - **Conflict (open):** in replay, the program state differs from the closed loop from the start: RAM `$50` (AdcZero, subtracted from every ADC channel) is 27 in replay and 24 in closed loop, consistent with replayed ADC-end edges arriving 3 cycles late. In run 5 the replay's spark timing moves by 8 cycles exactly at the switch to 5000 rpm. Not root-caused.
+    - **Next (proposed):** make the Pico's engine reactions land at the model's times (correct for the sampling offset; give ADC-start a fixed delay in both the model and the Pico), then two identical `run 6`s.
     - **Open:** 7 ADC-hold edges (two different effects); `run 6` (all three rpm/load points) for more cases; then the Verifier.
 - [ ] **In-car test rig: parts list proposed** ([`../hardware/BOM.md`](../hardware/BOM.md) section C1; about £30). Awaiting owner approval to order. The final PCB outline waits for a photo of the clearance above the CPU socket.
 - [x] **Ross Tier-B pass on the 17140** (2026-10-14; Verifier PASS WITH ISSUES, fixes applied, re-check pending). Every claim whose "Test on" includes `MR2 ROM` (43) has a 17140 status, evidence and a "P4 17140" note in [`ross/claims.md`](ross/claims.md). Simulator results are pinned in [`../tests/test_ross17140.py`](../tests/test_ross17140.py) (44 tests, about 3 s, on the C-backed simulator). The simulator has two inputs for them, `idl_closed` (P1-6, default throttle open) and `p37` (P3-7, default 0 = A/C off). `emu.loopback_ref` pins `p37=1`, the level `expected.h` and `engine.h` use, so the loopback reference is unchanged.

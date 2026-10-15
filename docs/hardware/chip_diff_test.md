@@ -209,13 +209,24 @@ PYTHONPATH=analysis uv run python -m emu.chipdiff analyse run1.log
   - the injector pulse is 0.3-0.8 % shorter on the chip.
 - **Rig caveat:** the Pico applied 3420 engine reactions late in run 4 (`late=3420`), mostly the quick ADC conversions. Late ADC-end edges change the chip's readings, so a closed-loop comparison is only fair with `late=0`. The firmware now looks ahead 8 cycles instead of 16 (USB no longer runs on that core), so the reactions land on time.
 
-**Run 5** (owner, 2026-10-15; all 6 phases, look-ahead 8, **`late=0`**): **the validation result.**
+**Run 5** (owner, 2026-10-15; all 6 phases, look-ahead 8, `late=0`). Spark and fuel at steady points: LIKELY. The PASS criterion above is not yet met (see Verifier, below).
 - **Log:** [`analysis/captures/chipdiff_17140_run5_6phase_2026-10-15.log`](../../analysis/captures/chipdiff_17140_run5_6phase_2026-10-15.log).
 - **Closed loop, edge for edge** (`python -m emu.chipdiff summary`, the emulator running as in the car), over 36 s at 800, 2000 and 5000 rpm [EMU:tests/test_chip_vs_emulator.py]:
   - **every spark edge (6 238) and every injector edge (3 130) of the real chip, at a constant 2-cycle offset;**
   - injector pulse widths equal to the cycle in every phase;
-  - the ADC channel sequence on 99.4-99.6 % of edges. The rest are a few conversions shifted by one slot: the interrupt-sampling detail below. It changes no spark or injector edge.
-- **Replay** (the chip's exact inputs) matches through phases 1 and 2; it drifts in phase 3 after the same small ADC-start differences.
+  - the ADC channel sequence on 99.3-99.6 % of edges; the rest are a few conversions shifted by one slot. Most of this residual comes from the rig: the Pico applies ADC-start 12-15 cycles after the edge it sees and ADC-end/IGF 2-3 cycles later than the model. With those latencies modelled, P15 rises to 17 978 of 18 002. It changes no spark or injector edge.
+- **Replay** (the chip's exact inputs):
+  - spark and injector match through phases 1 and 2, but P15 already differs on 41 edges there;
+  - in phase 3 every spark sits 8 cycles off from the switch to 5000 rpm;
+  - the replayed program state differs from the start: AdcZero (`$50`) is 27 against 24 closed loop, consistent with replayed ADC-end edges arriving 3 cycles late.
+
+  Not root-caused; STATUS conflict.
+- **Scope:**
+  - three steady points with constant sensor voltages, so ADC sampling time cannot move a reading (the ROM also subtracts AdcZero);
+  - not tested: idle contact closed, cranking, rev limit, cold start, missing IGF, the test terminal, serial traffic;
+  - the chip clocked at E = 125 kHz, not 1 MHz;
+  - the C core run on a PC, not on the RP2350 with its I/O.
+- **Verifier** (independent agent, 2026-10-15): PASS WITH ISSUES for "spark and fuel at steady points". The PASS criterion above needs every pin exact, the replay passing, and a repeat `late=0` run; that is not yet met.
 
 **Open:** 7 ADC-hold edges where the chip's output-compare routine runs 3-5 cycles off the emulator's. The first, at cycle 322 048, is an interrupt the chip took one instruction earlier. Another, at 661 883, comes later on the chip although the interrupt had a 6-cycle margin, so a second effect is involved. More runs (other rpm and load points) will show the pattern.
 

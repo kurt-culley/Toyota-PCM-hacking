@@ -69,7 +69,7 @@ The ECU sends a word, so for a byte variable at `addr`, request `addr` and use t
 
 1. **Answering Q10 in the car, without the powered bench measurement.** Peek `$06`: bit 4 of the high byte is what P34 actually reads with the factory J8, so it shows directly which ignition map (A or B) and fuel correction the car runs.
 2. **Settling the kPa scale.** With the key on and the engine off, the manifold is at barometric pressure (about 100 kPa at sea level). The current scale predicts Load ≈ 600. A different reading calibrates the scale and shows whether the high-load staircase `$F1DA` is reachable (STATUS conflicts log).
-3. **Live logging and the phone dashboard.** At about 100 words/s or more, a set of 8 variables updates about 20 times a second. That covers rpm, load, coolant, throttle, pulse width and advance, the P8 and Pi web-server plan.
+3. **Live logging and the phone dashboard.** At about 100 words/s or more, a set of 8 variables updates about 12 times a second at 5000 rpm, more at lower rpm. That covers rpm, load, coolant, throttle, pulse width and advance, the P8 and Pi web-server plan.
 4. **Checking the simulator against the real ECU.** The same variables, read from the car and from the simulator with the same inputs, show any modelling error.
 5. **Reading the stored fault bits** (`$40`–`$43`).
 

@@ -37,7 +37,7 @@
 #define RX_N 8192u                // words; ring of 32 KB (65 ms at E = 125 kHz)
 #define LOG_N 16384u
 #define DMA_COUNT 0x0FFFFFFFu     // longest plain transfer: 2147 s at E = 125 kHz
-#define RAIL_PULLUPS ((1u << 12) | (1u << 13) | (1u << 20) | (1u << 21) | (1u << 22))  // 10k to the 5 V rail
+#define RAIL_PULLUPS ((1u << 12) | (1u << 13) | (1u << 20) | (1u << 21))  // 10k to the 5 V rail (P20-P22, P24)
 
 static uint32_t tx_ring[TX_N] __attribute__((aligned(TX_N * 4)));
 static uint32_t rx_ring[RX_N] __attribute__((aligned(RX_N * 4)));
@@ -264,6 +264,11 @@ static void cmd_rigcheck(void) {
         printf("FAIL: E is toggling, so a chip is running. Remove it and retry.\n");
         return;
     }
+    // Let go of /RES and EXTAL: both have pull-ups to the (unplugged) 5 V rail, so holding either
+    // low would drag the whole rail low and every rail-pulled pin would read as shorted.
+    pio_sm_set_enabled(pio_clk, sm_clk, false);
+    pio_sm_set_pindirs_with_mask(pio_clk, sm_clk, 0, 1u << CD_GPIO_EXTAL);
+    gpio_set_dir(CD_GPIO_RES, GPIO_IN);
     uint32_t pins = CD_IN_MASK | CD_OUT_MASK, faults = 0;
     for (uint g = 0; g < 29; g++)
         if (pins >> g & 1u) {
@@ -294,6 +299,8 @@ static void cmd_rigcheck(void) {
     }
     for (uint g = 0; g < 29; g++)
         if (CD_IN_MASK >> g & 1u) gpio_disable_pulls(g);
+    res_assert();
+    pio_sm_set_enabled(pio_clk, sm_clk, true);
     printf(faults ? "rigcheck: %lu fault(s)\n" : "rigcheck: PASS (no stuck or shorted lines)\n", (unsigned long)faults);
 }
 

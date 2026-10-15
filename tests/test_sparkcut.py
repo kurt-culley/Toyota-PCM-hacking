@@ -95,14 +95,19 @@ def test_igf_safety_cut_still_works_below_limit():
     assert not fuel_starts(s) and s.ram("SatCount_98") >= 0x80
 
 
-@pytest.mark.parametrize(("reload", "max_sparks"), [(None, 7), (0x7E, 2)])
-def test_cut_engages_and_releases_with_fuel_throughout(reload, max_sparks):
-    """Stock reload: 6 passes above the limit; $7E: 1. Both plus one pass of NE measurement lag."""
+@pytest.mark.parametrize(("reload", "max_sparks", "windows", "release"), [(None, 15, 24, 5), (0x7E, 2, 14, 2)])
+def test_cut_engages_and_releases_with_fuel_throughout(reload, max_sparks, windows, release):
+    """Stock reload: 6 counter passes above the limit; $7E: 1. Both plus NE measurement lag.
+
+    With the D151801's MC6801 timing the stock reload lets 15 spark windows through before the cut
+    and the spark returns within 5 windows (7 and 2 with HD6301 timing): the counter does not
+    advance once per NE window. STATUS.
+    """
     s = run(7300, ms=600, reload=reload)
-    up = passes(s, 7600, 14)
+    up = passes(s, 7600, windows)
     first_cut = next(i for i, (spark, _) in enumerate(up) if not spark)
     assert first_cut <= max_sparks and not any(spark for spark, _ in up[first_cut:])
     down = passes(s, 7300, 10)
     first_spark = next(i for i, (spark, _) in enumerate(down) if spark)
-    assert first_spark <= 2 and all(spark for spark, _ in down[first_spark:])
+    assert first_spark <= release and all(spark for spark, _ in down[first_spark:])
     assert all(fuel for _, fuel in up[:-1] + down[:-1])  # the last window may end before injection

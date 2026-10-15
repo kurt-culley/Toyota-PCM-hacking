@@ -290,6 +290,10 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
       - port 4 latch high at reset;
       - interrupt sampling window of 2 cycles, with compare flags counting a cycle after the match and capture flags a cycle before the edge.
     - The loopback reference `expected.h` is regenerated, so the owner's earlier loopback PASS was against the old model. Re-run the loopback UF2 when convenient (no wiring).
+    - **Knock-on in simulations (MC6801 timing is slower):**
+      - 17140 serial link: about 100 words/s at 5000 rpm;
+      - Bluetop spark-cut prototype: with the stock reload the cut engages after 15 spark windows above the limit, not 7, and releases within 5. The "6 passes" of `SatCount_97` are counter passes, not NE windows; `docs/bluetop/rev_limiter.md` to re-check;
+      - every other simulation result is unchanged (full suite).
     - **Open:** 7 ADC-hold edges (two different effects); `run 6` (all three rpm/load points) for more cases; then the Verifier.
 - [ ] **In-car test rig: parts list proposed** ([`../hardware/BOM.md`](../hardware/BOM.md) section C1; about £30). Awaiting owner approval to order. The final PCB outline waits for a photo of the clearance above the CPU socket.
 - [x] **Ross Tier-B pass on the 17140** (2026-10-14; Verifier PASS WITH ISSUES, fixes applied, re-check pending). Every claim whose "Test on" includes `MR2 ROM` (43) has a 17140 status, evidence and a "P4 17140" note in [`ross/claims.md`](ross/claims.md). Simulator results are pinned in [`../tests/test_ross17140.py`](../tests/test_ross17140.py) (44 tests, about 3 s, on the C-backed simulator). The simulator has two inputs for them, `idl_closed` (P1-6, default throttle open) and `p37` (P3-7, default 0 = A/C off). `emu.loopback_ref` pins `p37=1`, the level `expected.h` and `engine.h` use, so the loopback reference is unchanged.

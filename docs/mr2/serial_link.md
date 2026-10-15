@@ -36,7 +36,7 @@ sequenceDiagram
 | **Address range** | **`$00`–`$FF` only**: the index register is always 0 when `SerialPeek` runs, so the byte is the whole address. The registers and RAM are readable; the ROM is not | [ROM:$F3D8-$F3E2, $F3F8-$F402] CONFIRMED (code) |
 | **Writes** | **None.** The link cannot change anything in the ECU | CONFIRMED (code) |
 | **Keep-alive** | Each reply sets `DiagFlags` (`$CC`) bit 0. Every time the counter `$6A` reaches `$FA` (about **1.0 s** in the simulator), the ROM clears the bit and, if it was already clear, **switches the SCI off until the next reset** | [ROM:$F62E-$F641] CONFIRMED (code); [EMU:test_switches_off_after_a_second_without_requests, test_polling_twice_a_second_keeps_it_on] |
-| **Rate** | One request per main-loop pass, and the ECU waits for each reply. Simulated: about **200 words/s at 2000 rpm** and **130 words/s at 5000 rpm**, 4–10 ms per word | [EMU:sim] LIKELY. The real chip may be slower if its cycle counts are 6801-like (STATUS bench observations) |
+| **Rate** | One request per main-loop pass, and the ECU waits for each reply. Simulated with the chip's MC6801 timing: about **100 words/s at 5000 rpm**, more at lower rpm | [EMU:sim] LIKELY (the simulator's timing now matches the real chip, [`../hardware/chip_diff_test.md`](../hardware/chip_diff_test.md#results)) |
 | **Effect on the engine** | None seen: polling flat out at 5000 rpm leaves every spark time identical and the injector pulses within 20 µs | [EMU:test_polling_flat_out_leaves_spark_and_injection_alone] |
 
 Send the next request only after the reply has arrived. A second byte sent while the first is unanswered overruns the receiver, and the ROM drops both. The keep-alive windows are fixed from reset, so the first request must arrive within about 1.03 s of reset, and the link switches off 1–2 s after the last request.
@@ -69,7 +69,7 @@ The ECU sends a word, so for a byte variable at `addr`, request `addr` and use t
 
 1. **Answering Q10 in the car, without the powered bench measurement.** Peek `$06`: bit 4 of the high byte is what P34 actually reads with the factory J8, so it shows directly which ignition map (A or B) and fuel correction the car runs.
 2. **Settling the kPa scale.** With the key on and the engine off, the manifold is at barometric pressure (about 100 kPa at sea level). The current scale predicts Load ≈ 600. A different reading calibrates the scale and shows whether the high-load staircase `$F1DA` is reachable (STATUS conflicts log).
-3. **Live logging and the phone dashboard.** At 130–200 words/s, a set of 8 variables updates about 20 times a second. That covers rpm, load, coolant, throttle, pulse width and advance, the P8 and Pi web-server plan.
+3. **Live logging and the phone dashboard.** At about 100 words/s or more, a set of 8 variables updates about 20 times a second. That covers rpm, load, coolant, throttle, pulse width and advance, the P8 and Pi web-server plan.
 4. **Checking the simulator against the real ECU.** The same variables, read from the car and from the simulator with the same inputs, show any modelling error.
 5. **Reading the stored fault bits** (`$40`–`$43`).
 

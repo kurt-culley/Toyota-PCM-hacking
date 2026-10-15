@@ -32,7 +32,7 @@
 #define EXTAL_HZ 500000u
 #define E_HZ (EXTAL_HZ / 4u)
 #define HOLD_CYCLES (E_HZ / 20u)  // /RES low for 50 ms of E cycles (>= 20 ms needed)
-#define LOOKAHEAD 16              // input words computed ahead of the DMA: 128 us of slack for USB interrupts
+#define LOOKAHEAD 8               // input words computed ahead of the DMA (64 us); reactions come >= 20 cycles later, so on time
 #define TX_N 1024u                // words; ring of 4 KB
 #define RX_N 8192u                // words; ring of 32 KB (65 ms at E = 125 kHz)
 #define LOG_N 16384u

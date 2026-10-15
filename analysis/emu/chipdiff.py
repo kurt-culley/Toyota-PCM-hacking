@@ -222,6 +222,77 @@ def report(offset: int, res: list[PinResult]) -> str:
     return "\n".join(lines)
 
 
+# -- closed loop: per-phase behaviour of the chip and of the emulator running free --------------
+def phase_stats(ne: list[int], sparks: list[int], inj: list[tuple[int, int]], ph: int) -> dict:
+    """Sparks, spark offset after the NE edge, and injector pulses in the measuring window of phase ``ph``."""
+    from .loopback_ref import MEASURE_FROM_US, PHASE_US
+
+    a, b = ph * PHASE_US + MEASURE_FROM_US, (ph + 1) * PHASE_US
+    sp = [t for t in sparks if a <= t < b]
+    offs = []
+    for t in sp:
+        prev = max((n for n in ne if n <= t), default=None)
+        if prev is not None:
+            offs.append(t - prev)
+    pulses, on = [], None
+    for t, lv in inj:
+        if a <= t < b:
+            if lv == 0:
+                on = t
+            elif on is not None:
+                pulses.append(t - on)
+                on = None
+    return {"sparks": len(sp), "offset": (min(offs), max(offs)) if offs else None, "pulses": len(pulses),
+            "pulse": (min(pulses), round(sum(pulses) / len(pulses)), max(pulses)) if pulses else None}  # fmt: skip
+
+
+def summary(log: Log) -> str:
+    """The chip's log against the emulator running closed loop with the same engine model (as in the car).
+
+    Unlike ``analyse``, the emulator gets its own on-time engine reactions, so this shows whether the two
+    behave alike (spark timing, injector pulses) rather than whether they match edge for edge.
+    """
+    from .loopback_ref import PHASE_US, SCENARIOS
+
+    g = {p.name: p.gpio for p in PINS}
+    ne, sp, inj, prev = [], [], [], None
+    for k, w in log.changes:
+        if prev is not None:
+            ch = w ^ prev
+            if ch >> g["P10"] & 1 and w >> g["P10"] & 1:
+                ne.append(k)
+            if ch >> g["P11"] & 1 and not w >> g["P11"] & 1:
+                sp.append(k)
+            if ch >> g["P21"] & 1:
+                inj.append((k, w >> g["P21"] & 1))
+        prev = w
+    phases = log.end // PHASE_US
+    rpm, kpa, tps = SCENARIOS[0]
+    sim = CSimulation(inputs=Inputs17140(rpm=rpm, map_kpa=kpa, tps_v=tps, p37=1))
+    sim.engine.update_sensors()
+    esp, einj = [], []
+    sim.periph.listeners.append(
+        lambda n, lv, t: (
+            esp.append(t) if n == "P1-1" and not lv else None,
+            einj.append((t, lv)) if n == "P2-1" else None,
+        )
+    )
+
+    def switch(k: int) -> None:
+        sim.inputs.rpm, sim.inputs.map_kpa, sim.inputs.tps_v = SCENARIOS[k % len(SCENARIOS)]
+
+    for k in range(1, phases):
+        sim.periph.at(k * PHASE_US, lambda k=k: switch(k))
+    sim.run_until(phases * PHASE_US)
+    lines = ["phase  rpm    sparks chip/emu  spark offset chip/emu  pulses chip/emu  pulse min/mean/max chip | emu"]
+    for ph in range(phases):
+        c, e = phase_stats(ne, sp, inj, ph), phase_stats(sim.engine.teeth, esp, einj, ph)
+        off = f"{c['offset']}/{e['offset']}"
+        lines.append(f"{ph + 1:5}  {SCENARIOS[ph % 3][0]:4}   {c['sparks']:6}/{e['sparks']:<6}   {off:>24}"
+                     f"   {c['pulses']:5}/{e['pulses']:<5}   {c['pulse']} | {e['pulse']}")  # fmt: skip
+    return "\n".join(lines)
+
+
 def capture(port: str, phases: int, out: Path) -> None:
     import serial  # pyserial, only needed for a live capture
 
@@ -252,6 +323,8 @@ def main() -> int:
     a.add_argument("log", type=Path)
     a.add_argument("--offset", type=int)
     a.add_argument("--until", type=int, help="compare only the first N cycles")
+    sm = sub.add_parser("summary", help="per-phase behaviour: the chip vs the emulator running closed loop")
+    sm.add_argument("log", type=Path)
     args = ap.parse_args()
     if args.cmd == "capture":
         capture(args.port, args.phases, args.out)
@@ -259,6 +332,9 @@ def main() -> int:
     log = parse_log(args.log.read_text())
     if log.summary:
         print(log.summary)
+    if args.cmd == "summary":
+        print(summary(log))
+        return 0
     offset, res = analyse(log, args.offset, args.until)
     print(report(offset, res))
     return 0 if all(r.ok for r in res) else 1

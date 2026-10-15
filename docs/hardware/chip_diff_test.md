@@ -199,6 +199,16 @@ PYTHONPATH=analysis uv run python -m emu.chipdiff analyse run1.log
 4. **The port 4 data latch reads high at reset.**
 5. **Interrupt sampling:** an interrupt is taken after an instruction only if its flag counts at least 2 cycles before the instruction's end. A compare flag counts from the cycle after the match, a capture flag from the cycle before the input edge. This is fitted to the interrupts of run 3 (LIKELY).
 
+**Run 4** (owner, 2026-10-15; all 6 phases, 36 M cycles):
+- **Log:** [`analysis/captures/chipdiff_17140_run4_6phase_2026-10-15.log`](../../analysis/captures/chipdiff_17140_run4_6phase_2026-10-15.log), 287 999 ms against 288 000 expected, nothing dropped.
+- **The chip is deterministic:** its phase-1 output is identical, edge for edge, to run 3.
+- **Replay:** it matches as run 3 through phase 1. Shortly after the switch to 2000 rpm it drifts apart, with no interrupt near the first difference; the program state had already diverged, most likely from the 7 phase-1 ADC-start differences.
+- **Closed loop** (`python -m emu.chipdiff summary`: the emulator running free with the same engine model, as in the car):
+  - every phase has the same number of sparks and injector pulses;
+  - the spark sits at the usual 2-cycle offset at 800 and 2000 rpm, and 8 cycles early at 5000 rpm;
+  - the injector pulse is 0.3-0.8 % shorter on the chip.
+- **Rig caveat:** the Pico applied 3420 engine reactions late in run 4 (`late=3420`), mostly the quick ADC conversions. Late ADC-end edges change the chip's readings, so a closed-loop comparison is only fair with `late=0`. The firmware now looks ahead 8 cycles instead of 16 (USB no longer runs on that core), so the reactions land on time.
+
 **Open:** 7 ADC-hold edges where the chip's output-compare routine runs 3-5 cycles off the emulator's. The first, at cycle 322 048, is an interrupt the chip took one instruction earlier. Another, at 661 883, comes later on the chip although the interrupt had a 6-cycle margin, so a second effect is involved. More runs (other rpm and load points) will show the pattern.
 
 ## Steps (each powered step needs the owner's OK on the day)

@@ -32,7 +32,7 @@
 #define EXTAL_HZ 500000u
 #define E_HZ (EXTAL_HZ / 4u)
 #define HOLD_CYCLES (E_HZ / 20u)  // /RES low for 50 ms of E cycles (>= 20 ms needed)
-#define LOOKAHEAD 12              // input words computed ahead of the DMA (reactions come >= 20 cycles later)
+#define LOOKAHEAD 16              // input words computed ahead of the DMA: 128 us of slack for USB interrupts
 #define TX_N 1024u                // words; ring of 4 KB
 #define RX_N 8192u                // words; ring of 32 KB (65 ms at E = 125 kHz)
 #define LOG_N 16384u
@@ -59,11 +59,10 @@ static cd_t cd;
 
 // ---- core 1: the log printer ------------------------------------------------------------
 
-// Core 1 owns USB: stdio is started here, so the USB interrupts run on this core and never
-// delay core 0's per-cycle loop. During a run core 1 also watches for a key press.
+// Core 1 prints the log and, during a run, watches for a key press, so core 0's per-cycle loop
+// never waits on the stdio lock. (stdio itself starts on core 0: the SDK's USB background task
+// runs from a core-0 timer, and USB does not come up if stdio is started on core 1.)
 static void core1_printer(void) {
-    stdio_init_all();
-    multicore_fifo_push_blocking(1);
     uint32_t t_key = 0;
     for (;;) {
         if (run_active && time_us_32() - t_key > 50000u) {
@@ -380,10 +379,10 @@ static void help(void) {
 
 int main(void) {
     pins_init();  // /RES low first
-    multicore_launch_core1(core1_printer);
-    multicore_fifo_pop_blocking();  // core 1 has started stdio (USB)
+    stdio_init_all();
     clock_init();
     chipio_init();
+    multicore_launch_core1(core1_printer);
     while (!stdio_usb_connected()) sleep_ms(50);
     help();
     char line[32];

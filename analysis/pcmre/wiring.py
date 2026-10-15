@@ -278,11 +278,13 @@ def breadboard_table() -> str:
     return "\n".join(rows)
 
 
-def draw_breadboard(out: Path) -> None:
+def draw_breadboard(out: Path, layout=None, head=None, dip=None, wire_colour=None, part_colour=None) -> None:
     """A top view in portrait, as the common 830-point board is printed: row 1 at the top, a-e on the left.
 
     Rail order follows that board: on the left the + strip is outermost and the - strip sits beside
     column a; on the right the + strip sits beside column j and the - strip is outermost.
+    The reader layout by default; pcmre.chipdiff_wiring passes its own layout, title lines, chip pin
+    names and colours.
     """
     from PIL import Image, ImageDraw, ImageFont
 
@@ -292,7 +294,8 @@ def draw_breadboard(out: Path) -> None:
         except OSError:
             return ImageFont.load_default()
 
-    wires, parts = breadboard()
+    wires, parts = layout or breadboard()
+    dip = dip or DIP
     p, left, top = 26, 160, 250  # pitch and origin, px
     # x lane of each hole column and rail strip, in pitches; the centre gap is 3 pitches (e to f = 0.3")
     lane = {"a+": 0, "a-": 1, **{c: 3 + i for i, c in enumerate("abcde")}, **{c: 10 + i for i, c in enumerate("fghij")},
@@ -306,7 +309,7 @@ def draw_breadboard(out: Path) -> None:
         key = hole.split("@")[0] if is_rail(hole) else hole[0]
         return left + lane[key] * p, top + _row(hole) * p
 
-    head = [
+    head = head or [
         ("HD6301 / D151801 ROM reader: breadboard layout (Raspberry Pi Pico 2 W, 830-point board)", f22b, "black"),
         ("Top view, row 1 at the top, as the board is printed. Generated from pins.h (python -m pcmre.wiring --png).",
          f15, "black"),
@@ -368,7 +371,7 @@ def draw_breadboard(out: Path) -> None:
     d.pieslice([(xd + xh) // 2 - 18, yb - 18, (xd + xh) // 2 + 18, yb + 18], 180, 360, fill=(245, 243, 236))
     d.text(((xd + xh) // 2, (ya + yb) // 2), "D151801\n(face up)\nnotch ↓", fill="white", font=f15, anchor="mm",
            align="center")  # fmt: skip
-    for pin, name in DIP.items():
+    for pin, name in dip.items():
         col, r = chip_hole(pin)
         x, y = left + lane[col] * p, top + r * p
         d.ellipse([x - 5, y - 5, x + 5, y + 5], fill=(200, 200, 200), outline="black")
@@ -388,12 +391,14 @@ def draw_breadboard(out: Path) -> None:
             d.text((left - 26, my), label, fill="black", font=f10, anchor="rm")
             d.line([left - 24, my, xa_ - 5, my], fill=(150, 150, 150), width=1)
             continue
+        body = part_colour(part) if part_colour else (225, 200, 150)
+        d.line([xa_, ya_, xb_, yb_], fill=body if part_colour else (90, 90, 90), width=3 if part_colour else 2)
         for x, y in ((xa_, ya_), (xb_, yb_)):  # leg holes
             d.ellipse([x - 4, y - 4, x + 4, y + 4], fill="black")
         if xa_ == xb_:  # resistor lying along a column (between two rows)
-            d.rectangle([mx - 4, my - 9, mx + 4, my + 9], fill=(225, 200, 150), outline="black")
+            d.rectangle([mx - 4, my - 9, mx + 4, my + 9], fill=body, outline="black")
         else:
-            d.rectangle([mx - 9, my - 4, mx + 9, my + 4], fill=(225, 200, 150), outline="black")
+            d.rectangle([mx - 9, my - 4, mx + 9, my + 4], fill=body, outline="black")
         d.text((mx + 6, my - 7), part.split(",")[0], fill="black", font=f10, anchor="lb")
     # wires
     sig_colour = {"AD": (0, 110, 200), "A": (0, 140, 70), "ctl": (200, 90, 0)}
@@ -413,8 +418,9 @@ def draw_breadboard(out: Path) -> None:
                 d.ellipse([x - 5, y - 5, x + 5, y + 5], fill=colour, outline="black")
             continue
         kind = "AD" if what.startswith("AD") else "A" if re.match(r"A\d", what) else "ctl"
+        fill = wire_colour(tag, what) if wire_colour else sig_colour[kind]
         for x, y in ((xa_, ya_), (xb_, yb_)):
-            d.ellipse([x - 10, y - 10, x + 10, y + 10], fill=sig_colour[kind], outline="black")
+            d.ellipse([x - 10, y - 10, x + 10, y + 10], fill=fill, outline="black")
             d.text((x, y), tag, fill="white", font=f10, anchor="mm")
     # key, to the right of the board
     kx, ky = left + board_w + 40, top

@@ -55,15 +55,14 @@ In single-chip mode, the reader's bus pins become the chip's ports:
 - pins 29–22 (A8–A15) are P40–P47;
 - pin 39 (AS) is SC1 (IS3, the IGF input).
 
-Most existing wires therefore stay. The changes, all made **unpowered**:
+Most existing wires therefore stay, and every reader GPIO is reused. The changes, all made **unpowered** (USB out, 5 V jumper out, chip out):
 
-1. **Mode straps:** move the three 10 kΩ resistors on pins 8, 9 and 10 from GND to the 5 V rail (mode 7 = HHH).
-2. **Remove** the wires on pins 22–25 (P44–P47), 26 and 27 (P43, P42), 31 (P36) and 38 (SC2).
-3. **Straps:** these levels match the simulator's defaults.
-   - Pins 22–27 (P47–P42): 10 kΩ each to the 5 V rail.
-   - Pin 31 (P36): 10 kΩ to GND.
-4. **Add** the Port 1 and Port 2 wires from the table below. GP26–GP28 are the Pico's ADC pins and are **not 5 V tolerant**, so they only drive chip inputs, through 1 kΩ.
-5. **Pull-up:** pin 11 (P23) gets a 10 kΩ pull-up to the 5 V rail. The serial link is off unless the Pico pulls it low.
+1. **Move 8 wire ends.** For GP6, GP12–GP17 and GP20 the Pico end stays where it is; only the chip end moves, from the old bus pin to its new port pin (orange in the picture, "MOVE" in the table).
+2. **Mode straps:** move the far end of the three 10 kΩ resistors on pins 8, 9 and 10 from the − rail to the + rail (mode 7 = HHH).
+3. **Add 4 signals** (green): GP22 to pin 11 (P23), and GP26–GP28 to pins 13, 19 and 20 (P10, P16, P17), each through a 1 kΩ that bridges the centre gap in rows 21–23. GP26–GP28 are the Pico's ADC pins and are **not 5 V tolerant**, so they only drive chip inputs, and only through 1 kΩ.
+4. **Add 8 resistors of 10 kΩ:**
+   - pin 11 (P23) pull-up to +, so the serial link stays off;
+   - pins 22–27 (P47–P42) to +, and pin 31 (P36) to −. These levels match the simulator's defaults.
 
 Unchanged: pin 1 GND; pins 21, 7 (STBY), 4 (NMI) and 5 (IRQ1) on the 5 V rail; 100 nF + 10 µF across pins 21/1; XTAL (pin 2) open.
 
@@ -91,12 +90,75 @@ Unchanged: pin 1 GND; pins 21, 7 (STBY), 4 (NMI) and 5 (IRQ1) on the 5 V rail; 1
 | 18 | P15 (ADC hold) | out | GP6 | New (was AD6) |
 | 19 | P16 (IDL) | in | GP27 via 1 kΩ | New |
 | 20 | P17 | in | GP28 via 1 kΩ | New; held high |
-| 8 | P20 (ADC end, mode bit 0) | in | GP12 | New (was A10); 10 kΩ pull-up; Pico pin floating until /RES rises |
+| 8 | P20 (ADC end, mode bit 0) | in | GP12 | New (was A10); 10 kΩ pull-up; the Pico holds it high through reset |
 | 9 | P21 (injector, mode bit 1) | out | GP13 | New (was A11); 10 kΩ pull-up |
 | 10 | P22 (mode bit 2) | out | GP20 | New (was R/W); 10 kΩ pull-up |
 | 11 | P23 | out | GP22 | New; 10 kΩ pull-up |
 
 That is 26 GPIOs in all, defined once in [`chipdiff.h`](../../hardware/ecu-emu/chipdiff/chipdiff.h). **New parts:** three 1 kΩ resistors and eight 10 kΩ (the seven straps and the P23 pull-up); everything else is already on the board.
+
+### Breadboard layout
+
+![Breadboard layout for the chip-in-isolation test](photos/chip_diff_test/breadboard_chipdiff.png)
+
+Grey wires stay as on the reader; orange ones keep their Pico hole and move their chip end; green ones are new. The left-hand straps run at a slant to the nearest free hole on the + rail, because the reader's capacitors and rail bridges already use some rail holes level with the chip.
+
+<!-- generated: python -m pcmre.chipdiff_wiring; tests/test_chipdiff_wiring.py checks this table -->
+
+| Wire | Change | From | To | What |
+|---|---|---|---|---|
+| 1 | keep | b41 | b1 | P30 (pin 37) T terminal → GP0 (Pico pin 1) |
+| 2 | keep | b40 | b2 | P31 (pin 36) → GP1 (Pico pin 2) |
+| 3 | keep | b39 | b4 | P32 (pin 35) → GP2 (Pico pin 4) |
+| 4 | keep | b38 | b5 | P33 (pin 34) → GP3 (Pico pin 5) |
+| 5 | keep | b37 | b6 | P34 (pin 33) J8 → GP4 (Pico pin 6) |
+| 6 | keep | b36 | b7 | P35 (pin 32) G → GP5 (Pico pin 7) |
+| 7 | MOVE | i27 | b9 | P15 (pin 18) ADC hold → GP6 (Pico pin 9)   [move the chip end from b35] |
+| 8 | keep | b34 | b10 | P37 (pin 30) → GP7 (Pico pin 10) |
+| 9 | keep | i39 | b11 | /RES (pin 6) → GP8 (Pico pin 11) |
+| 10 | keep | i42 | b12 | EXTAL (pin 3) → GP9 (Pico pin 12) |
+| 11 | keep | b33 | b14 | P40 (pin 29) → GP10 (Pico pin 14) |
+| 12 | keep | b32 | b15 | P41 (pin 28) → GP11 (Pico pin 15) |
+| 13 | MOVE | i37 | b16 | P20 (pin 8) ADC end → GP12 (Pico pin 16)   [move the chip end from b31] |
+| 14 | MOVE | i36 | b17 | P21 (pin 9) injector → GP13 (Pico pin 17)   [move the chip end from b30] |
+| 15 | MOVE | i31 | b19 | P11 (pin 14) IGT → GP14 (Pico pin 19)   [move the chip end from b29] |
+| 16 | MOVE | i30 | b20 | P12 (pin 15) ADC select → GP15 (Pico pin 20)   [move the chip end from b28] |
+| 17 | MOVE | i29 | i20 | P13 (pin 16) ADC select → GP16 (Pico pin 21)   [move the chip end from b27] |
+| 18 | MOVE | i28 | i19 | P14 (pin 17) ADC select → GP17 (Pico pin 22)   [move the chip end from b26] |
+| 19 | keep | b43 | i17 | SC1 (pin 39) IS3 / IGF → GP18 (Pico pin 24) |
+| 20 | keep | b44 | i16 | E (pin 40) → GP19 (Pico pin 25) |
+| 21 | MOVE | i35 | i15 | P22 (pin 10) → GP20 (Pico pin 26)   [move the chip end from b42] |
+| 22 | keep | i33 | i14 | P24 (pin 12) TX / fault lamp → GP21 (Pico pin 27) |
+| 23 | NEW | i34 | i12 | P23 (pin 11) → GP22 (Pico pin 29) |
+| 24 | NEW | i10 | b21 | GP26 (Pico pin 31) → 1 kΩ in row 21 → P10 (pin 13) NE |
+| 24' | NEW | j21 | i32 | … 1 kΩ in row 21 → P10 (pin 13) |
+| 25 | NEW | i9 | b22 | GP27 (Pico pin 32) → 1 kΩ in row 22 → P16 (pin 19) IDL |
+| 25' | NEW | j22 | i26 | … 1 kΩ in row 22 → P16 (pin 19) |
+| 26 | NEW | i7 | b23 | GP28 (Pico pin 34) → 1 kΩ in row 23 → P17 (pin 20) |
+| 26' | NEW | j23 | i25 | … 1 kΩ in row 23 → P17 (pin 20) |
+
+| Part | Change | From | To |
+|---|---|---|---|
+| 1 kΩ (GP26) | NEW | e21 | f21 |
+| 1 kΩ (GP27) | NEW | e22 | f22 |
+| 1 kΩ (GP28) | NEW | e23 | f23 |
+| 100 nF (or 47 nF '473'), either way round | keep | + rail beside a (row 26) | − rail beside a (row 26) |
+| 10 µF, + leg on the + rail | keep | + rail beside a (row 24) | − rail beside a (row 24) |
+| 330 Ω, EXTAL pull-up part 1 | keep | j42 | j45 |
+| 220 Ω, EXTAL pull-up part 2 | keep | i45 | + rail beside j (row 45) |
+| 10 kΩ | keep | j39 | + rail beside j (row 39) |
+| 10 kΩ | keep | j33 | + rail beside j (row 33) |
+| 10 kΩ, P23 (pin 11) pull-up | NEW | j34 | + rail beside j (row 29) |
+| 10 kΩ, P22 (pin 10) mode strap, now to + | MOVE | j35 | + rail beside j (row 35) |
+| 10 kΩ, P21 (pin 9) mode strap, now to + | MOVE | j36 | + rail beside j (row 36) |
+| 10 kΩ, P20 (pin 8) mode strap, now to + | MOVE | j37 | + rail beside j (row 37) |
+| 10 kΩ, P47 (pin 22) strap to + | NEW | a26 | + rail beside a (row 22) |
+| 10 kΩ, P46 (pin 23) strap to + | NEW | a27 | + rail beside a (row 23) |
+| 10 kΩ, P45 (pin 24) strap to + | NEW | a28 | + rail beside a (row 27) |
+| 10 kΩ, P44 (pin 25) strap to + | NEW | a29 | + rail beside a (row 29) |
+| 10 kΩ, P43 (pin 26) strap to + | NEW | a30 | + rail beside a (row 33) |
+| 10 kΩ, P42 (pin 27) strap to + | NEW | a31 | + rail beside a (row 35) |
+| 10 kΩ, P36 (pin 31) strap to − | NEW | a35 | − rail beside a (row 35) |
 
 ## Firmware and the PC tool
 

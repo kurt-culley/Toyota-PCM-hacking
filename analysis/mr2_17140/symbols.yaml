@@ -198,7 +198,7 @@ ram:
     note: 'decel fuel-cut return rpm (RpmIndex) vs coolant, table $F0C4 (56 .. 112) or 42 when hotter than the first site, +16 for the first 5 s [ROM:$F675-$F686] CONFIRMED (code, EMU)'
   0x9b:
     name: DecelCutRpm
-    note: 'armed decel fuel-cut return rpm: DecelCutBase, +$0E when standing (SPD count $B4 <= $23) unless warm and falling fast, floor $3C (1500 rpm) when P37 is high; fuel is cut above this + $10 and returns at or below it [ROM:$F4D3-$F51E] CONFIRMED (code, EMU) (Ross R-F25)'
+    note: 'armed decel fuel-cut return rpm: DecelCutBase, +$0E when standing (SPD count $B4 <= $23) unless warm and falling fast, floor $3C (1500 rpm) when P37 (A/C on, LIKELY) is high; fuel is cut above this + $10 and returns at or below it [ROM:$F4D3-$F51E] CONFIRMED (code, EMU) (Ross R-F25)'
   0xa9:
     name: IgnCoolant
     note: 'coolant advance term of the spark sum: table $F0EC (85 warm .. 145 cold, +7.0 deg); hotter than coolant reading $1B at MapRaw >= $85 (not closed throttle) table $F0F2 (down to 17, -8.0 deg) [ROM:$F60A-$F629] CONFIRMED (code, EMU) (Ross R-I11/R-I12)'
@@ -215,6 +215,9 @@ ram:
     name: StairFilt
     note: 'staircase fuel factor, lag-filtered (1/4 old + 3/4 new) per fuel calculation [ROM:$FA8F-$FA97] CONFIRMED (code, EMU)'
 labels:
+  0xf769:
+    name: Code51Check
+    note: 'with T shorted (P30 = 0) puts P16 OR P37 into bit 1 of the value stored at $AB: clear only with the throttle closed (IDL, P16 low) and P37 low. Toyota code 51, "IDL off or A/C on with T-E1 shorted", so P37 = A/C switch, high = on [ROM:$F769-$F797] [EMU:tests/test_ross17140.py::test_code_51_check_ors_idl_open_with_p37] LIKELY'
   0xf4c9:
     name: IdlCheck
     note: 'closed-throttle branch: P16 (IDL) low for > $25 ADC ticks -> decel fuel cut above DecelCutRpm + $10, else closed-throttle idle state [ROM:$F4C9-$F51E] CONFIRMED (code, EMU) (Ross R-F25)'
@@ -391,7 +394,7 @@ data:
 - start: 0xf0c4
   end: 0xf0c9
   name: DecelCutTbl
-  note: 'DecelCutBase vs coolant 35/99/163/227: RpmIndex 56/80/92/112 (1400/2000/2300/2800 rpm) [ROM:$F675] CONFIRMED (code, EMU)'
+  note: 'DecelCutBase vs coolant 35/99/163/227: RpmIndex 56/80/92/112 (1400/2000/2300/2800 rpm); below the first site (coolant reading < 35, hotter) the lookup returns carry and the code uses 42 (1050 rpm) instead [ROM:$F675-$F67C] CONFIRMED (code, EMU)'
 - start: 0xf0ca
   end: 0xf0e1
   name: RegionTbls

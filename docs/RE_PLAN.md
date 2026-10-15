@@ -331,7 +331,7 @@ The parts list is in [`../hardware/BOM.md`](../hardware/BOM.md).
 
 ### 6b. In-car modified-ROM board (P7): replace the CPU with an RP2350 that emulates it
 
-The factory CPU cannot run a modified program without external-memory mode. That mode turns 18 of its pins (Port 3, Port 4, SC1/SC2) into a memory bus, and the ECU board needs those pins for G, T, J8, the trims, the fuel pump, T-VIS and IGF (handbook §2.1; [port audit](mr2/architecture.md)). Every design that keeps the factory CPU has to rebuild them.
+The factory CPU cannot run a modified program without external-memory mode. That mode turns 18 of its pins (Port 3, Port 4, SC1/SC2) into a memory bus, and the ECU board needs those pins for G, T, J8, the trims, the A/C and speed inputs, the P31 and T-VIS outputs, and IGF (handbook §2.1; [port audit](mr2/architecture.md)). Every design that keeps the factory CPU has to rebuild them.
 
 So the board **replaces the CPU**: an RP2350 on a DIP-40 plug runs the 17140 program in emulation (HD6301 core plus the D151801's timers, serial port and ports) in single-chip mode, so all 40 pins keep their jobs. Design and validation path: [`mr2/cpu_replacement.md`](mr2/cpu_replacement.md).
 

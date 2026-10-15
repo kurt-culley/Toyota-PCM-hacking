@@ -248,7 +248,7 @@ def test_decel_fuel_cut_and_return():
 def test_mixture_screw_correction():
     """R-M03/R-M04/R-F16: the pulse changes by (Mixture - 128) x MX2 / 32 us, below 3600 rpm and MapRaw 154."""
     _, mx2 = table(0xF0BD, 8)
-    for rpm, kpa, expect_mx2 in ((1000, 60, mx2[0]), (3400, 60, mx2[-1]), (3700, 60, 0), (1000, 105, 0)):
+    for rpm, kpa, expect_mx2 in ((1000, 60, mx2[0]), (3400, 60, mx2[-1]), (3700, 60, 0), (1000, 115, 0)):
         a, b = sim(400, rpm=rpm, map_kpa=kpa, vaf_v=2.5), sim(400, rpm=rpm, map_kpa=kpa, vaf_v=4.5)
         delta = mem(b, 0x88, 2) - mem(a, 0x88, 2)
         assert delta == pytest.approx((mem(b, 0x8C) - mem(a, 0x8C)) * expect_mx2 / 32, abs=1)
@@ -405,6 +405,66 @@ def test_fault_codes_survive_a_reset_and_nothing_is_learned():
     r = run(ROM, 0xF2BE, 0xF371, ram=ram)
     r = run(ROM, 0xF3CC, 0xF403, ram={a: r.mem[a] for a in range(0x40, 0x100)})
     assert [r.mem[a] for a in (0x40, 0x41, 0x42, 0x43)] == [0x5A, 0xA5, 0x00, 0xFF]
+
+
+@pytest.mark.parametrize(("p16", "p37", "bit"), [(0, 0, 0), (0, 1, 2), (1, 0, 2), (1, 1, 2)])
+@pytest.mark.parametrize("p17", [0, 1])
+def test_code_51_check_ors_idl_open_with_p37(p16, p37, bit, p17):
+    """With T shorted (P30 = 0) $F769-$F797 puts P16 OR P37 into bit 1 of the value stored at $AB.
+
+    Clear only with the throttle closed (P16 low) and P37 low: Toyota's code 51, "IDL off or A/C
+    on with T-E1 shorted", so P37 high = A/C on (LIKELY). P17 does not take part.
+    """
+    ram = {0x02: p17 << 7 | p16 << 6, 0x06: p37 << 7, 0x40: 0, 0x42: 0}  # PORT1, PORT3 (bit 0 = T shorted)
+    r = run(ROM, 0xF769, 0xF797, ram=ram)
+    assert r.a == bit
+
+
+def crank_then_idle(idle_s: float, **kw):
+    """Crank at 200 rpm with P1-7 held low for 1.5 s, then raise P1-7 and idle at 900 rpm.
+
+    Returns the simulation, the P1-7 rise time and the P3-1 / P2-2 edges as (seconds, pin, level).
+    """
+    from emu.cboard import CSimulation
+
+    s = CSimulation(inputs=Inputs17140(rpm=200, map_kpa=90, idl_closed=True, ref_v=3.0, **kw))
+    ev: list[tuple[float, str, int]] = []
+    s.periph.listeners.append(lambda n, lvl, t: ev.append((t / 1e6, n, lvl)) if n in ("P3-1", "P2-2") else None)
+    s.engine.update_sensors()
+    s.periph.set_pin(1, 7, 0)
+    s.run_ms(1500)
+    s.periph.set_pin(1, 7, 1)
+    s.inputs.rpm, s.inputs.map_kpa = 900, 35
+    s.engine.update_sensors()
+    rise = s.periph.now / 1e6
+    s.run_ms(idle_s * 1000)
+    return s, rise, ev
+
+
+def last_edge(ev, pin: str, level: int, after: float = 0.01) -> list[float]:
+    return [t for t, n, lvl in ev if n == pin and lvl == level and t > after]
+
+
+@needs_cc
+def test_hot_crank_p31_timer_and_port2_bit2():
+    """R-I08 / Q2: P31 is on until about 20.5 s after P1-7 rises [ROM:$F3A2-$F3CC]; after a hot crank
+    (Coolant 15, Tha 51) PORT2 bit 2 goes low at about 0.18 s and back high at about 92 s [ROM:$F478-$F49F,
+    $F654-$F672]."""
+    s, rise, ev = crank_then_idle(93, thw_v=0.3, tha_v=1.0)
+    assert (mem(s, 0x53), mem(s, 0x5F)) == (15, 51)
+    off = last_edge(ev, "P3-1", 0)
+    assert len(off) == 1 and off[0] - rise == pytest.approx(20.5, abs=0.3)
+    assert [round(t, 1) for t in last_edge(ev, "P2-2", 0)] == [0.2]
+    assert [t for t in last_edge(ev, "P2-2", 1)] == [pytest.approx(92, abs=1)]
+
+
+@needs_cc
+def test_warmer_crank_keeps_port2_bit2_high():
+    """R-I08: with Coolant above $18 the hot-start output stays high; the P31 timer is the same."""
+    s, rise, ev = crank_then_idle(22, thw_v=0.5, tha_v=2.5)
+    assert mem(s, 0x53) > 0x18
+    assert last_edge(ev, "P2-2", 0) == []
+    assert last_edge(ev, "P3-1", 0)[0] - rise == pytest.approx(20.5, abs=0.3)
 
 
 # ---- ADC scale (evidence for the kPa conflict) ------------------------------------------------------

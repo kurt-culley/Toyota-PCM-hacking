@@ -13,7 +13,7 @@ The handbook settles it (Hitachi HD6301 handbook, §2.1, Table 2-1-1 and Fig. 2-
   - the Port 3/4 registers `$04`–`$07` and `$0F` move to external address space.
 - **RAM map:** the HD6301V1's mode-2 map shows `$20`–`$7F` as external space, but the 17140 keeps variables in `$40`–`$7F` [ROM: RAM test `$F310`–`$F336`]. On the Denso part that RAM may also have to come from outside (unknown).
 
-The ECU board was designed for single-chip mode and uses those very pins: G, T, J8, the trims, the fuel pump, T-VIS and IGF ([port audit](architecture.md)). Every design that keeps the factory CPU must rebuild them externally, which means a latch, a CPLD or shadows, and possibly RAM. Replacing the CPU avoids all of it: nothing is lost, because single-chip mode is what gets emulated.
+The ECU board was designed for single-chip mode and uses those very pins: G, T, J8, the trims, the A/C and speed inputs, the P31 and T-VIS outputs, and IGF ([port audit](architecture.md)). Which output, if any, drives the board's `FC` (fuel pump relay) pin is not known: no ROM output behaves like a fuel-pump control (STATUS Q13). Every design that keeps the factory CPU must rebuild them externally, which means a latch, a CPLD or shadows, and possibly RAM. Replacing the CPU avoids all of it: nothing is lost, because single-chip mode is what gets emulated.
 
 ## Block diagram
 

@@ -17,10 +17,11 @@ the CPU pins; the ROM fixes most of it, the rest is marked GUESS.
   adc_offset`` us later, which the ROM captures (TCSR1 IEDG = 0) and times against its
   start stamp [ROM:$FC32]. P2-0 goes high again when bit 5 is set for the next channel.
   The channel is PORT1 bits 2-4 at the start. The linear time-per-volt converter and its
-  constants are GUESS; the ROM subtracts channel 0 and divides by channel 7 (the
-  reference), so the results depend on volts relative to the reference, not on adc_k.
-  **Channel 7 is taken as the 5 V sensor supply (GUESS)**, which makes the readings
-  ratiometric like the sensors.
+  constants are GUESS. The ROM subtracts channel 0 and scales by channel 7 through table $F044,
+  which is exactly ratiometric (reading = 153.7 x V / V_ch7), but for ``ref_v`` above about
+  3.7 V the reference reading sits past the end of that table, so the default scale rests on
+  ``adc_k`` (GUESS). ``ref_v=3.0`` gives 256 counts per 5 V, the LIKELY scale (docs/mr2/maps.md,
+  STATUS kPa-scale conflict).
 - **Outputs.** P1-1 is OC2's pin: the ROM schedules it from the NE edge plus the spark
   delay [ROM:$FF85-$FF94], so its **falling edge is taken as the spark** (IGT high =
   dwell, LIKELY). P2-1 is OC1's pin (Tout1), logged as the injector drive (LIKELY; the
@@ -32,12 +33,14 @@ the CPU pins; the ROM fixes most of it, the rest is marked GUESS.
   P1-7 high, PORT4 inputs high (trim code 11 = 0). Their meanings are LIKELY/GUESS as noted
   in docs/mr2/maps.md.
 - **P1-6 = IDL (throttle idle contact), low = throttle closed** (LIKELY): ~150 ms low sets the
-  closed-throttle state (`ModeFlags` bit 7: idle ignition table $F0FA, decel fuel cut) [ROM:$F4C9-$F51E],
-  and with T shorted a high P1-6 adds a fault bit, as Toyota's code 51 [ROM:$F769-$F795]; the 1984 EWD
-  gives IDL 4-6 V with the throttle open. ``idl_closed`` drives it (default open = the pin's old level).
-- **P3-7** only sets a floor of $3C (1500 rpm return, about 1900 rpm cut) under the decel fuel-cut rpm
-  [ROM:$F4EC-$F4F4]; those are the 1988 RM's A/C-on figures, so it is probably the A/C switch (GUESS).
-  ``p37`` drives it (default 1 = the pin's old level).
+  closed-throttle state (`ModeFlags` bit 7: idle ignition table $F0FA, decel fuel cut) [ROM:$F4C9-$F51E];
+  the 1984 EWD gives IDL 4-6 V with the throttle open. ``idl_closed`` drives it (default open).
+- **P3-7 = A/C switch, high = A/C on** (LIKELY). Two uses: a floor of $3C (1500 rpm return, about
+  1900 rpm cut) under the decel fuel-cut rpm [ROM:$F4EC-$F4F4], the 1988 RM's A/C-on figures; and the
+  T-shorted check at $F769-$F797, which ORs P3-7 with P1-6 into one fault bit, set unless the throttle
+  is closed (P1-6 low) and P3-7 is low: Toyota's code 51, "IDL off or A/C on with T-E1 shorted"
+  [EMU:tests/test_ross17140.py::test_code_51_check_ors_idl_open_with_p37]. ``p37`` drives it (default 0 =
+  A/C off; the loopback reference pins the pin's earlier level, 1).
 """
 
 from __future__ import annotations
@@ -61,12 +64,12 @@ class Inputs17140:
     batt_v: float = 3.5  # +B as seen at the ADC pin (GUESS divider)
     thw_v: float = 0.5  # coolant sensor pin volts (hot engine, GUESS)
     tha_v: float = 2.5  # intake air sensor pin volts (about 20 C, GUESS)
-    ref_v: float = 5.0  # channel 7 reference (GUESS: the 5 V supply)
+    ref_v: float = 5.0  # channel 7 reference; 3.0 = the LIKELY 256-counts-per-5-V scale
     zero_v: float = 0.0  # channel 0
     p34: int = 1  # jumper J8 level: 1 -> map $F1EF, 0 -> map $F25D
     test_terminal: bool = False  # True = T shorted: P3-0 low (LIKELY polarity)
     idl_closed: bool = False  # True = throttle closed: P1-6 (IDL) low (LIKELY)
-    p37: int = 1  # P3-7: decel-cut rpm floor when 1 (GUESS: A/C on)
+    p37: int = 0  # P3-7: A/C switch, 1 = A/C on (LIKELY): decel-cut rpm floor, code-51 bit
     igf: bool = True
     ne_duty: float = 0.5
 

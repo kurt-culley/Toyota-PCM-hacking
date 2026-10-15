@@ -187,7 +187,7 @@ MixRemapTbls:
 ; MX2 vs RpmIndex 40/72/104/136/(168) = 1000/1800/2600/3400/(4200) rpm: 128/113/96/81/64, clamped at 3600 rpm (76) [ROM:$FAEC-$FAF1] CONFIRMED (code, EMU) (Ross R-M02: same bytes, different rpm sites)
 MixRpmTbl:
 	db	$28,$68,$80,$71,$60,$51,$40
-; DecelCutBase vs coolant 35/99/163/227: RpmIndex 56/80/92/112 (1400/2000/2300/2800 rpm) [ROM:$F675] CONFIRMED (code, EMU)
+; DecelCutBase vs coolant 35/99/163/227: RpmIndex 56/80/92/112 (1400/2000/2300/2800 rpm); below the first site (coolant reading < 35, hotter) the lookup returns carry and the code uses 42 (1050 rpm) instead [ROM:$F675-$F67C] CONFIRMED (code, EMU)
 DecelCutTbl:
 	db	$23,$C0,$38,$50,$5C,$70
 ; RegionState limits: $F0CA/$F0CC [MapRaw, RpmIndex] pairs for state 0 ($8F/$FC enter, $8B/$F4 stay), $F0CE state 1, $F0D2 state 2, $F0DB state 3 (MapRaw vs RpmIndex) [ROM:$F550-$F5C5] CONFIRMED (code)
@@ -1063,7 +1063,7 @@ L_F73A:
 L_F73D:
 	cmpb	#$20
 	bcc	L_F758
-	bra	L_F769
+	bra	Code51Check
 L_F743:
 	ldd	#$1B6B
 	cmpb	MapRaw
@@ -1077,18 +1077,18 @@ L_F743:
 	cli
 L_F758:
 	ldaa	$B4
-	bne	L_F769
+	bne	Code51Check
 	ldab	StateFlags
-	bmi	L_F769
+	bmi	Code51Check
 	lsrb
 	lsrb
-	bcc	L_F769
+	bcc	Code51Check
 	clrb
 	inca
 	bsr	L_F717
 	cli
-L_F769:
-	ldaa	PORT1
+Code51Check:
+	ldaa	PORT1		; with T shorted (P30 = 0) puts P16 OR P37 into bit 1 of the value stored at $AB: clear only with the throttle closed (IDL, P16 low) and P37 low. Toyota code 51, "IDL off or A/C on with T-E1 shorted", so P37 = A/C switch, high = on [ROM:$F769-$F797] [EMU:tests/test_ross17140.py::test_code_51_check_ors_idl_open_with_p37] LIKELY
 	asla
 	eora	#$80
 	coma

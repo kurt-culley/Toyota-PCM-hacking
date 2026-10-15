@@ -31,7 +31,9 @@ PHASES = 6
 
 def run() -> list[dict]:
     rpm, kpa, tps = SCENARIOS[0]
-    sim = CSimulation(inputs=Inputs17140(rpm=rpm, map_kpa=kpa, tps_v=tps))
+    # p37=1 (A/C on) is the P3-7 level the reference was generated with, and the level engine.h
+    # leaves the pin at; it must not change, because the Pico runs were checked against expected.h.
+    sim = CSimulation(inputs=Inputs17140(rpm=rpm, map_kpa=kpa, tps_v=tps, p37=1))
     sim.engine.update_sensors()
     edges: list[tuple[int, int, int, int]] = []
     sim.periph.listeners.append(lambda name, level, t: edges.append((int(name[1]), int(name[3]), level, t)))

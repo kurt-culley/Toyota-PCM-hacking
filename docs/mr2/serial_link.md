@@ -48,7 +48,7 @@ The ECU sends a word, so for a byte variable at `addr`, request `addr` and use t
 | Address | Name | Reading |
 |---|---|---|
 | `$77` (word) | RpmWord | rpm = value / 0.32 (CONFIRMED [EMU]) |
-| `$46` (word) | Load | kPa ≈ (value − 98.6) / 4.98 (GUESS, see the kPa conflict in STATUS) |
+| `$46` (word) | Load | kPa ≈ (value − 123) / 6.14 (LIKELY, 256 counts per 5 V); the simulator default scale gives (value − 98.6) / 4.98. The two disagree (STATUS kPa-scale conflict, open): at sea level with the key on and the engine off, expect about 745 on the LIKELY scale and about 603 on the default |
 | `$4A` | MapRaw | 8-bit manifold pressure |
 | `$44` / `$45` | TpsOpen / TpsZero | throttle above the learned closed position / the learned closed reading |
 | `$53` | Coolant | raw coolant reading (scaling still to calibrate) |

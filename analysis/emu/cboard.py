@@ -29,13 +29,25 @@ CACHE = ROOT / ".tools/ecu-emu"
 SHIM = r"""
 #include <stdlib.h>
 #include "board.h"
-board_t *cb_new(void) { return calloc(1, sizeof(board_t)); }
+/* The board plus the time of the earliest Python engine event, which Python keeps current
+   (cb_set_next), so the C step loop does not call back into Python to ask for it. */
+typedef struct { board_t b; int64_t next_t; d_run_event_fn py_run; } cboard_t;
+static int64_t c_next(void *ctx) { return ((cboard_t *)ctx)->next_t; }
+static void c_run(void *ctx) { ((cboard_t *)ctx)->py_run(ctx); }
+board_t *cb_new(void) { cboard_t *c = calloc(1, sizeof(cboard_t)); c->next_t = -1; return &c->b; }
 void cb_free(board_t *b) { free(b); }
-void cb_setup(board_t *b, d_output_fn out, d_next_event_fn nxt, d_run_event_fn run) {
-    b->io.on_output = out; b->io.ctx = b; b->next_ev = nxt; b->run_ev = run; b->ev_ctx = b;
+void cb_set_next(board_t *b, int64_t t) { ((cboard_t *)b)->next_t = t; }
+void cb_setup(board_t *b, d_output_fn out, d_run_event_fn run) {
+    ((cboard_t *)b)->py_run = run;
+    b->io.on_output = out; b->io.ctx = b; b->next_ev = c_next; b->run_ev = c_run; b->ev_ctx = b;
 }
 void cb_init(board_t *b, const uint8_t *rom, int len) { board_init(b, rom, len); }
 int cb_step(board_t *b) { return board_step(b); }
+int cb_run_until(board_t *b, int64_t t) {
+    while (b->io.now < t)
+        if (board_step(b) < 0) return -1;
+    return 0;
+}
 int64_t cb_now(board_t *b) { return b->io.now; }
 uint64_t cb_cycles(board_t *b) { return b->cpu.cycles; }
 uint16_t cb_pc(board_t *b) { return b->cpu.pc; }
@@ -48,7 +60,6 @@ uint8_t cb_port_out(board_t *b, int i) { return d_port_out(&b->io, i); }
 """
 
 OUTPUT_FN = ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int64)
-NEXT_FN = ctypes.CFUNCTYPE(ctypes.c_int64, ctypes.c_void_p)
 RUN_FN = ctypes.CFUNCTYPE(None, ctypes.c_void_p)
 
 
@@ -71,11 +82,13 @@ def library() -> ctypes.CDLL:
         tmp.replace(so)
     lib = ctypes.CDLL(str(so))
     lib.cb_new.restype = ctypes.c_void_p
-    for f in ("cb_free", "cb_setup", "cb_init", "cb_step", "cb_now", "cb_cycles", "cb_pc", "cb_mem", "cb_waiting",
-              "cb_irq_count", "cb_set_pin", "cb_is3", "cb_port_out"):  # fmt: skip
+    names = ("cb_free", "cb_setup", "cb_init", "cb_step", "cb_run_until", "cb_set_next", "cb_now", "cb_cycles",
+             "cb_pc", "cb_mem", "cb_waiting", "cb_irq_count", "cb_set_pin", "cb_is3", "cb_port_out")  # fmt: skip
+    for f in names:
         getattr(lib, f).argtypes = [ctypes.c_void_p] + {
-            "cb_setup": [OUTPUT_FN, NEXT_FN, RUN_FN], "cb_init": [ctypes.c_char_p, ctypes.c_int],
-            "cb_irq_count": [ctypes.c_int], "cb_set_pin": [ctypes.c_int] * 3, "cb_port_out": [ctypes.c_int],
+            "cb_setup": [OUTPUT_FN, RUN_FN], "cb_init": [ctypes.c_char_p, ctypes.c_int],
+            "cb_irq_count": [ctypes.c_int], "cb_run_until": [ctypes.c_int64], "cb_set_next": [ctypes.c_int64],
+            "cb_set_pin": [ctypes.c_int] * 3, "cb_port_out": [ctypes.c_int],
         }.get(f, [])  # fmt: skip
     lib.cb_now.restype = ctypes.c_int64
     lib.cb_cycles.restype = ctypes.c_uint64
@@ -103,6 +116,11 @@ class CPeripherals:
     def at(self, t: int, fn: Callable[[], None]) -> None:
         self._seq += 1
         heapq.heappush(self._events, (t, self._seq, fn))
+        self._sync()
+
+    def _sync(self) -> None:
+        """Tell the C side when the earliest engine event is due (-1: none)."""
+        self.lib.cb_set_next(self.b, self._events[0][0] if self._events else -1)
 
     def next_event_time(self) -> int | None:
         return self._events[0][0] if self._events else None
@@ -122,11 +140,9 @@ class CPeripherals:
         for fn in self.listeners:
             fn(name, level, t)
 
-    def _next(self, _ctx) -> int:
-        return self._events[0][0] if self._events else -1
-
     def _run(self, _ctx) -> None:
         _, _, fn = heapq.heappop(self._events)
+        self._sync()
         fn()
 
 
@@ -139,7 +155,7 @@ class CSimulation:
         self.b = lib.cb_new()
         self.periph = CPeripherals(lib, self.b)
         # keep the C callbacks alive as long as the simulation
-        self._cbs = (OUTPUT_FN(self.periph._on_output), NEXT_FN(self.periph._next), RUN_FN(self.periph._run))
+        self._cbs = (OUTPUT_FN(self.periph._on_output), RUN_FN(self.periph._run))
         lib.cb_setup(self.b, *self._cbs)
         lib.cb_init(self.b, self.rom, len(self.rom))
         self.engine = engine(self.periph, self.rom, inputs, None)
@@ -162,8 +178,8 @@ class CSimulation:
             raise RuntimeError(f"TRAP taken (undefined opcode) at cycle {self.periph.now}")
 
     def run_until(self, t: int) -> None:
-        while self.periph.now < t:
-            self.step()
+        if self.lib.cb_run_until(self.b, t) < 0:
+            raise RuntimeError(f"TRAP taken (undefined opcode) at cycle {self.periph.now}")
 
     def run_ms(self, ms: float) -> None:
         self.run_until(self.periph.now + round(ms * 1000))

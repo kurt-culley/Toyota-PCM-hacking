@@ -1,2 +1,0 @@
-
-	cmp	#value, MEMORY performs the following operation: MEMORY-#immediate and sets flags accordingly

@@ -1,10 +1,10 @@
 # MR2 89661-17140: program architecture (first pass)
 
-**ROM:** `AW11 MR2 PCM/89661-17140.bin`, 4 KB at `$F000`–`$FFFF`. SHA-256 `0cfc1fdd…6f271f6e`.
+**ROM:** `roms/mr2_17140/89661-17140.bin`, 4 KB at `$F000`–`$FFFF`. SHA-256 `0cfc1fdd…6f271f6e`.
 
-**Labelled source:** [`analysis/mr2_17140/mr2_17140.asm`](../../analysis/mr2_17140/mr2_17140.asm), generated from [`symbols.yaml`](../../analysis/mr2_17140/symbols.yaml). It reassembles to the identical image.
+**Labelled source:** [`roms/mr2_17140/mr2_17140.asm`](../../roms/mr2_17140/mr2_17140.asm), generated from [`symbols.yaml`](../../roms/mr2_17140/symbols.yaml). It reassembles to the identical image.
 
-**Cross-references and call graph:** [`analysis/mr2_17140/xref.md`](../../analysis/mr2_17140/xref.md).
+**Cross-references and call graph:** [`roms/mr2_17140/xref.md`](../../roms/mr2_17140/xref.md).
 
 This is the P4 step-1 map: where things are and roughly what they do. Names are working names. Every statement carries its evidence and a confidence level; LIKELY and GUESS items get confirmed in the simulator and on the real-CPU harness in the next steps.
 

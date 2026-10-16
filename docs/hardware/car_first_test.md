@@ -87,7 +87,7 @@ Fit the spare ECU with the Pico. **Never** have 5 V on the Pico's pins while the
   - the switch inputs as the pins read them;
   - the held spark and injection counts;
   - the ADC conversion time per channel, in µs at the pins.
-- **`D,<ms>,<addr>,<word>` lines** are the RAM variables, in the serial-link logger's format. Decode them with `PYTHONPATH=analysis uv run python -m pcmre.peeklog log.txt`, which gives MAP, coolant and intake raw values, rpm and so on.
+- **`D,<ms>,<addr>,<word>` lines** are the RAM variables, in the serial-link logger's format. Decode them with `uv run python -m pcmre.peeklog log.txt`, which gives MAP, coolant and intake raw values, rpm and so on.
 - **`S,...` lines** are a compact machine copy of the status.
 - **`r`** prints a full RAM dump (`R,` lines).
 

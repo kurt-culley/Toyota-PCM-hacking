@@ -1,0 +1,462 @@
+# Names and notes for the MR2 89661-17140 ROM. The single hand-maintained record of what we
+# know about this program; `python -m pcmre.symlisting mr2_17140 --write` regenerates the
+# labelled source and the cross-reference report from it. Tag every note with its evidence
+# and confidence. First pass (P4 step 1): names are working names, not conclusions.
+title: MR2 AW11 ECU 89661-17140 (D151801-7110), $F000-$FFFF
+rom:
+  file: roms/mr2_17140/89661-17140.bin
+ram:
+  0x40:
+    name: SelfTestMark
+    note: RAM/ROM self-test result word $40/$41; also fault-code bits (oraa $40) [ROM:$F330, $F71D] LIKELY
+  0x42:
+    name: FaultBits2
+    note: second fault-bit word, set with $40 [ROM:$F72A] GUESS
+  0x44:
+    name: TpsOpen
+    note: throttle opening above the learned closed position $45 (ADC ch2) [ROM:$FCCA-$FD07] LIKELY
+  0x45:
+    name: TpsZero
+    note: learned closed-throttle reading, clamped $06..$31, default $2C [ROM:$FCCA-$FCFC] LIKELY
+  0x46:
+    name: Load
+    note: manifold pressure, 16-bit, filtered (ADC ch1, normalised by ch7) [ROM:$FD76-$FD92] LIKELY; kPa scaling still to measure
+  0x4a:
+    name: MapRaw
+    note: 'manifold pressure, 8-bit (ADC ch1); on a sensor fault the immediate value #$4D is used [ROM:$FD70-$FD76] LIKELY'
+  0x4d:
+    name: CoolantCorr
+    note: written by the ch5 coolant handler from table $F090 [ROM:$FE2C-$FE33]; meaning GUESS
+  0x50:
+    name: AdcZero
+    note: ADC ch0 conversion time, subtracted from every other channel [ROM:$FC32-$FC4A] LIKELY
+  0x53:
+    name: Coolant
+    note: coolant reading (ADC ch5), latched when the event flag $C9 is set; $1E on a sensor fault [ROM:$FE1F-$FE2B] LIKELY
+  0x55:
+    name: AdcRef
+    note: ADC ch7 (reference) via table $F044; scales every other channel (Mul by $55+410) [ROM:$FC4D-$FC64] LIKELY
+  0x5e:
+    name: ThaCorr
+    note: intake-air-temperature fuel correction from table $F083 (ADC ch6) [ROM:$FE0A-$FE12] LIKELY
+  0x5f:
+    name: Tha
+    note: intake air temperature reading (ADC ch6); $79 on a fault [ROM:$FE0A] LIKELY
+  0x61:
+    name: SecretRpmFuel
+    note: rpm fuel correction from table $F117, used only when PORT3 bit 4 (P34) = 0; otherwise the fixed $66 (x1.00) [ROM:$F465-$F46C, $FAC2-$FACB] LIKELY (Ross R-F12); $F117 = 3 sites 1200/2000/2800 rpm
+      -> x1.00/1.025/1.05
+  0x8a:
+    name: InjDeadTime
+    note: battery-voltage injector dead time from table $F0A4 (ADC ch4) [ROM:$FE14-$FE1E] LIKELY
+  0x8c:
+    name: Mixture
+    note: mixture-adjust (VAF/CO resistor, ADC ch3), $80 on a fault; used as reading - $80 [ROM:$FC6A-$FC96, $FAF5] LIKELY (Ross R-M01)
+  0x59:
+    name: InjFlags
+    note: bit 7/6 flags around injection [ROM:$F4BC, $FC0C] GUESS
+  0x5a:
+    name: StateFlags
+    note: status bits; bit 3 mirrors PORT3 bit 3 changes [ROM:$FBD0] GUESS
+  0x73:
+    name: RpmIndex
+    note: 'byte from the crank period ($77 -> sub_F9D4) [ROM:$F44F]; compared with #$64/#$C8/#$DC LIKELY: engine speed'
+  0x77:
+    name: RpmWord
+    note: 'engine speed: reciprocal of the NE period sum (table $F031 + shifts) [ROM:$F41F-$F44C]; rpm x 0.32 (LIKELY: the staircase sites in $F1C5/$F1D7 come out at round rpm, and $0400 = 3200 rpm is the
+      speed-map split)'
+  0x7c:
+    name: NEperiod0
+    note: NE edge interval x/2, written by IRQ_ICF for even edge counts [ROM:$FF24-$FF35] CONFIRMED (code)
+  0x7e:
+    name: NEperiod1
+    note: see NEperiod0
+  0x80:
+    name: NEperiod2
+    note: see NEperiod0
+  0x84:
+    name: LastNEtime
+    note: ICR2 at the previous counted NE edge [ROM:$FF33]
+  0x88:
+    name: InjPulse
+    note: injection pulse length handed to sub_FFB7 [ROM:$FF07-$FF11] LIKELY
+  0x8d:
+    name: OC1next
+    note: next output-compare-1 time (OCR1) [ROM:$FE7A, $FFE0] CONFIRMED (code)
+  0x90:
+    name: AdcStart
+    note: FRC when the ADC measurement started at OC1 [ROM:$FE8F]; ICR1 - AdcStart = conversion time [ROM:$FC33] LIKELY
+  0x92:
+    name: OC1period
+    note: periodic OC1 schedule, += 1000 or 4000 us [ROM:$FE83-$FE99] LIKELY
+  0x97:
+    name: NEcount
+    note: NE edge counter 0..5, reset when PORT3 bit 5 (G) is seen [ROM:$FEC7-$FEDF] LIKELY
+  0x99:
+    name: ModeFlags
+    note: 'engine state, written at $F604 from the main-loop branches: bit 7 = throttle closed (IDL, P16 low for more than 37 ADC ticks, about 150 ms) or cranking; bit 6 = closed-throttle idle (rpm byte $75 <= $B0, about 1000 rpm); bit 1 = decel fuel cut (no injection [ROM:$FEFB-$FEFF]); bit 0 = cranking (more than $19 ADC ticks per 180 degrees) [ROM:$F478-$F51E, $F604] LIKELY (code, EMU:tests/test_ross17140.py)'
+  0x9e:
+    name: IgnEdge
+    note: NE edge (0..5) on which the spark is scheduled [ROM:$F848, $FF5E] LIKELY
+  0x9f:
+    name: IgnDelay
+    note: delay from that edge to the spark/dwell (us) [ROM:$F848, $FF61] LIKELY
+  0xa8:
+    name: IgnBase
+    note: base advance from the 2D map $F1EF (P34=1) or $F25D (P34=0) over RpmWord x Load; when ModeFlags bit 7 is set (throttle closed), from the idle ignition table $F0FA instead, with no trims [ROM:$FD96-$FDA3]; +13 when $72 bit 7 [ROM:$FDDA];
+      then the PORT4 bits 2-3 trim from $F01A. SvcIgnition copies it to $AB and sums $A8+$A9+$AA+$AB, so it counts twice [ROM:$F7F0, $F806]. Larger = more advance (delay = $05AA - sum) [ROM:$F81B-$F824]
+      CONFIRMED (code)
+  0xa7:
+    name: StartCount
+    note: 'missing-IGF counter: +1 per ignition OC2 event, 0 when the IS3 (IGF) flag is set; SchedInj injects nothing while >= 2; at 4 the IGF fault is logged when $6B bit 7 is set [ROM:$FE54-$FE6B, $FFB8] CONFIRMED (code)'
+  0xc0:
+    name: NEtime
+    note: ICR2 at the latest NE edge [ROM:$FEC2]
+  0xc5:
+    name: OC2next
+    note: next output-compare-2 time (ignition) [ROM:$FE3F, $FF8C] LIKELY
+  0xc7:
+    name: EvLoad
+    note: event flag set by IRQ_ICF, handled in sub_F84D [ROM:$FF4C, $F8BB] LIKELY
+  0xc8:
+    name: EvRpm
+    note: event flag set by IRQ_ICF on edge 1, handled in sub_F84D [ROM:$FF53, $F84D] LIKELY
+  0xc9:
+    name: EvCoolant
+    note: event flag set on edge 2 [ROM:$FF5E] GUESS
+  0xca:
+    name: EvEdge2
+    note: event flag set on edge 2 when $B7 bit 7 [ROM:$FF5C, $F886] GUESS
+  0x82:
+    name: NEsum
+    note: 'NE period sum stored at edge 0 by IRQ_ICF; rpm ~ 15,000,000 / NEsum [ROM:$FF14-$FF1A] CONFIRMED (EMU)'
+  0x94:
+    name: RevCount
+    note: 'rev-limit pass counter: $FD below the limit, +1 per FuelPulse above it; cut at $FF [ROM:$FA2B-$FA3E] CONFIRMED (code, EMU)'
+  0x95:
+    name: FuelCut
+    note: 'bit 3 = rev-limit fuel cut; SchedInj schedules nothing while $95 is non-zero [ROM:$FA3E, $FFBD] CONFIRMED (code, EMU:tests/test_rev_limiter17140.py)'
+  0xb9:
+    name: RevLimit
+    note: 'armed rev limit as an NEsum: $07B6 (7600 rpm) or $07EB (7400 rpm) after a fast climb through 6000 rpm [ROM:$FA03-$FA29] CONFIRMED (code, EMU)'
+  0xcc:
+    name: DiagFlags
+    note: 'bit 0 set after a serial RAM-peek reply [ROM:$F41B]; checked and cleared about once a second, and the SCI is switched off if it was clear (link keep-alive) [ROM:$F62E-$F641] CONFIRMED (code, EMU); bit 7 set after the reset self-test ($AA stored at $F331), cleared only by the flasher''s P30 = 1 branch [ROM:$F77A]; it blocks the fixed spark sum [ROM:$F7F7] CONFIRMED (code)'
+  0x64:
+    name: Counters
+    note: '8 saturating up-counters $64-$6B, all incremented together at $FBC8 [ROM:$FBC8-$FBCD] CONFIRMED (code); $6A is the link keep-alive timer'
+  0x6a:
+    name: LinkTimer
+    note: 'keep-alive timer for the serial link: every time it reaches $FA (about 1.0 s in the simulator) the link is checked [ROM:$F62E-$F641] CONFIRMED (code, EMU:tests/test_peek17140.py)'
+  0x4b:
+    name: LoadLag
+    note: 'lagged Load x 8 (16-bit): follows Load at 1/8 (1/2 for small steps) per EvLoad event; Load x 8 minus this is the transient used by the global factor [ROM:$F8DA-$F90E] LIKELY'
+  0x4e:
+    name: LoadDelta
+    note: '|Load x 8 - LoadLag| / 16, 0 below 4 [ROM:$F8EF-$F8F7] LIKELY'
+  0x51:
+    name: TransGainUp
+    note: 'acceleration gain vs coolant, table $F077 (30 warm .. 77 cold) [ROM:$F692-$F697] LIKELY'
+  0x52:
+    name: TransGainDown
+    note: 'deceleration gain vs coolant, table $F07D (16 warm .. 101 cold) [ROM:$F699-$F69E] LIKELY'
+  0x54:
+    name: StartCoolant
+    note: 'coolant reading latched once after cranking (cleared while cranking) [ROM:$F4C2-$F4C7, $F4AC] LIKELY'
+  0x56:
+    name: FuelCap
+    note: 'upper limit of the global fuel factor, from coolant table $F09E [ROM:$F688-$F690, $F9B9-$F9BD] LIKELY'
+  0x58:
+    name: WarmFuel
+    note: 'warm-up multiplier term: the global factor is multiplied by (1 + $58/128); table $F069 vs coolant (0 warm .. 90 cold), +13 for the first 30 s after a start with StartCoolant > $2D [ROM:$F6A3-$F6BC, $F9A0-$F9B6] LIKELY'
+  0x5c:
+    name: AfterStart
+    note: 'after-start enrichment, added to the global factor; set from coolant table $F056 at cranking and decays one count per $5B rollover (about 3 s from 17 to 0 in the simulator) [ROM:$F4A1-$F4AA, $F5F2-$F5FE] LIKELY'
+  0x5d:
+    name: AccelFuel
+    note: 'acceleration term of the global factor, $80 = neutral; computed on EvEdge2 from tables $F095/$F099 when ModeFlags bit 6 and warm, else $80 [ROM:$F886-$F8B1, $F989-$F98F] GUESS'
+  0x60:
+    name: RegionFuel
+    note: 'load/rpm region enrichment added to the global factor: table $F0E2 indexed by RegionState, +5 entries when TpsOpen >= $3D: state 0 42/50, 1 36/36, 2 18/36, 3 0/18, 4 8/36 [ROM:$F5DE-$F5EE] CONFIRMED (code, EMU) (Ross R-F14/R-F15)'
+  0x62:
+    name: RegionState
+    note: 'fuel region 0-4: 0 = RpmIndex >= $FC (6300 rpm, held to 6100) and MapRaw >= $8F; 1 = from 5550 rpm and MapRaw over table $F0CE; 2/3 = MapRaw over tables $F0D2/$F0DB, or 3 from 4600 rpm; 4 = light load [ROM:$F550-$F5C5] CONFIRMED (code, EMU)'
+  0x67:
+    name: IdlTimer
+    note: 'one of the ADC-tick counters $64-$6B; cleared while P16 (IDL) is high, so it counts how long the throttle has been closed; more than $25 ticks = closed-throttle state [ROM:$F4C9-$F4D6] LIKELY'
+  0x6f:
+    name: SecsRun
+    note: '$6F/$70/$71: saturating counters stepped about once a second at the link keep-alive [ROM:$F641-$F646]; $6F cleared while cranking (seconds since start), $71 held at 0 while P17 is low [ROM:$F3A6-$F3AA] LIKELY'
+  0x72:
+    name: TvisTimer
+    note: 'T-VIS advance delay: counts down from $32 per ADC tick while P41 is on, then sits negative ($F3); +13 is added to IgnBase while negative; counts back up when P41 goes off [ROM:$FBB8-$FBC6, $FDDA] CONFIRMED (code, EMU: step 0.21 s after P41)'
+  0x74:
+    name: RpmByte
+    note: 'RpmWord - $90 saturated to a byte; $75 = mean of the last two [ROM:$F854-$F864] LIKELY'
+  0x9a:
+    name: DecelCutBase
+    note: 'decel fuel-cut return rpm (RpmIndex) vs coolant, table $F0C4 (56 .. 112) or 42 when hotter than the first site, +16 for the first 5 s [ROM:$F675-$F686] CONFIRMED (code, EMU)'
+  0x9b:
+    name: DecelCutRpm
+    note: 'armed decel fuel-cut return rpm: DecelCutBase, +$0E when standing (SPD count $B4 <= $23) unless warm and falling fast, floor $3C (1500 rpm) when P37 (A/C on, LIKELY) is high; fuel is cut above this + $10 and returns at or below it [ROM:$F4D3-$F51E] CONFIRMED (code, EMU) (Ross R-F25)'
+  0xa9:
+    name: IgnCoolant
+    note: 'coolant advance term of the spark sum: table $F0EC (85 warm .. 145 cold, +7.0 deg); hotter than coolant reading $1B at MapRaw >= $85 (not closed throttle) table $F0F2 (down to 17, -8.0 deg) [ROM:$F60A-$F629] CONFIRMED (code, EMU) (Ross R-I11/R-I12)'
+  0xaa:
+    name: IgnIdleStab
+    note: 'idle-stability advance: table $F0F6 (0 .. 68 over a 16-count dip) of RpmSlow - $75, only with InjFlags and ModeFlags bit 7 [ROM:$F872-$F884] CONFIRMED (code, EMU) (Ross R-I13)'
+  0xb2:
+    name: RpmSlow
+    note: 'slow filter of $75 (16-bit, 1/32 per EvRpm event) [ROM:$F866-$F870] LIKELY'
+  0xb7:
+    name: InjPhase
+    note: 'bit 0 = double-pulse mode (on above RpmIndex $F0 = 6000 rpm, off at $E0 = 5600) [ROM:$F454-$F461]; upper bits count crank groups for every-other-revolution injection [ROM:$FEE1-$FF11] CONFIRMED (code, EMU) (Ross R-F24)'
+  0xb8:
+    name: StairFilt
+    note: 'staircase fuel factor, lag-filtered (1/4 old + 3/4 new) per fuel calculation [ROM:$FA8F-$FA97] CONFIRMED (code, EMU)'
+labels:
+  0xf769:
+    name: Code51Check
+    note: 'with T shorted (P30 = 0) puts P16 OR P37 into bit 1 of the value stored at $AB: clear only with the throttle closed (IDL, P16 low) and P37 low. Toyota code 51, "IDL off or A/C on with T-E1 shorted", so P37 = A/C switch, high = on [ROM:$F769-$F797] [EMU:tests/test_ross17140.py::test_code_51_check_ors_idl_open_with_p37] LIKELY'
+  0xf4c9:
+    name: IdlCheck
+    note: 'closed-throttle branch: P16 (IDL) low for > $25 ADC ticks -> decel fuel cut above DecelCutRpm + $10, else closed-throttle idle state [ROM:$F4C9-$F51E] CONFIRMED (code, EMU) (Ross R-F25)'
+  0xf550:
+    name: RegionSelect
+    note: 'RegionState $62 from MapRaw and RpmIndex (tables $F0CA-$F0E1), then RegionFuel $60 from $F0E2 [ROM:$F550-$F5EE] CONFIRMED (code, EMU) (Ross R-F14)'
+  0xf8da:
+    name: GlobalFactor
+    note: 'global fuel factor, computed per crank group: (transient + AccelFuel + AfterStart + RegionFuel) x (1 + WarmFuel/128), capped at FuelCap, passed to FuelPulse in X (x/128) [ROM:$F8DA-$F9BF] CONFIRMED (code, EMU) (Ross R-F13)'
+  0xfadd:
+    name: MixtureTerm
+    note: 'mixture screw: only while MapRaw <= $9A and RpmIndex <= $90 (3600 rpm), re-enabled at $96/$88; pulse += (Mixture - $80) x MX2 / 32 us, MX2 from $F0BD [ROM:$FAD2-$FB15] CONFIRMED (code, EMU) (Ross R-M03/R-M04)'
+  0xfba6:
+    name: TvisOutput
+    note: 'P41 (T-VIS VSV, LIKELY) on above RpmIndex $BA (4650 rpm), off at $AA (4250 rpm) [ROM:$FBA6-$FBB6] CONFIRMED (code, EMU) (Ross R-I10)'
+  0xf11d:
+    name: Lookup1D_a
+    note: table-lookup helper family $F11D-$F16A (entered at several offsets with X = table) [xref] LIKELY
+  0xf16a:
+    name: Lookup2D
+    note: '2D lookup: header [off1 word, max1, off2 word, max2], then rows; interpolates both ways [ROM:$F16A-$F195] LIKELY'
+  0xf2be:
+    name: Reset
+    note: reset vector (also SWI, NMI, IRQ1, TOF, SCI) [ROM:$FFF0-$FFFF]
+    block: 'Reset: accept only mode 7 (single chip) or mode 2 (expanded multiplexed), else hang.
+
+      Then ports, timers, SCI, optional ROM checksum ($AA55) and RAM test, RAM clear.
+
+      '
+  0xf371:
+    name: MainLoop
+    note: 'main loop: re-initialises SP, DDRs and RAMCR every pass [ROM:$F371-$F6E3] LIKELY'
+  0xf3e4:
+    name: NEperiodSum
+    note: D = $7C + $7E + $80, saturating [ROM:$F3E4-$F3F1] CONFIRMED (code)
+  0xf403:
+    name: SerialPeek
+    note: 'RAM peek: a byte received on the SCI is an address $00-$FF (X = 0 here); the word there is sent back, high byte first; overrun/framing errors are ignored [ROM:$F403-$F41E] CONFIRMED (code, EMU)'
+    block: 'Diagnostic link (docs/mr2/serial_link.md): enabled at reset only if P23 (SCI RX, pin 11) is low,
+
+      7812.5 baud (E/128), read-only, page zero only, switched off after about 1 s without a request.
+
+      '
+  0xf33b:
+    name: LinkEnable
+    note: 'TRCSR = RE+TE (SCI on, no interrupts) only if PORT2 bit 3 (P23 = SCI RX, chip pin 11) reads low at reset [ROM:$F33B-$F343] CONFIRMED (code, EMU)'
+  0xf62e:
+    name: LinkKeepAlive
+    note: 'every $FA counts of LinkTimer: if no peek was answered (DiagFlags bit 0 clear) switch the SCI off until the next reset [ROM:$F62E-$F641] CONFIRMED (code, EMU)'
+  0xf7ec:
+    name: SvcIgnition
+    note: computes the spark edge/delay $9E/$9F from the crank period [ROM:$F81B-$F84C] LIKELY
+  0xf84d:
+    name: SvcEvents
+    note: handles the edge-event flags $C8/$CA/$C7 set by IRQ_ICF, then falls into SvcAdc [ROM:$F84D-$F8BF] LIKELY
+  0xfb23:
+    name: SvcAdc
+    note: 'when TCSR ICF (bit 7) is set: read the finished conversion, select the next channel on PORT1 bits 2-4 [ROM:$FB5F-$FB96] LIKELY'
+  0xfb33:
+    name: Mul16
+    note: 16 x 16 multiply, saturating at $FFFF; result in X [ROM:$FB33-$FB5E] LIKELY
+  0xfe36:
+    name: IRQ_OCF
+    note: output-compare interrupt [ROM:$FFF4]
+    block: 'OC2 (TCSR2 bit 6): reload OCR2 from OC2next ($C5): ignition timing.
+
+      OC1 (TCSR bit 6): ADC start (clear PORT1 bits 5-7, stamp FRC in $90), periodic OC1 schedule,
+
+      and the injector pulse on Tout1 (P21) via $8D. LIKELY
+
+      '
+  0xfeb4:
+    name: IRQ_ICF
+    note: input-capture interrupt [ROM:$FFF6]
+    block: 'IC2 (TCSR2 flags): NE crank edge. Counts edges 0..5 in $97 (G seen on PORT3 bit 5 resets it),
+
+      stores half-periods in $7C/$7E/$80, sets the event flags $C7-$CA, schedules injection
+
+      (sub_FFB7) and the spark (OCR2 = edge time + $C3 + $9C). LIKELY
+
+      '
+  0xffb7:
+    name: SchedInj
+    note: 'schedule the end of an injector pulse: OC1next = FRC + D (+ $22) [ROM:$FFB7-$FFE0] LIKELY'
+  0xfc32:
+    name: AdcResult
+    note: 'conversion done: D = ICR1 - AdcStart; A = channel (pushed by SvcAdc); dispatch per channel [ROM:$FC32-$FE35] LIKELY'
+    block: 'ADC channels (PORT1 bits 2-4): 0 zero ref -> $50, 1 MAP -> $4A/$46, 2 throttle -> $44/$45,
+
+      3 mixture (VAF) -> $8C, 4 battery -> $8A dead time, 5 coolant -> $53, 6 intake air -> $5F/$5E,
+
+      7 reference -> $55. LIKELY (from the code paths and their consumers; to be confirmed in the simulator)'
+  0xf9f0:
+    name: DensityLookup
+    note: X = table pair; uses the second table at rpm >= 3200 (RpmWord >= $0400); input Load [ROM:$F9F0-$FA01] LIKELY
+  0xfdae:
+    name: IgnMapSelect
+    note: PORT3 bit 4 (P34, jumper J8) selects ignition map $F1EF (1) or $F25D (0) [ROM:$FDC9-$FDD5] CONFIRMED (code, Verifier) (Ross R-I15)
+  0xf000:
+    name: Tables
+    note: 'calibration tables and descriptors $F000-$F2BD, except code at $F01E-$F03A (range check and clamp); $F000-$F002 = 3F 3F 3F (SWI opcodes: a stray jump to the start of the ROM traps to the reset vector) LIKELY'
+  0xfa1e:
+    name: RevLimitSel
+    note: 'rev limit: $07B6 = 7600 rpm (slow climb), $07EB (constant at $FA27) = 7400 rpm (fast climb through 6000 rpm); value = 15e6 / rpm [ROM:$FA1E-$FA29] CONFIRMED (code, EMU)'
+  0xfa03:
+    name: FuelPulse
+    note: 'injection pulse: density x speed x staircase (lag-filtered in $B8) x InjFlags factor x caller factor x ThaCorr x (P34 ? 1.00 : $61) x mixture term, minimum 600 counts -> InjPulse [ROM:$FA03-$FB1F]
+      LIKELY'
+  0xf7f2:
+    name: IgnFixedTest
+    note: 'fixed spark sum $00AA instead of the maps when ModeFlags bit 7 = 1 (throttle closed or cranking), DiagFlags bit 7 = 0 and PORT3 bit 0 (P30) = 0 [ROM:$F7F2-$F800] CONFIRMED (code); so it is the closed-throttle T-terminal base timing, the factory 10 deg BTDC check [EMU:tests/test_ross17140.py] LIKELY'
+data:
+- start: 0xf00d
+  end: 0xf012
+  name: MixLimits
+  note: 'mixture reading valid while $F00E (10) <= r < $F00D (248), else Mixture = $80, zero correction [ROM:$FC6D-$FC76] (Ross R-M06); $F00F/$F010 = MapRaw $9A / RpmIndex $90 (3600 rpm) limits of the mixture term, $F011/$F012 = $96 / $88 (3400 rpm) to re-enable [ROM:$FAD2-$FAEA] CONFIRMED (code, EMU)'
+- start: 0xf013
+  end: 0xf01a
+  kind: word
+  name: SparkClamp
+  note: 'spark-sum clamp [max, min]: [$0222, $0055], or [$01D5, $0055] while $CB is set [ROM:$F80D-$F818, $F027] LIKELY'
+- start: 0xf01b
+  end: 0xf01d
+  name: IgnTrimTbl
+  note: 'PORT4 bits 2-3 advance trim, subtracted (base $F01A): 17, 9, 0 for codes 01, 10, 11; code 00 adds 9 [ROM:$FDE4-$FDFD] CONFIRMED (code)'
+- start: 0xf044
+  end: 0xf055
+  name: AdcRefTbl
+  note: 'ADC ch7 reference -> AdcRef; (AdcRef + 410) x the ch7 time is constant (314,700 +/- 0.1 %), so every reading = 153.7 x V / V_ch7 [ROM:$FC4D-$FC5B] CONFIRMED (EMU:tests/test_ross17140.py)'
+- start: 0xf056
+  end: 0xf05e
+  name: AfterStartTbl
+  note: AfterStart $5C initial value vs coolant [ROM:$F4A4] LIKELY
+- start: 0xf05f
+  end: 0xf068
+  name: CrankFuelTbl
+  note: cranking fuel vs coolant (ModeFlags bit 0 path) [ROM:$F9C4-$F9CB] LIKELY
+- start: 0xf069
+  end: 0xf071
+  name: WarmFuelTbl
+  note: WarmFuel $58 vs coolant (0 warm .. 90 cold) [ROM:$F6A3] LIKELY
+- start: 0xf072
+  end: 0xf076
+  name: GlobalRpmTbl
+  note: 'scale on WarmFuel vs RpmIndex: flat 128 (x1) on the 17140 [ROM:$F9A6-$F9AB] CONFIRMED (code)'
+- start: 0xf077
+  end: 0xf082
+  name: TransGainTbls
+  note: TransGainUp $51 ($F077) and TransGainDown $52 ($F07D) vs coolant [ROM:$F692-$F69E] LIKELY
+- start: 0xf083
+  end: 0xf088
+  name: ThaCorrTbl
+  note: 'ThaCorr vs THA reading 35/99/163/227: 54/90/117/150 = -9.4/-2.3/+2.9/+9.4 % (hot to cold) [ROM:$FE0A-$FE12] CONFIRMED (code, EMU) (Ross R-F11)'
+- start: 0xf089
+  end: 0xf08f
+  name: TransLimitTbl
+  note: limit on the rising-load transient vs MapRaw - CoolantCorr [ROM:$F90E-$F924] LIKELY
+- start: 0xf09e
+  end: 0xf0a3
+  name: FuelCapTbl
+  note: FuelCap $56 vs coolant [ROM:$F688] LIKELY
+- start: 0xf0a4
+  end: 0xf0aa
+  name: DeadTimeTbl
+  note: 'InjDeadTime ~ 8 x value us vs battery reading 83..211: 2040 .. 424 us, rising as the voltage falls [ROM:$FE14-$FE1E] CONFIRMED (code, EMU) (Ross R-F17)'
+- start: 0xf0ab
+  end: 0xf0bc
+  name: MixRemapTbls
+  note: 'mixture reading -> Mixture: $F0B9 below 48 (28 at 10 .. 104), $F0AB 48-207 (103 .. 153, 128 at 128), $F0B1 from 208 (153 .. 228) [ROM:$FC78-$FC96] CONFIRMED (code, EMU) (Ross R-M01)'
+- start: 0xf0bd
+  end: 0xf0c3
+  name: MixRpmTbl
+  note: 'MX2 vs RpmIndex 40/72/104/136/(168) = 1000/1800/2600/3400/(4200) rpm: 128/113/96/81/64, clamped at 3600 rpm (76) [ROM:$FAEC-$FAF1] CONFIRMED (code, EMU) (Ross R-M02: same bytes, different rpm sites)'
+- start: 0xf0c4
+  end: 0xf0c9
+  name: DecelCutTbl
+  note: 'DecelCutBase vs coolant 35/99/163/227: RpmIndex 56/80/92/112 (1400/2000/2300/2800 rpm); below the first site (coolant reading < 35, hotter) the lookup returns carry and the code uses 42 (1050 rpm) instead [ROM:$F675-$F67C] CONFIRMED (code, EMU)'
+- start: 0xf0ca
+  end: 0xf0e1
+  name: RegionTbls
+  note: 'RegionState limits: $F0CA/$F0CC [MapRaw, RpmIndex] pairs for state 0 ($8F/$FC enter, $8B/$F4 stay), $F0CE state 1, $F0D2 state 2, $F0DB state 3 (MapRaw vs RpmIndex) [ROM:$F550-$F5C5] CONFIRMED (code)'
+- start: 0xf0e2
+  end: 0xf0eb
+  name: RegionFuelTbl
+  note: 'RegionFuel by RegionState 0-4: 42 36 18 0 8, with TpsOpen >= $3D: 50 36 36 18 36 [ROM:$F5DE-$F5EE] CONFIRMED (code, EMU)'
+- start: 0xf0ec
+  end: 0xf0f1
+  name: IgnWarmTbl
+  note: 'IgnCoolant vs coolant 99/131/163/195: 85/127/132/145 [ROM:$F610-$F615] CONFIRMED (code, EMU) (Ross R-I11)'
+- start: 0xf0f2
+  end: 0xf0f5
+  name: IgnHotTbl
+  note: 'over-temperature IgnCoolant vs coolant 14/18: 17/85 [ROM:$F617-$F629] CONFIRMED (code, EMU) (Ross R-I12)'
+- start: 0xf0f6
+  end: 0xf0f9
+  name: IdleStabTbl
+  note: 'IgnIdleStab vs rpm dip (RpmSlow - $75) 0/16: 0/68 [ROM:$F879-$F884] CONFIRMED (code, EMU) (Ross R-I13)'
+- start: 0xf0fa
+  end: 0xf0fe
+  name: IdleIgnTbl
+  note: 'closed-throttle ignition base vs RpmIndex 48/64/80 = 1200/1600/2000 rpm: 68/98/162, held outside [ROM:$FD96-$FDA3] CONFIRMED (code, EMU) (Ross R-I07: identical values)'
+- start: 0xf0ff
+  end: 0xf116
+  name: DensityMaps
+  note: 'base fuel vs Load: $F0FF below 3200 rpm, $F10B above; header [offset word, max index], 9 sites [ROM:$FA43] LIKELY (Ross R-F03/R-F06)'
+- start: 0xf117
+  end: 0xf11c
+  name: SecretRpmTbl
+  note: rpm fuel correction, active only with P34 = 0 [ROM:$F465] LIKELY (Ross R-F12)
+- start: 0xf196
+  end: 0xf1ad
+  name: DensityFine
+  note: 'added to the density map at 1/32 of a base count (base >>3, this >>8): a fine-resolution extension, not a high-MAP bump [ROM:$FA43-$FA52] GUESS'
+- start: 0xf1ae
+  end: 0xf1b9
+  name: SpeedMapLo
+  note: rpm correction below 3200 rpm [ROM:$FA66] LIKELY (Ross R-F06)
+- start: 0xf1ba
+  end: 0xf1c7
+  name: SpeedMapHi
+  note: 'rpm correction from 3200 rpm: 11 sites 3200-7200 rpm (header max 10) [ROM:$FA55] LIKELY (Ross R-F06)'
+- start: 0xf1c8
+  end: 0xf1d6
+  name: StairLowLoad
+  note: 'staircase rpm correction at low Load (no interpolation): entries [rpm word, factor]; the walk is based at $F1C5 and steps 3 before reading [ROM:$FA75-$FA8D] LIKELY'
+- start: 0xf1d7
+  end: 0xf1ee
+  name: StairHighLoad
+  note: 'hard-driving staircase at high Load (> $2B8): walk based at $F1D7, entries from $F1DA, sites 3500/4500/5100/5700/6100/6500 rpm [ROM:$FA81-$FA8D] LIKELY (Ross R-F09/R-F10). Never read in the simulator: Load $2B8 is about 120 kPa on the current scale (STATUS conflicts log)'
+- start: 0xf1ef
+  end: 0xf25c
+  name: IgnMapA
+  note: 'ignition base map used with P34 = 1: 13 rpm (800-5600, step 400) x 8 Load rows; header [off $0200, max 12, off $04A4, max 7] [ROM:$FDC9] LIKELY'
+- start: 0xf25d
+  end: 0xf2bd
+  name: IgnMapB
+  note: 'ignition base map used with P34 = 0 (secret mode if, as likely, the stock P34 is 1; Q10): 13 rpm x 7 Load rows [ROM:$FDD2] LIKELY (Ross R-I15)'
+- start: 0xffee
+  end: 0xffff
+  kind: word
+  name: Vectors
+  note: '$FFEE: checksum balance word; then SCI, TOF, OCF, ICF, IRQ1, SWI, NMI, RES'

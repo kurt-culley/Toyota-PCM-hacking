@@ -10,7 +10,7 @@
 //   rises and down REF_ADC_OFFSET + 200 x volts after it falls; IGF: SC1 pulled low REF_IGF_DELAY
 //   after each spark (P11 falling), for IGF_LOW_CYCLES, in phases with IGF.
 // The chip's reaction times are its own (observed), so the log records the inputs as actually
-// applied; analysis/emu/chipdiff.py replays exactly those into the emulator and compares the
+// applied; src/pcmre/emu/chipdiff.py replays exactly those into the emulator and compares the
 // outputs. Include once, after board.h, expected.h and engine.h.
 
 #ifndef CHIPDIFF_H
@@ -19,7 +19,7 @@
 #include <math.h>
 #include <stdint.h>
 
-// GPIO, port, bit, direction as seen from the chip. Parsed by analysis/emu/chipdiff.py.
+// GPIO, port, bit, direction as seen from the chip. Parsed by src/pcmre/emu/chipdiff.py.
 #define CD_PINS(X)                                                                                                     \
     X(0, 3, 0, IN)    /* P30  T terminal       pin 37 */                                                               \
     X(1, 3, 1, OUT)   /* P31                   pin 36 */                                                               \

@@ -317,7 +317,7 @@ The reader runs the dump **three times** (about 5 s each). It checks four things
 - the 16-bit word sum and the vectors.
 
 The tool then:
-- saves `AW11 MR2 PCM/89661-17140.bin` and its SHA-256;
+- saves `roms/mr2_17140/89661-17140.bin` and its SHA-256;
 - refuses to overwrite an existing file that differs.
 
 Then type `size` in the terminal. It reports whether `$E000`–`$EFFF` is also internal ROM; a 4 KB ROM is expected.

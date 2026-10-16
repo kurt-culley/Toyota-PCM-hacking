@@ -2,7 +2,7 @@
 # Build the assemblers used by the round-trip gate into .tools/ (git-ignored).
 #   asl/p2bin : Macroassembler AS, built from the asl-releases "upstream" branch
 #               (primary, modern assembler).
-#   dasm      : built from the copy vendored in "TOYOTA Bluetop PCM/dasm/src"
+#   dasm      : built from the copy vendored in "tools/vendor/dasm/src"
 #               (legacy, used only as a cross-check).
 # Usage: tools/setup_assemblers.sh   (idempotent)
 set -euo pipefail
@@ -27,7 +27,7 @@ fi
 if [[ ! -x "$TOOLS/dasm/dasm" ]]; then
   rm -rf "$TOOLS/dasm"
   mkdir -p "$TOOLS/dasm"
-  cp -r "$ROOT/TOYOTA Bluetop PCM/dasm/src/." "$TOOLS/dasm/"
+  cp -r "$ROOT/tools/vendor/dasm/src/." "$TOOLS/dasm/"
   make -C "$TOOLS/dasm" >"$TOOLS/dasm/build.log" 2>&1
 fi
 

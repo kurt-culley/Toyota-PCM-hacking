@@ -1,6 +1,6 @@
 # MR2 89661-17140: rev limiter
 
-**Code:** `FuelPulse` `$FA03`–`$FA3E` and `SchedInj` `$FFB7` in [`analysis/mr2_17140/mr2_17140.asm`](../../analysis/mr2_17140/mr2_17140.asm).
+**Code:** `FuelPulse` `$FA03`–`$FA3E` and `SchedInj` `$FFB7` in [`roms/mr2_17140/mr2_17140.asm`](../../roms/mr2_17140/mr2_17140.asm).
 
 **Tests:** [`tests/test_rev_limiter17140.py`](../../tests/test_rev_limiter17140.py) [EMU].
 

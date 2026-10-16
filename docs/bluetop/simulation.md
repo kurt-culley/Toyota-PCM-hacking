@@ -3,9 +3,9 @@
 The Bluetop ROM (`cap.bin`) now runs unmodified from reset in Python, with its timers, serial ADC and interrupts driven by a simulated engine. This is the tool goal 1 needs: the same set-up will run the 17140 ROM in P4/P5 to predict what removing the IACV and the cold-start injector does.
 
 Code:
-- [`analysis/emu/periph.py`](../../analysis/emu/periph.py): the on-chip peripherals.
-- [`analysis/emu/engine.py`](../../analysis/emu/engine.py): engine and sensor stimulus.
-- [`analysis/emu/sim.py`](../../analysis/emu/sim.py): the `Simulation` class and probes.
+- [`src/pcmre/emu/periph.py`](../../src/pcmre/emu/periph.py): the on-chip peripherals.
+- [`src/pcmre/emu/engine.py`](../../src/pcmre/emu/engine.py): engine and sensor stimulus.
+- [`src/pcmre/emu/sim.py`](../../src/pcmre/emu/sim.py): the `Simulation` class and probes.
 
 Tests: [`tests/test_periph.py`](../../tests/test_periph.py) (register behaviour) and [`tests/test_sim.py`](../../tests/test_sim.py) (the whole ROM against its own arithmetic).
 
@@ -46,7 +46,7 @@ flowchart LR
 ## Using it
 
 ```python
-from emu.sim import Simulation
+from pcmre.emu.sim import Simulation
 sim = Simulation()                         # boots cap.bin from reset
 sim.inputs.rpm = 900                       # engine turning at 900 rpm
 sim.inputs.coolant_f = 50                  # coolant in °F, as the ROM sees it
@@ -62,7 +62,7 @@ sim.spark_advance()[-1]                    # degrees BTDC
 - the ROM's coolant linearisation table;
 - whether the SE056 airflow edge exists.
 
-`BLUETOP` is the default. `mr2_dtype(adc, thw_table)` builds a MAP-sensor profile for the 17140 once its channel map is read from the dump. The 17140 board has a serial ADC and no SE056, so PIM is expected on an ADC channel (GUESS until P4). `inputs.map_kpa` drives PIM through the factory vacuum-sensor curve ([`../../analysis/emu/sensors.py`](../../analysis/emu/sensors.py): V = 0.6 + 0.03 × kPa, a straight line through the EWD points, LIKELY). `inputs.mixture_raw` drives a mixture-screw channel. ROMs larger than 4 KB load so that they end at `$FFFF` [EMU:tests/test_profiles.py].
+`BLUETOP` is the default. `mr2_dtype(adc, thw_table)` builds a MAP-sensor profile for the 17140 once its channel map is read from the dump. The 17140 board has a serial ADC and no SE056, so PIM is expected on an ADC channel (GUESS until P4). `inputs.map_kpa` drives PIM through the factory vacuum-sensor curve ([`../../src/pcmre/emu/sensors.py`](../../src/pcmre/emu/sensors.py): V = 0.6 + 0.03 × kPa, a straight line through the EWD points, LIKELY). `inputs.mixture_raw` drives a mixture-screw channel. ROMs larger than 4 KB load so that they end at `$FFFF` [EMU:tests/test_profiles.py].
 
 `Simulation(rom, extra={0xE000: code})` adds code or data outside the 4 KB ROM, as external memory on the P7 board.
 
@@ -90,7 +90,7 @@ Run `PYTHONPATH=analysis uv run python ...` from the repo root. Speed is about r
 
 Items 1–6 and the cranking behaviour in item 8 are asserted in `tests/test_sim.py` [EMU:sim]. Item 7 is an input polarity the simulation adopts from the ROM code, and the "same fuel per cycle" in item 2 follows from the pulse formulas.
 
-1. **rpm scaling.** At 900, 2400 and 4800 rpm: `lilRPM` = rpm/25 and `RPMish` = rpm/25 − 32, given `deltaNE` = 30e6/rpm (the stimulus). The variables in [`maps.md`](../../analysis/bluetop/maps.md) are confirmed.
+1. **rpm scaling.** At 900, 2400 and 4800 rpm: `lilRPM` = rpm/25 and `RPMish` = rpm/25 − 32, given `deltaNE` = 30e6/rpm (the stimulus). The variables in [`maps.md`](../../roms/bluetop/maps.md) are confirmed.
 2. **Injection.**
    - **Warm (above 80 °F / 27 °C):** grouped. Each group fires once per crank revolution for 2 × `InjLoadPulse` + `InjDeadTime`.
    - **Cold (72 °F / 22 °C or below), and while starting:** simultaneous. Both groups fire on every NE edge (4 times per cycle) for `InjLoadPulse` + `InjDeadTime`.

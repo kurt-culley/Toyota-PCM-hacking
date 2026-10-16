@@ -29,7 +29,7 @@ Earlier, 2026-10-13:
 Earlier:
 - **P2 is complete and signed off** (independent Verifier PASS, 2026-10-10).
   - Next is **P3, dumping the 17140 ROM**. It needs the owner to order [`../hardware/BOM.md`](../hardware/BOM.md) section A.
-  - Owner checks outstanding: load `analysis/bluetop/bluetop.xdf` in TunerPro, continuity Test B, and Q10 (a powered check).
+  - Owner checks outstanding: load `roms/bluetop/bluetop.xdf` in TunerPro, continuity Test B, and Q10 (a powered check).
   - Whole-ROM simulation and warm-up results (PR #4).
   - All Tier-A claims have Bluetop evidence; every table is defined.
   - TunerPro XDF and checksum helper.
@@ -65,10 +65,10 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
 - [x] Build `asl` 1.42 bld306 from source, plus `dasm` from the vendored copy: [`../tools/setup_assemblers.sh`](../tools/setup_assemblers.sh).
 - [x] HD6301 opcode table and decoder: all 230 opcodes verified against `asl`.
 - [x] `cap.asm` → label/comment/code-data importer. It rebuilds every address by walking the listing alongside `cap.bin`: 1,980 instructions, 331 data lines, 339 ROM labels and 141 RAM labels, with every mnemonic matching the ROM.
-- [x] **Gate: [`analysis/bluetop/cap.s`](../analysis/bluetop/cap.s) reassembles byte-identical to `cap.bin` with `asl`, and the `dasm` cross-check agrees** (`uv run pytest`, 2026-10-09). The ROM's SHA-256 (`62b2a3f2…7f2`) is pinned in the tests.
-- [x] Cross-reference and call-graph generator ([`../analysis/pcmre/xref.py`](../analysis/pcmre/xref.py) → [`../analysis/bluetop/xref.md`](../analysis/bluetop/xref.md)). It covers 68 routines and 1,989 instructions, with readers/writers of every RAM variable and Mermaid call graphs per vector. It follows Denso's indexed calls, jump tables and inline-parameter returns, and agrees with all 514 of IDA's XREF comments (`tests/test_xref.py`). It also found one IDA error: `$F4C9` is inline data, not code. **Verifier (independent agent, 2026-10-09): PASS WITH ISSUES.** It hand-traced 10 X-resolved calls, swept 28 variables by name and checked the stack model, and all of these were correct. Its two should-fix items are now fixed: 16-bit accesses are credited to both bytes, and loop sites are counted and disclosed. Five latent nits were fixed as well.
+- [x] **Gate: [`roms/bluetop/cap.s`](../roms/bluetop/cap.s) reassembles byte-identical to `cap.bin` with `asl`, and the `dasm` cross-check agrees** (`uv run pytest`, 2026-10-09). The ROM's SHA-256 (`62b2a3f2…7f2`) is pinned in the tests.
+- [x] Cross-reference and call-graph generator ([`../src/pcmre/xref.py`](../src/pcmre/xref.py) → [`../roms/bluetop/xref.md`](../roms/bluetop/xref.md)). It covers 68 routines and 1,989 instructions, with readers/writers of every RAM variable and Mermaid call graphs per vector. It follows Denso's indexed calls, jump tables and inline-parameter returns, and agrees with all 514 of IDA's XREF comments (`tests/test_xref.py`). It also found one IDA error: `$F4C9` is inline data, not code. **Verifier (independent agent, 2026-10-09): PASS WITH ISSUES.** It hand-traced 10 X-resolved calls, swept 28 variables by name and checked the stack model, and all of these were correct. Its two should-fix items are now fixed: 16-bit accesses are credited to both bytes, and loop sites are counted and disclosed. Five latent nits were fixed as well.
 - [~] ~~Ghidra + pyghidra~~ **Made optional (owner decision, 2026-10-09).** There is no HD6301 module, and a decompiler adds little on hand-written 8-bit code. It is not a dependency or a gate. A later optional task may write a setup guide so the owner can browse the ROMs in Ghidra on their own PC.
-- [x] Python HD6301 CPU core ([`../analysis/emu/cpu.py`](../analysis/emu/cpu.py)), written from the Hitachi handbook tables.
+- [x] Python HD6301 CPU core ([`../src/pcmre/emu/cpu.py`](../src/pcmre/emu/cpu.py)), written from the Hitachi handbook tables.
   - It matches MAME's hd6301 handlers on 16,384 random single-instruction cases (64 per opcode): registers, flags, memory writes and cycles.
   - Every `suite6303` instruction steps with the right length.
   - The Bluetop ROM runs from reset into `Main_Loop`.
@@ -76,14 +76,14 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
   - **Verifier (independent agent): PASS WITH ISSUES.** It found 0 mismatches over 256,000 random and 1.08 million targeted cases. All 4 should-fix items are fixed, with regression tests: write order is now compared, SLP wakes on a masked IRQ, waking from WAI costs 4 cycles not 12, and the DAA V-flag conflict is logged. The Verifier re-checked the fixes: **signed off**.
 - [x] P0 gate signed off by the Verifier (2026-10-09). The emulator re-check passed after the fixes.
 ### P2 tasks (Bluetop analysis)
-- [x] Emulator routine-call harness ([`../analysis/emu/harness.py`](../analysis/emu/harness.py)).
+- [x] Emulator routine-call harness ([`../src/pcmre/emu/harness.py`](../src/pcmre/emu/harness.py)).
 - [x] Table lookups modelled and proven equal to the emulator:
   - the 1D helper (six entry points);
   - the 3D ignition map at `$FF40`: 6 load rows × 14 rpm columns at 800–4800 every 400, then 5600, 6400, 7200 rpm.
   - [EMU:tests/test_tables.py]
-- [x] `analysis/defs/bluetop.yaml` with its generator:
+- [x] `roms/bluetop/defs.yaml` with its generator:
   - 13 maps, including coolant linearisation, THA correction, injector dead time and decel-cut rpm;
-  - output in [`../analysis/bluetop/maps.md`](../analysis/bluetop/maps.md).
+  - output in [`../roms/bluetop/maps.md`](../roms/bluetop/maps.md).
 - [x] Architecture write-up ([`bluetop/architecture.md`](bluetop/architecture.md)): reset, the event-driven main loop, ISR roles, ADC sequencer, RAM map.
 - [x] Fuel and ignition chains ([`bluetop/fuel_chain.md`](bluetop/fuel_chain.md)). `Calc72` is proven in the emulator [EMU:tests/test_fuel_chain.py]. The ratio-vs-coolant shape (≈2.5× at 0 °C) comes from a routine-level experiment.
 - [x] **Peripheral model + whole-ROM simulation** ([`bluetop/simulation.md`](bluetop/simulation.md)): timers 1 and 2, the serial ADC, ports and IS3, plus NE/G, airflow, IGF and sensor stimulus. `cap.bin` runs unmodified from reset at about real time. Checked against the ROM's own arithmetic [EMU:tests/test_sim.py]:
@@ -93,7 +93,7 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
   - T terminal → 10.3° BTDC;
   - rev-limit and missing-IGF fuel cuts.
   - **Verifier (independent agent, 2026-10-09): PASS WITH ISSUES.** It agreed with the handbook semantics, the timer-2 mirror, the IDL polarity and the cranking-spark inference. Fixed: pass counts (6 above the limit, 4 without IGF), no rev-limit hysteresis, the $FA19 tip-in reading, the circular NE-reference confidence, the cranking-spark model limited to cranking, the formula clamps, and the missing tests.
-- [x] Warm-up experiments ([`bluetop/warmup_sim.md`](bluetop/warmup_sim.md), CSVs in `analysis/bluetop/sim/`). Steady warm-up fuel is 2.0× warm at −10 °C and 1.7× at 0 °C, gone by 60 °C. The after-start boost (`byte_84`) is +1.1× at 0 °C and bleeds off over about 550 revolutions. Extra cold advance is about +10° at idle. The injection mode switches simultaneous → grouped at 22–27 °C.
+- [x] Warm-up experiments ([`bluetop/warmup_sim.md`](bluetop/warmup_sim.md), CSVs in `roms/bluetop/sim/`). Steady warm-up fuel is 2.0× warm at −10 °C and 1.7× at 0 °C, gone by 60 °C. The after-start boost (`byte_84`) is +1.1× at 0 °C and bleeds off over about 550 revolutions. Extra cold advance is about +10° at idle. The injection mode switches simultaneous → grouped at 22–27 °C.
 - [x] Tier-A claim statuses: all 24 have Bluetop evidence.
   - Latest: R-F10 DIFFERS (only PWRr staircases), R-F12/R-I15 no alternative map on the Bluetop (17140 question), R-I08 PARTIAL, R-I12 CONFIRMED, R-I14 DIFFERS.
   - **R-I08 / P1-5:** the Bluetop drives an idle-up output for about 10 s after start (= 1988 RM V-ISC timing), plus at idle while the learned `word_42` is below $42; no direct coolant schedule.
@@ -112,8 +112,8 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
   - **Correction:** the injector dead time is `$FEE9` (8·v + 464 µs); `$FF12` is the dwell term.
   - `Load` scaling documented (air-temperature-corrected airflow delay, µs).
   - Advance degrees: see Q3.
-- [x] TunerPro RT XDF generated from the YAML ([`../analysis/bluetop/bluetop.xdf`](../analysis/bluetop/bluetop.xdf)) with display equations for advance, dead time, dwell and max airflow. **Not yet opened in TunerPro: owner check.**
-  - Checksum helper [`../analysis/pcmre/checksum.py`](../analysis/pcmre/checksum.py): the word sum must be $AA55, balanced at $FFEE [ROM:$FE50].
+- [x] TunerPro RT XDF generated from the YAML ([`../roms/bluetop/bluetop.xdf`](../roms/bluetop/bluetop.xdf)) with display equations for advance, dead time, dwell and max airflow. **Not yet opened in TunerPro: owner check.**
+  - Checksum helper [`../src/pcmre/checksum.py`](../src/pcmre/checksum.py): the word sum must be $AA55, balanced at $FFEE [ROM:$FE50].
   - A TunerStudio INI needs a comms protocol, so it moves to P7.
 - [x] **P4 prep: day-one toolkit** `pcmre.ingest`. It handles any ROM size, traces and ports the Bluetop maps (all 19 CONFIRMED on 2860), lists candidate tables, searches for Ross's tables, and finds the ADC array, mixture-screw candidates and rpm constants [EMU:tests/test_ingest.py, including a synthetic 8 KB ROM with Ross's table planted]. `crossver` now works with any ROM origin.
 - [x] **P4 prep: MAP-sensor simulator.** `EcuProfile` sets the ADC channel map, the coolant table and whether the SE056 airflow edge exists. `mr2_dtype()` is for the 17140; the PIM sensor model comes from the EWD curve. The Bluetop wiring is unchanged [EMU:tests/test_profiles.py].
@@ -134,7 +134,7 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
 ### P1 tasks
 - [x] Claim register skeleton: [`ross/claims.md`](ross/claims.md).
 - [x] Extract the 16 figures (`pdfimages`, flipped upright) and confirm the page mapping ([`ross/figures/`](ross/figures/README.md)).
-- [x] Digitise the graphs to CSV ([`../analysis/ross/digitise.py`](../analysis/ross/digitise.py)) and transcribe the 17×8 ignition table. The transcription matches Ross's own p13 chart to within 1 count.
+- [x] Digitise the graphs to CSV ([`../src/pcmre/ross/digitise.py`](../src/pcmre/ross/digitise.py)) and transcribe the 17×8 ignition table. The transcription matches Ross's own p13 chart to within 1 count.
 - [x] Mermaid diagrams of Ross's fuel chain, ignition chain, injection modes, T-VIS, idle stability, mixture screw and cold start ([`ross/diagrams.md`](ross/diagrams.md)). All render with mermaid-cli 11.4.
 
 ### P3 tasks (ROM dump, RP2350 reader)
@@ -145,7 +145,7 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
 - [x] Owner orders [`../hardware/BOM.md`](../hardware/BOM.md) section A. (A first "Pico WH" turned out to be the RP2040 board: not 5 V tolerant, not used; replaced by a Pico 2 W with headers.)
 - [x] 6301 dump program ([`../hardware/rp2350-reader/6301/`](../hardware/rp2350-reader/6301/)): in the emulator against `cap.bin` it sends the mode byte then the ROM exactly, with no stack use, no contention and no TDRE violation [EMU:tests/test_romdump.py].
 - [x] RP2350 reader firmware ([`../hardware/rp2350-reader/firmware/`](../hardware/rp2350-reader/firmware/)): builds warning-free for the BB48R and the Pico 2 W(H) (pico-sdk 2.1.1); CI uploads both UF2s. Its decode rule matches the Python model [EMU:tests/test_reader_decode_c.py]. Not yet run on hardware.
-- [x] Host capture tool `analysis/pcmre/romcapture.py` [EMU:tests/test_romcapture.py].
+- [x] Host capture tool `src/pcmre/romcapture.py` [EMU:tests/test_romcapture.py].
 - **Firmware Verifier (independent agent, 2026-10-10): FAIL, then PASS WITH ISSUES on re-review.** It confirmed the blocker fixed and found no remaining contention path while the clock is in spec. Its four minor follow-ups are fixed: the early-release path pushes a marker, so lateness is always detected (the SCI receiver moved to PIO1 to make room); a missed drive is detected after each put; `listen` reports PASS/UNCLEAR/STOP; and a new `res` command lets the owner measure the RES level. **Final check of the follow-ups: PASS** (same independent agent, 2026-10-10). The firmware is cleared for the guided hardware bring-up; the P3 gate itself still needs the dump and its Verifier sign-off.
   - **Blocker:** a late core-1 answer could be driven past E falling, or into a later cycle. Fixed in the PIO and core 1:
     - the answer must be queued before E rises, or the cycle is listen-only;
@@ -178,7 +178,7 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
 - [x] `res`: RES (pin 6) reads ≥ 4.5 V while released [BENCH:owner report 2026-10-13].
 - [x] New firmware (address sampled ~107 ns after AS): two `listen` runs, both PASS and identical cycle for cycle; cycle 0 reads `$FFFE`; all 64 addresses agree with the instruction flow [BENCH:owner logs 2026-10-13].
 - [x] At E = 125 kHz: `clock` PASS (124,993 Hz, 50 %), `listen` PASS, **`probe` PASS** (vector served, `$C0C0` fetched, late cycles 0) [BENCH:owner report 2026-10-13]. At E = 250 kHz the first `probe` failed safe: core 1 was late on the back-to-back `$FFFF` cycle, so it stopped driving; no contention.
-- [x] **17140 ROM dumped** (2026-10-13): three runs identical (4096 ROM bytes, 0 differ), mode bits 000 in every run, snoop channel agrees on 4095/4095 bytes, word sum `$AA55`, vectors RES/SWI/NMI/IRQ1/TOF/SCI `$F2BE`, OCF `$FE36`, ICF `$FEB4` [BENCH:analysis/captures/89661-17140_dump_2026-10-13.txt]. SHA-256 `0cfc1fdd36fc4514cf0693e18ef7e4b47594a4b78f72beadd30766a36f271f6e`. Saved as `AW11 MR2 PCM/89661-17140.bin`. The first dump attempt failed only because the run comparison included the Port 2 pin byte (P22 read 0 in one run and 1 in two); fixed in firmware v4.
+- [x] **17140 ROM dumped** (2026-10-13): three runs identical (4096 ROM bytes, 0 differ), mode bits 000 in every run, snoop channel agrees on 4095/4095 bytes, word sum `$AA55`, vectors RES/SWI/NMI/IRQ1/TOF/SCI `$F2BE`, OCF `$FE36`, ICF `$FEB4` [BENCH:data/captures/89661-17140_dump_2026-10-13.txt]. SHA-256 `0cfc1fdd36fc4514cf0693e18ef7e4b47594a4b78f72beadd30766a36f271f6e`. Saved as `roms/mr2_17140/89661-17140.bin`. The first dump attempt failed only because the run comparison included the Port 2 pin byte (P22 read 0 in one run and 1 in two); fixed in firmware v4.
 - [x] `size`: `$E000`–`$EFFF` echoes the address on all 4096 bytes (floating bus, not ROM); `$F000`–`$FFFF` is identical across runs (internal ROM). **The 17140 ROM is 4 KB** [BENCH:owner report 2026-10-13].
 - [x] **Dump Verifier (independent agent, 2026-10-13): PASS WITH ISSUES.**
   - **Image:** the .bin equals the captured HEX, re-parsed with two parsers; SHA-256 matches.
@@ -210,7 +210,7 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
 | Q13 | What drives the ECU's **`FC`** pin (fuel pump control, circuit opening relay, EWD L-4)? No 17140 ROM output behaves like a fuel-pump control: P31 is an idle-up-like timer (Q2), P40/P41 follow rpm compares, PORT2 bits 2–4 are the hot-start output, a fault timer and the flasher [ROM:$F3A2-$F3CC, $FB98-$FBB6, $F478-$F49F, $FC1C-$FC28, $F7DF-$F7E9]. So `FC` may be driven from NE or STA by board hardware outside the CPU (GUESS). This decides whether the P7 board must drive it | Owner: unpowered continuity from `FC` back to its driver transistor and on to the CPU socket or the NE/STA circuitry (with Test B) |
 
 ### P4 tasks (MR2 17140 analysis)
-- [x] Step 1, first pass: labelled source `analysis/mr2_17140/mr2_17140.asm` (generated from `symbols.yaml` by `pcmre.symlisting`; asl round trip IDENTICAL), xref and call graph, architecture map [`mr2/architecture.md`](mr2/architecture.md). Findings:
+- [x] Step 1, first pass: labelled source `roms/mr2_17140/mr2_17140.asm` (generated from `symbols.yaml` by `pcmre.symlisting`; asl round trip IDENTICAL), xref and call graph, architecture map [`mr2/architecture.md`](mr2/architecture.md). Findings:
   - NE on input capture 2 (6 edges, G on PORT3 bit 5);
   - ignition on output compare 2;
   - a timed ADC on input capture 1 with channel select on PORT1 bits 2–4;
@@ -240,7 +240,7 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
       - the `#$4D` fault value is distinguished from the `$4D` RAM variable;
       - code at `$F01E`–`$F03A` is noted;
       - "secret" map B is conditional on Q10.
-- [x] Step 3, first pass: the 17140 runs in the whole-ROM simulator. Its own I/O model is [`../analysis/emu/engine17140.py`](../analysis/emu/engine17140.py): NE on IC2 at 30°/edge, G on P3-5, a timed ADC on IC1, spark on P1-1, injector on Tout1. Units [EMU:tests/test_sim17140.py]:
+- [x] Step 3, first pass: the 17140 runs in the whole-ROM simulator. Its own I/O model is [`../src/pcmre/emu/engine17140.py`](../src/pcmre/emu/engine17140.py): NE on IC2 at 30°/edge, G on P3-5, a timed ADC on IC1, spark on P1-1, injector on Tout1. Units [EMU:tests/test_sim17140.py]:
   - **RpmWord = rpm × 0.32** CONFIRMED;
   - **15/64° per ignition-map count** CONFIRMED;
   - **injector pulse = InjPulse + dead time** in µs, CONFIRMED;
@@ -260,7 +260,7 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
   - switched off after about 1 s without a request;
   - about 100 words/s at 5000 rpm in the simulator (MC6801 timing), with no effect on spark or injection.
   
-  Simulator host model: [`../analysis/emu/peek17140.py`](../analysis/emu/peek17140.py).
+  Simulator host model: [`../src/pcmre/emu/peek17140.py`](../src/pcmre/emu/peek17140.py).
 - [x] **17140 rev limiter** ([`mr2/rev_limiter.md`](mr2/rev_limiter.md)) [ROM:$FA03-$FA3E, $FFB7] [EMU:tests/test_rev_limiter17140.py]:
   - fuel only, after 3 calculations over the limit, no hysteresis;
   - **7600 rpm** (`$07B6` at `$FA1F`), or **7400 rpm** (`$07EB` at `$FA27`) after a fast climb through 6000 rpm;
@@ -287,11 +287,11 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
     - nits: StartCount, `$FA27`, the P23 description, the instruction count, P32 → LIKELY, overrun and keep-alive wording, the map footer, the 4A-GZE alternative, citation ranges, stronger missing-IGF and slow-climb tests.
   - **Re-check of the fixes (same independent agent, 2026-10-14): PASS.** Its cosmetic follow-ups are applied (citation `$FDC9-$FDD5`, evidence tag on the `ModeFlags` bit 7 statement, a car check of the P30 polarity).
 - [x] **P7 early exploration: the C HD6301 core** (`hardware/ecu-emu/core/`, switch generated from the opcode table by `pcmre.gen_hd6301_c`). It matches the MAME-verified Python core on all 256 opcodes (random cases, interrupts included) and on 200 000 steps of the 17140 ROM [EMU:tests/test_hd6301_c.py]. On a PC it runs the ROM about 270× faster than the real chip. **On the owner's Pico 2 W: 4.6× the real chip at 150 MHz, 7.7× at 250 MHz** [BENCH: owner, bench v2, 2026-10-14]. **D151801 peripherals in C done** (`d151801.c`, `board.c`): identical to the Python simulator at 8 operating points, every spark, injector edge, ADC conversion and RAM byte [EMU:tests/test_d151801_c.py]. Loopback on the Pico (v1, owner 2026-10-14): RpmWord exact, spark within 0.13°, 72 % busy, lag ≤ 14 µs. **v2 on the Pico: all 6 phases PASS, bit-exact with the simulator** (every output edge, RAM, injector pulse) [BENCH: owner 2026-10-14]. A low-rpm lag spike (1.1 ms at 800 rpm, a crank-queue horizon bug) is fixed in v2.1.
-- [ ] **Chip-in-isolation test (next P7 step):** [`hardware/chip_diff_test.md`](hardware/chip_diff_test.md). The real D151801 runs its own ROM in mode 7 on the reader breadboard while the Pico plays the engine with the loopback's model and schedule; its edge checksums must equal `expected.h`, which the emulator already matches. Owner decision 2026-10-14: this replaces the ECU bench as the emulator's validation; then the car on the in-car test rig (spare ECU, car's own ECU kept as the known-good spare). Firmware `hardware/ecu-emu/chipdiff/` (UF2 builds clean, CI artefact) and the PC tool `analysis/emu/chipdiff.py` (replays the logged inputs into the emulator, compares every output edge) are done; the pipeline passes with the emulator standing in for the chip, and catches a spark moved by one cycle [EMU:tests/test_chipdiff.py]. Breadboard rewired by the owner; `rigcheck` (chip out, 5 V jumper out) PASS [BENCH: owner, 2026-10-15]. `clock` OK (124 980 Hz). First `run 1` [BENCH: owner, 2026-10-15]: completed (late/qfull/dropped all 0) and the chip's first output edges come in the emulator's order, but at about 1/6 of the time scale: a firmware fault, not a chip difference. The PIO program loaded its two set-up words with PULL while autopull was on (a PULL is then a no-op), so the sample delay got the reset-hold count and only every 6th E cycle was sampled (the chip then saw the crank at about 1/6 of the intended rpm). Fixed (OUT instead of PULL), and the firmware now aborts if the sample count disagrees with real time. Second `run 1`: sampled correctly (166 469 E cycles in 1331 ms) but aborted on a Pico-side input-ring underrun after 1.3 s (fixed: USB moved to core 1, code in RAM). **The 1.3 s log already compares the real chip with the emulator** [BENCH: owner run 2, 2026-10-15]:
+- [ ] **Chip-in-isolation test (next P7 step):** [`hardware/chip_diff_test.md`](hardware/chip_diff_test.md). The real D151801 runs its own ROM in mode 7 on the reader breadboard while the Pico plays the engine with the loopback's model and schedule; its edge checksums must equal `expected.h`, which the emulator already matches. Owner decision 2026-10-14: this replaces the ECU bench as the emulator's validation; then the car on the in-car test rig (spare ECU, car's own ECU kept as the known-good spare). Firmware `hardware/ecu-emu/chipdiff/` (UF2 builds clean, CI artefact) and the PC tool `src/pcmre/emu/chipdiff.py` (replays the logged inputs into the emulator, compares every output edge) are done; the pipeline passes with the emulator standing in for the chip, and catches a spark moved by one cycle [EMU:tests/test_chipdiff.py]. Breadboard rewired by the owner; `rigcheck` (chip out, 5 V jumper out) PASS [BENCH: owner, 2026-10-15]. `clock` OK (124 980 Hz). First `run 1` [BENCH: owner, 2026-10-15]: completed (late/qfull/dropped all 0) and the chip's first output edges come in the emulator's order, but at about 1/6 of the time scale: a firmware fault, not a chip difference. The PIO program loaded its two set-up words with PULL while autopull was on (a PULL is then a no-op), so the sample delay got the reset-hold count and only every 6th E cycle was sampled (the chip then saw the crank at about 1/6 of the intended rpm). Fixed (OUT instead of PULL), and the firmware now aborts if the sample count disagrees with real time. Second `run 1`: sampled correctly (166 469 E cycles in 1331 ms) but aborted on a Pico-side input-ring underrun after 1.3 s (fixed: USB moved to core 1, code in RAM). **The 1.3 s log already compares the real chip with the emulator** [BENCH: owner run 2, 2026-10-15]:
     - With the emulator's HD6301 timing, the first ADC cycle comes 414 E cycles late: the RAM-clear loop at `$F336` (136 passes of CLR idx / DEX / BNE) takes 3 more cycles per pass on the chip, exactly the MC6801 counts (CLR idx 6, DEX 3) [ROM:$F336-$F33A]. **The D151801 runs MC6801 instruction timing** (LIKELY; matches the earlier "6801-like bus cycles" bench note). The 17140 ROM uses no HD6301-only opcode.
     - With MAME's MC6803 cycle table **and** the MC6801 counter write (a write to the FRC only presets `$FFF8`; the low-byte write does not load a value), every output pin shows the same number of edges as the chip over the 1.3 s, including all 6 spark edges at a constant offset (EXPERIMENT, scratch build).
     - Remaining differences: 1-4 cycle variations in when port writes appear (the emulator applies a store at the start of the instruction, the chip in its last cycle), and P40 does not glitch low when DDR4 is written (the chip's port 4 data latch is not 0 at reset).
-    - **Run 3 (full phase, 6 M cycles, owner 2026-10-15):** after the model fixes below, **every output pin matches the chip's edge count; all sparks, injector and ADC-select edges at a constant offset; the ADC hold line on 2994 of 3001 edges** [BENCH:analysis/captures/chipdiff_17140_run3_2026-10-15.log] [EMU:tests/test_chip_vs_emulator.py]. Details: [`hardware/chip_diff_test.md`](hardware/chip_diff_test.md#results).
+    - **Run 3 (full phase, 6 M cycles, owner 2026-10-15):** after the model fixes below, **every output pin matches the chip's edge count; all sparks, injector and ADC-select edges at a constant offset; the ADC hold line on 2994 of 3001 edges** [BENCH:data/captures/chipdiff_17140_run3_2026-10-15.log] [EMU:tests/test_chip_vs_emulator.py]. Details: [`hardware/chip_diff_test.md`](hardware/chip_diff_test.md#results).
     - **Model fixes, in both `emu` and `hardware/ecu-emu/core`:**
       - MC6801 cycle counts (`emu.cpu.CYCLES_6801`);
       - I/O accesses on their bus cycle;
@@ -304,7 +304,7 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
       - Bluetop spark-cut prototype: with the stock reload the cut engages after 15 spark windows above the limit, not 7, and releases within 5. The "6 passes" of `SatCount_97` are counter passes, not NE windows; `docs/bluetop/rev_limiter.md` to re-check;
       - every other simulation result is unchanged (full suite).
     - **Run 4 (all 6 phases):** the chip is deterministic (phase 1 identical to run 3). In replay it drifts apart early in phase 2. Closed loop (`emu.chipdiff summary`): same spark and pulse counts at every point; spark timing equal at 800/2000 rpm and 8 cycles early on the chip at 5000 rpm; injector pulses 0.3-0.8 % shorter on the chip. But 3420 engine reactions were late on the Pico, which shifts the chip's ADC readings, so that is not a fair comparison yet: the firmware look-ahead is now 8 cycles. Next: one more `run 6` with `late=0`.
-    - **Run 5 (all 6 phases, `late=0`):** closed loop at three steady points (800/2000/5000 rpm, constant sensor voltages), the emulator gives **every spark edge (6 238) and injector edge (3 130) of the real chip at a constant 2-cycle offset**; ADC sequencing 99.3-99.6 % [BENCH:analysis/captures/chipdiff_17140_run5_6phase_2026-10-15.log] [EMU:tests/test_chip_vs_emulator.py]. LIKELY for spark and fuel at steady operating points.
+    - **Run 5 (all 6 phases, `late=0`):** closed loop at three steady points (800/2000/5000 rpm, constant sensor voltages), the emulator gives **every spark edge (6 238) and injector edge (3 130) of the real chip at a constant 2-cycle offset**; ADC sequencing 99.3-99.6 % [BENCH:data/captures/chipdiff_17140_run5_6phase_2026-10-15.log] [EMU:tests/test_chip_vs_emulator.py]. LIKELY for spark and fuel at steady operating points.
     - **Verifier (independent agent, 2026-10-15): PASS WITH ISSUES**, no blockers:
       - **Out-of-sample:** run 5 is a genuine out-of-sample test. The interrupt rules were fitted on run 3 only; phases 2-6 are new operating points.
       - **Sensitivity:** spark timing hardly tests the CPU model (it survives switching every interrupt rule off), but the injector does confirm the fitted rules (a window of 0, 1 or 3 drops it to about 74 %).
@@ -349,7 +349,7 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
     - idle-stability gain;
     - P31 and the PORT2 bit 2 hot-start output (Q2).
 
-    All are named in `analysis/mr2_17140/symbols.yaml` (asl round trip IDENTICAL).
+    All are named in `roms/mr2_17140/symbols.yaml` (asl round trip IDENTICAL).
   - **Blocking the "Ross verified" gate:**
     1. **R-M09** (Tier B, 17070 MX2 map) is still PENDING and needs a 17070 dump. Owner decision: keep it as a gate item, or move it to `docs/variants.md` as out of scope for the 17140.
     2. `docs/ross/verification_report.md` (the P4 deliverable) is not written yet.
@@ -368,7 +368,7 @@ Earlier: the 1988 repair manual is recorded ([`hardware/repair_manual_aw11_1988.
 - [ ] Logger on the spare ECU on the bench (after Q11; owner confirmation), then the Wi-Fi dashboard.
 
 ### Bench observations to follow up (P4)
-- **Day-one ingest** ([`../analysis/mr2_17140/ingest.md`](../analysis/mr2_17140/ingest.md)):
+- **Day-one ingest** ([`../roms/mr2_17140/ingest.md`](../roms/mr2_17140/ingest.md)):
   - Only 4 % of the Bluetop's instructions align, so this is a different program, and **none of the 19 Bluetop maps port automatically**.
   - The data tables sit at the **start** of the ROM (`$F000`–`$F2BD`), not the end.
   - Ross's 17030 ignition table is not present byte for byte (mean difference 44 counts).

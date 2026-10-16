@@ -4,7 +4,7 @@
 cmake_minimum_required(VERSION 3.13)
 
 set(PICO_PLATFORM rp2350)
-include(pico_sdk_import.cmake)
+include(${CMAKE_CURRENT_LIST_DIR}/../../cmake/pico_sdk_import.cmake)
 project(peek_logger C CXX ASM)
 set(CMAKE_C_STANDARD 11)
 

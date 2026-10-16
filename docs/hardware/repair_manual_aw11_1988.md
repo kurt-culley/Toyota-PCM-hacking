@@ -106,7 +106,7 @@ The connector face drawing (FI-29) has three connectors. Read left to right, top
 | Injector resistance | about **13.8 Ω** (4A-GE, high impedance); about 2.9 Ω (4A-GZE) | FI-80 (PDF 275) | GUESS (1984 says 1.5–3.0 Ω) |
 | Fuel pressure | 265–304 kPa | Service specs (PDF 980–992) | LIKELY |
 | Throttle body, fully closed angle | 6° | Service specs (PDF 980–992) | LIKELY |
-| THW / THA thermistor | −20 °C 10–20 kΩ … 80 °C 0.2–0.4 kΩ | FI-116 (PDF 311), FI-94 (PDF 289) | LIKELY (agrees with [`analysis/sensors/`](../../analysis/sensors/)) |
+| THW / THA thermistor | −20 °C 10–20 kΩ … 80 °C 0.2–0.4 kΩ | FI-116 (PDF 311), FI-94 (PDF 289) | LIKELY (agrees with [`data/sensors/`](../../data/sensors/)) |
 | Thermostat | Opens at 80–84 °C; fully open at 95 °C | Service specs (PDF 980–992) | LIKELY |
 | Ignition coil | Primary 0.5–0.7 Ω; secondary 11–16 kΩ | IG section (PDF 364–367) | LIKELY |
 | Distributor pickups (G, NE) | 140–180 Ω | IG section (PDF 364–367) | LIKELY (same as 1984) |

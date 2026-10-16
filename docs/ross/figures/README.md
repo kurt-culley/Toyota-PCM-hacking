@@ -1,12 +1,12 @@
 # Ross figures: extracted and digitised (P1)
 
-These are the 16 images embedded in *Lifting the Lid on the mk1 MR2 ECU* (Jeremy Ross), extracted by [`analysis/ross/digitise.py`](../../../analysis/ross/digitise.py).
+These are the 16 images embedded in *Lifting the Lid on the mk1 MR2 ECU* (Jeremy Ross), extracted by [`src/pcmre/ross/digitise.py`](../../../src/pcmre/ross/digitise.py).
 - The PDF stores every image upside down; the script flips them upright.
 - The graph data is read off pixels, and each CSV states its source page, linked claims and resolution.
 
 **Evidence level:** `[PDF]`. These are Ross's plots of the **17030** (mk1a) ECU, not ROM data. They are the targets that P4 must reproduce from the 17140 ROM (see [`../claims.md`](../claims.md)).
 
-Regenerate with `PYTHONPATH=analysis uv run python -m ross.digitise`. `tests/test_ross_figures.py` checks the files.
+Regenerate with `uv run python -m pcmre.ross.digitise`. `tests/test_ross_figures.py` checks the files.
 
 | Image | Page | Content | Data | Claims |
 |---|---|---|---|---|

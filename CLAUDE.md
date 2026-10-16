@@ -41,7 +41,7 @@ This repo is used to reverse-engineer Denso/Toyota ECUs. The active project is t
 
 - **Docs** are Markdown, with **Mermaid** for flows, signal chains and state machines.
 - **Map write-ups** give the axes in physical units, the raw → physical scaling with its derivation, and an "In tuning terms" paragraph.
-- **One definition file per ROM**, `analysis/defs/<rom>.yaml`. Generate XDF, TunerStudio INI, CSV and Markdown from it. Never hand-maintain two copies.
+- **One definition file per ROM**, `roms/<rom>/defs.yaml`. Generate XDF, TunerStudio INI, CSV and Markdown from it. Never hand-maintain two copies.
 - **Never modify the original dumps** (`*.bin`, `*.idb`, `cap*.asm`). New work goes in `analysis/`, `docs/` and `hardware/`.
 - **PDFs** may not render on github.com. Read them locally with `pdftotext` / `pdfimages`.
 
@@ -60,7 +60,7 @@ This repo is used to reverse-engineer Denso/Toyota ECUs. The active project is t
 | `Toyota Redtop 4A-GE/`, `Toyota Blacktop 4a-ge/`, `Toyota 1UZ PCM/` | Toshiba 8X ECUs and dumps |
 | `Toshiba 8x info/`, `Toshiba 8x daughtercard/` | T8X documentation, the CPLD port-emulator daughtercard |
 | `BISON loader-debugger/` | BUFFALO-style RAM loader and monitor for the **Toshiba 8X** (not 6301 code) |
-| `Lifting The Lid on the mk1 MR2 ECU (Jeremy Ross).pdf` | UK MR2 ECU articles. Claims are tracked in `docs/ross/claims.md` |
+| `reference/ross_lifting_the_lid_mk1_mr2_ecu.pdf` | UK MR2 ECU articles. Claims are tracked in `docs/ross/claims.md` |
 | `docs/` | Playbook, status, Ross verification, write-ups |
 | `hardware/` | BOM, reader guide, RP2350 firmware, KiCad (as it is created) |
 | `analysis/` | `pcmre` Python tooling, generated source, emulator, map definitions, generated outputs (as they are created) |

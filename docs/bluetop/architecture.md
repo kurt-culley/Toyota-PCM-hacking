@@ -4,9 +4,9 @@ This page explains how the AE86 Bluetop ROM (`cap.bin`, D151801-0642, HD6301V1 i
 
 **Evidence:**
 - Tags are `[ROM:$addr]` for code reading and `[EMU:test]` for behaviour proven in the emulator.
-- Labels come from the IDA listing and [`../../analysis/bluetop/cap.s`](../../analysis/bluetop/cap.s).
-- Readers and writers of each variable are in [`../../analysis/bluetop/xref.md`](../../analysis/bluetop/xref.md).
-- Map data is in [`../../analysis/bluetop/maps.md`](../../analysis/bluetop/maps.md).
+- Labels come from the IDA listing and [`../../roms/bluetop/cap.s`](../../roms/bluetop/cap.s).
+- Readers and writers of each variable are in [`../../roms/bluetop/xref.md`](../../roms/bluetop/xref.md).
+- Map data is in [`../../roms/bluetop/maps.md`](../../roms/bluetop/maps.md).
 
 ## 1. Reset and the main loop
 
@@ -108,7 +108,7 @@ Digital inputs: IDL on P4-2 (**high = throttle closed** at the CPU pin; `byte_95
 | Saturating counters | `SatCount_*` (updated by the shared helpers at $FFE1/$FFE3) |
 | Diagnostics | `FlagBadStuff` / `flagbadstuf3` set fault bits that the T terminal reads out |
 
-The complete reader/writer list for every address is in [`xref.md`](../../analysis/bluetop/xref.md#ram-and-io-registers).
+The complete reader/writer list for every address is in [`xref.md`](../../roms/bluetop/xref.md#ram-and-io-registers).
 
 ## 5. Coding conventions to expect in the 17140 ROM
 

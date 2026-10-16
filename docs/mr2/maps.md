@@ -2,7 +2,7 @@
 
 **Builds on:** [`architecture.md`](architecture.md).
 
-**Names:** [`analysis/mr2_17140/symbols.yaml`](../../analysis/mr2_17140/symbols.yaml).
+**Names:** [`roms/mr2_17140/symbols.yaml`](../../roms/mr2_17140/symbols.yaml).
 
 **Status:** P4 steps 2–3, first pass. The channel map and maps are read from the code paths and their consumers (LIKELY). Their units come from the simulator (section below). Load in kPa and absolute advance still rest on GUESS anchors that the bench or the serial link ([`serial_link.md`](serial_link.md)) will settle.
 
@@ -134,7 +134,7 @@ flowchart LR
 
 ## Units from the simulator (P4 step 3)
 
-The 17140 ROM runs in the whole-ROM simulator with its own I/O model, [`analysis/emu/engine17140.py`](../../analysis/emu/engine17140.py). It boots, syncs to NE/G, converts all 8 ADC channels, sparks twice and injects once per revolution [EMU:tests/test_sim17140.py].
+The 17140 ROM runs in the whole-ROM simulator with its own I/O model, [`src/pcmre/emu/engine17140.py`](../../src/pcmre/emu/engine17140.py). It boots, syncs to NE/G, converts all 8 ADC channels, sparks twice and injects once per revolution [EMU:tests/test_sim17140.py].
 
 | Quantity | Unit | How sure |
 |---|---|---|
@@ -173,4 +173,4 @@ Until then, the kPa labels in [`ignition_maps.md`](ignition_maps.md) may be stre
 
 1. Read the live variables through the serial link ([`serial_link.md`](serial_link.md)): Load at key-on (kPa scale), PORT3 (which map the car runs), and the channel readings against known inputs.
 2. Settle the two GUESS anchors on the bench and in the car: what ADC channel 7 measures, and timing-light readings with T open (idle, steady 2500–3000 rpm). With T shorted a correctly set car always reads 10°, so that reading only checks the distributor setting.
-3. Write `analysis/defs/mr2_17140.yaml` (replacing the auto-ported Bluetop file) and generate the XDF and readable tables.
+3. Write `roms/mr2_17140/defs.yaml` (replacing the auto-ported Bluetop file) and generate the XDF and readable tables.

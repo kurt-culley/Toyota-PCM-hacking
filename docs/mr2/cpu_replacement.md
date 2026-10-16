@@ -32,11 +32,11 @@ flowchart LR
 
 ## What is emulated
 
-All of this is from the 17140's own register use [xref], and all of it is already modelled in the Python simulator, which runs the ROM end to end ([`analysis/emu/`](../../analysis/emu/)).
+All of this is from the 17140's own register use [xref], and all of it is already modelled in the Python simulator, which runs the ROM end to end ([`src/pcmre/emu/`](../../src/pcmre/emu/)).
 
 | Block | Registers | Pins | Model status |
 |---|---|---|---|
-| CPU | — | — | **C core done**: matches the MAME-verified Python core on every opcode and on 200 000 steps of the 17140 ROM [EMU:tests/test_hd6301_c.py]. **The D151801 runs MC6801 instruction timing** (MAME `cycles_6803`), with each I/O register read or written on its own bus cycle [BENCH:analysis/captures/chipdiff_17140_run3_2026-10-15.log] |
+| CPU | — | — | **C core done**: matches the MAME-verified Python core on every opcode and on 200 000 steps of the 17140 ROM [EMU:tests/test_hd6301_c.py]. **The D151801 runs MC6801 instruction timing** (MAME `cycles_6803`), with each I/O register read or written on its own bus cycle [BENCH:data/captures/chipdiff_17140_run3_2026-10-15.log] |
 | Timer 1 | TCSR `$08`, FRC `$09`, OCR1 `$0B`, ICR1 `$0D` | IC1 ← P20 (ADC end), OC1 → P21 (injector) | **C done** (`d151801.c`), handbook-based |
 | Timer 2 (Denso) | TCSR2 `$18`, OCR2 `$1B`, ICR2 `$1D` | IC2 ← P10 (NE), OC2 → P11 (IGT) | **C done**; inferred from the ROM; spark edges match the real chip closed loop at 800/2000/5000 rpm [BENCH: run 5] LIKELY (spark timing is set by this timer, so it is a weak test of the CPU model) |
 | SCI | RMCR `$10`, TRCSR `$11`, RDR `$12`, TDR `$13` | P23/P24 | **C done** (UART line side via callbacks) |

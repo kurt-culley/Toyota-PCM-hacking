@@ -1,5 +1,5 @@
 // D151801 on-chip peripherals in C: timer 1, the Denso second timer, SCI, ports 1-4 and the
-// IS3 (IGF) flag. A line-for-line port of analysis/emu/periph.py, so the C board can be checked
+// IS3 (IGF) flag. A line-for-line port of src/pcmre/emu/periph.py, so the C board can be checked
 // against the Python simulator (tests/test_d151801_c.py). Times are E-clock cycles (us at
 // E = 1 MHz) since power-up.
 //

@@ -9,7 +9,7 @@
 //         LOOKAHEAD cycles ahead (cd_word: crank schedule and reactions), both from chipdiff.h.
 //   Core 1: prints the pin changes, one line each: "<cycle hex> <pin word hex>".
 //
-// analysis/emu/chipdiff.py captures the log and replays it into the emulator.
+// src/pcmre/emu/chipdiff.py captures the log and replays it into the emulator.
 
 #include <stdio.h>
 #include <stdlib.h>

@@ -2,9 +2,9 @@
 
 The 17140 ROM contains a factory **live-data link**: a 3-wire serial port that answers "what is in RAM at this address?" while the engine runs. This gives logging and a dashboard straight from the ECU's own variables, with no extra sensors and no ROM changes.
 
-**Code:** `LinkEnable` `$F33B`, `SerialPeek` `$F403`, `LinkKeepAlive` `$F62E` in [`analysis/mr2_17140/mr2_17140.asm`](../../analysis/mr2_17140/mr2_17140.asm).
+**Code:** `LinkEnable` `$F33B`, `SerialPeek` `$F403`, `LinkKeepAlive` `$F62E` in [`roms/mr2_17140/mr2_17140.asm`](../../roms/mr2_17140/mr2_17140.asm).
 
-**Simulator model:** [`analysis/emu/peek17140.py`](../../analysis/emu/peek17140.py).
+**Simulator model:** [`src/pcmre/emu/peek17140.py`](../../src/pcmre/emu/peek17140.py).
 
 **Tests:** [`tests/test_peek17140.py`](../../tests/test_peek17140.py).
 
@@ -131,7 +131,7 @@ stateDiagram-v2
 
 - **Why the series resistors:** whenever the link is off, pin 11 is an ECU output (a fault-code line). The resistor limits any fight with the Pico's TX to a few mA, and the logger releases TX (LOST) as soon as the ECU stops answering.
 - **Output:** USB serial lines `D,<ms>,<addr>,<word>` (reply), `M,<ms>,<addr>` (miss), `S,<ms>,<state>`. Command `v 77 46 53 …` sets the polled addresses; addresses outside `$02`–`$07` and `$40`–`$FE` are refused.
-- **Decoding:** `PYTHONPATH=analysis uv run python -m pcmre.peeklog capture.txt -o log.csv` gives one row per pass in physical units (rpm, kPa, µs, degrees; GUESS scalings marked).
+- **Decoding:** `uv run python -m pcmre.peeklog capture.txt -o log.csv` gives one row per pass in physical units (rpm, kPa, µs, degrees; GUESS scalings marked).
 - **Tested:** the firmware's link logic (`link.h`) is compiled for the host and run against the simulated ECU: it brings the link up through the break, keeps it alive, decodes rpm, load and pulse correctly, and lets go of the line when the ECU never answers [EMU:tests/test_peek_logger.py].
 - **Wi-Fi dashboard:** next step, on the same board.
 

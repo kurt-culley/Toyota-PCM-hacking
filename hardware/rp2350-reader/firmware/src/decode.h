@@ -1,4 +1,4 @@
-// The reader's drive/listen rule. Mirrors analysis/pcmre/readerdecode.py line for line;
+// The reader's drive/listen rule. Mirrors src/pcmre/readerdecode.py line for line;
 // tests/test_romdump.py runs that model against the dump program in the emulator.
 #pragma once
 

@@ -2,7 +2,7 @@
 //
 // Core 1 runs the emulated chip (hd6301 + d151801 + the 17140 ROM) locked to real time: it
 // never runs ahead of the 1 us clock, nor past the last crank edge core 0 has queued. The
-// engine model (engine.h: the same behaviour as analysis/emu/engine17140.py) runs inside it at
+// engine model (engine.h: the same behaviour as src/pcmre/emu/engine17140.py) runs inside it at
 // exact emulated times, and the emulator drives its output pins as they change (IGT GP6, ADC
 // select GP7-9, hold GP10, injector GP11).
 // v3: the emulator predicts each output compare (d_next_match) and arms a hardware timer

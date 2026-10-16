@@ -15,13 +15,13 @@ The project owner has a UK mk1b MR2 (ECU **89661-17140**). They know aftermarket
 
 ### What the repo has
 
-- **There is no MR2 dump yet.** The closest relative is the AE86 **Bluetop**, [`TOYOTA Bluetop PCM/cap.bin`](../TOYOTA%20Bluetop%20PCM/cap.bin).
+- **There is no MR2 dump yet.** The closest relative is the AE86 **Bluetop**, [`roms/bluetop/cap.bin`](../TOYOTA%20Bluetop%20PCM/cap.bin).
   - Chip: D151801-0642, a Denso HD6301-family part. The ROM is 4 KB, mapped at `$F000–$FFFF`. It has TVIS and is from the same era as the MR2.
   - [`cap.asm`](../TOYOTA%20Bluetop%20PCM/cap.asm) / `cap.idb` hold a partly annotated disassembly. Names include `ADC_ThW`, `TVIScounter`, `IdleRPMs`, `IdleADVcomp` and `lookup3dTable`. The 3D ignition table is near `$FF40`, and the THW tables are at `$FEAF`, `$FEBD` and `$FED2`.
   - **The Bluetop uses a different strategy from the UK MR2.** The Bluetop is L-type (airflow pulse `SE056`) and has an O2 sensor (`ADC_Oxy`). The UK MR2 is D-type (MAP sensor) with no O2 sensor.
 - [`cap2-151801-2860.bin`](../TOYOTA%20Bluetop%20PCM/cap2-151801-2860.bin) is a revised version of the same D151801 program, with identical maps. `cap4.bin` is a second capture of it. Comparison: [`bluetop/versions.md`](bluetop/versions.md).
 - **Redtop** (`D151802-0442`) and **Blacktop** (`D151804-8081`) run on the **Toshiba 8X**, a later and different CPU. They are conceptual references only, unless the MR2 chip turns out to be a T8X (see P3).
-- [`Lifting The Lid on the mk1 MR2 ECU (Jeremy Ross).pdf`](../Lifting%20The%20Lid%20on%20the%20mk1%20MR2%20ECU%20%28Jeremy%20Ross%29.pdf) has 18 pages and 16 embedded figures, including the 17×8 ignition table. It covers the UK **17030** in depth and the **17140** for the mixture screw.
+- [`reference/ross_lifting_the_lid_mk1_mr2_ecu.pdf`](../Lifting%20The%20Lid%20on%20the%20mk1%20MR2%20ECU%20%28Jeremy%20Ross%29.pdf) has 18 pages and 16 embedded figures, including the 17×8 ignition table. It covers the UK **17030** in depth and the **17140** for the mixture screw.
 - Existing tooling and know-how:
   - D151801 reader (`reader6301v1.asm`, `bluetopreader.sch`)
   - BISON loader/debugger (Toshiba 8X code, not 6301)
@@ -75,7 +75,7 @@ If the hypothesis holds, the ECU never "knows" the IACV and CSI are gone. It is 
   - Write in Markdown, with **Mermaid** for control flow, signal chains, state machines and phase flow.
   - Put tables in Markdown or CSV. Plots are PNGs produced by scripts in the repo.
   - Every map write-up gives the axes in physical units (°C, rpm, kPa, µs, °BTDC) and the raw-to-physical scaling with its derivation. It also has an **"In tuning terms"** paragraph for the owner.
-- **Single source for map definitions.** Each ROM gets one file, `analysis/defs/<rom>.yaml`, listing its maps, scalars and RAM variables with scaling. CSV, Markdown, TunerPro XDF and TunerStudio INI are all generated from it. Nothing is maintained by hand in two places.
+- **Single source for map definitions.** Each ROM gets one file, `roms/<rom>/defs.yaml`, listing its maps, scalars and RAM variables with scaling. CSV, Markdown, TunerPro XDF and TunerStudio INI are all generated from it. Nothing is maintained by hand in two places.
 - **Never modify the original dumps.** Derived work goes in `analysis/`, `docs/` and `hardware/`.
 - **Safety:**
   - Every hardware step needs the owner's confirmation and comes with a safety checklist (power sequencing, ESD, signal levels).
@@ -89,7 +89,7 @@ If the hypothesis holds, the ECU never "knows" the IACV and CSI are gone. It is 
 |---|---|---|
 | Disassembly | **`analysis/pcmre`** (Python): a verified HD6301 decoder, the IDA listing importer, generated `asl` source that round-trips byte-identical, and a **cross-reference / call-graph generator** (Markdown + Mermaid). This is text-based, scriptable, checked in CI and diffable, which suits agent work. **Ghidra is optional**: an interactive browser for the owner to explore ROMs. It is never a gate or a dependency, because there is no HD6301 module and the decompiler adds little on hand-written 8-bit code with mid-instruction tricks | IDA 4.9 `.idb` |
 | Assembler | **Macroassembler AS (`asl`)**, maintained, with 6301/6303 support | dasm, TASM |
-| Emulation | A Python HD6301 core (`analysis/emu/`) with timer, OC/IC, SCI and ADC models, tested against `dasm/test/suite6303` and MAME's hd6301 core as reference. It runs single routines **and** the whole ROM with simulated NE/G and sensor inputs | — (Ross's 8086 port, conceptually) |
+| Emulation | A Python HD6301 core (`src/pcmre/emu/`) with timer, OC/IC, SCI and ADC models, tested against `dasm/test/suite6303` and MAME's hd6301 core as reference. It runs single routines **and** the whole ROM with simulated NE/G and sensor inputs | — (Ross's 8086 port, conceptually) |
 | Scripting & tests | Python 3.12+, `uv`, `pytest`, `ruff`. GitHub Actions runs the round-trip and emulator tests | `.bat` files |
 | Signal capture | **sigrok / PulseView** with custom decoders (NE/G, IGT/IGF, injector, Denso ADC serial). Captures are committed as `.sr` files | — |
 | ROM reader | **RP2350 reader** (§6a): C + pico-sdk + PIO firmware, built in CI to a UF2 | EPROM reader board, RS232, RealTerm |
@@ -130,10 +130,10 @@ flowchart LR
 ### P0: Foundations
 
 - Set up the Python project (`uv`), CI and `asl`, and write the `cap.asm` label/comment importer. **Done.**
-- Build a cross-reference and call-graph generator. For every RAM variable and routine it lists its readers, writers and callers, and it produces Mermaid call graphs, written to `analysis/bluetop/xref.md`. **Done.**
-- Build the Python HD6301 CPU core (`analysis/emu/`). **Done.** Peripheral models (timer, OC/IC, SCI, ADC) follow in P2.
+- Build a cross-reference and call-graph generator. For every RAM variable and routine it lists its readers, writers and callers, and it produces Mermaid call graphs, written to `roms/bluetop/xref.md`. **Done.**
+- Build the Python HD6301 CPU core (`src/pcmre/emu/`). **Done.** Peripheral models (timer, OC/IC, SCI, ADC) follow in P2.
 - **Gate:**
-  - `analysis/bluetop/cap.s`, generated by `pcmre`, reassembles with `asl` **byte-identical** to `cap.bin`, and a cross-check with `dasm` agrees. **Passed 2026-10-09.**
+  - `roms/bluetop/cap.s`, generated by `pcmre`, reassembles with `asl` **byte-identical** to `cap.bin`, and a cross-check with `dasm` agrees. **Passed 2026-10-09.**
   - The emulator passes the `suite6303` instruction tests. `suite6303` is only an encoding suite, so the core is also compared against MAME's hd6301 handlers: 64 random cases per opcode, matching registers, flags, memory writes and cycles. **Passed and signed off by the Verifier, 2026-10-09.**
 
 ### P1: Ross claim register (needs only the PDF)
@@ -153,7 +153,7 @@ flowchart LR
 ### P2: Bluetop analysis and Tier-A verification
 
 - Map the vectors, main loop and scheduler (`procJmpTable`), the ADC sequencer (`$FA9B`), the RAM map (`$40–$FF`), the table formats (2D and 3D interpolation helpers around `$FF35`), and the full fuel and ignition chains.
-- Write `analysis/defs/bluetop.yaml`, then generate CSV, Markdown and XDF from it.
+- Write `roms/bluetop/defs.yaml`, then generate CSV, Markdown and XDF from it.
 - Give every Tier-A claim a status: CONFIRMED, CONTRADICTED or NOT-APPLICABLE (because the Bluetop is L-type, not D-type). Back each one with ROM and emulator evidence. Diff against `cap2`.
 - Optionally cross-check selected routines on the **real CPU** using the RP2350 real-CPU harness (§6).
 - **Gate:** every Tier-A claim has a status, and the Verifier has spot-checked them in the emulator.
@@ -164,13 +164,13 @@ flowchart LR
 2. **Remove the chip and fit a socket** in the same session: conformal coat off with IPA, desoldering braid and pump (low-melt alloy as the backup), photos of pin 1 and the notch first, then a turned-pin DIP-40 socket. With the socket fitted, Q10 (node N) can be measured powered with the chip out, with the owner's confirmation at the time.
 3. **Build the §6a RP2350 reader on a breadboard.** The guide is [`hardware/rp2350_reader_guide.md`](hardware/rp2350_reader_guide.md); firmware is in `hardware/rp2350-reader/`. A factory-assembled carrier PCB (§6a) is built in parallel.
 4. **Bring-up, in order:** guided multimeter checklist → `rigcheck` (chip out) → insert the chip → `clock` → `listen` (nothing driven) → `probe` → `dump`. **If the bus shows endless or unexpected activity, the MCU is running its own code: fix the mode straps first** (upstream #4). The `size` run confirms the internal ROM size (4 KB at `$F000` is expected).
-5. **Dump at least 3 times** and check that the SHA-256 hashes match, the mode byte reads 0, and the SCI and bus-snoop channels agree. Store the image as `AW11 MR2 PCM/89661-17140.bin`.
+5. **Dump at least 3 times** and check that the SHA-256 hashes match, the mode byte reads 0, and the SCI and bus-snoop channels agree. Store the image as `roms/mr2_17140/89661-17140.bin`.
 6. **Gate:** an independent Verifier signs off the procedure and the dump's integrity before P4 starts.
 7. Start a variant matrix, `docs/variants.md`, covering 17030, 17070, JDM and US ECUs.
 
 ### P4: MR2 analysis and Tier-B verification → "Ross verified" gate
 
-- **Day one:** `PYTHONPATH=analysis uv run python -m pcmre.ingest "AW11 MR2 PCM/89661-17140.bin" --name mr2_17140 --write`. It writes `analysis/mr2_17140/ingest.md` and an auto-ported `analysis/defs/mr2_17140.yaml`, and does the following:
+- **Day one:** `uv run python -m pcmre.ingest "roms/mr2_17140/89661-17140.bin" --name mr2_17140 --write`. It writes `roms/mr2_17140/ingest.md` and an auto-ported `roms/mr2_17140/defs.yaml`, and does the following:
   - checks the size and origin, vectors and checksum;
   - traces the code and aligns it with the Bluetop;
   - ports every Bluetop map through the code that reads it, and lists RAM moves and behaviour changes;
@@ -324,7 +324,7 @@ sequenceDiagram
   | EXTAL (3), open-drain, 470 Ω pull-up | GP38 | GP9 |
   | P24/TX (12), 10 kΩ pull-up | GP39 | GP21 |
 
-  Firmware: [`../hardware/rp2350-reader/firmware/`](../hardware/rp2350-reader/firmware/) (C, pico-sdk ≥ 2.1, PIO; CI builds a UF2 per board). The drive/listen rule in `decode.h` is tested against the Python model in `analysis/pcmre/readerdecode.py`, and the dump program runs on the emulator against `cap.bin` [EMU:tests/test_romdump.py].
+  Firmware: [`../hardware/rp2350-reader/firmware/`](../hardware/rp2350-reader/firmware/) (C, pico-sdk ≥ 2.1, PIO; CI builds a UF2 per board). The drive/listen rule in `decode.h` is tested against the Python model in `src/pcmre/readerdecode.py`, and the dump program runs on the emulator against `cap.bin` [EMU:tests/test_romdump.py].
 - **Carrier PCB:** not needed; the breadboard rig did the dump and becomes the P4 real-CPU harness.
 
 The parts list is in [`../hardware/BOM.md`](../hardware/BOM.md).

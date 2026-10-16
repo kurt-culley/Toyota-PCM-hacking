@@ -16,7 +16,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .tools
-          key: tools-${{ runner.os }}-${{ hashFiles('tools/setup_assemblers.sh', 'tools/setup_mame_ref.sh', 'tools/mame_ref/**', 'TOYOTA Bluetop PCM/dasm/src/**') }}
+          key: tools-${{ runner.os }}-${{ hashFiles('tools/setup_assemblers.sh', 'tools/setup_mame_ref.sh', 'tools/mame_ref/**', 'tools/vendor/dasm/src/**') }}
 
       - name: Build asl and dasm
         run: tools/setup_assemblers.sh
@@ -33,9 +33,7 @@ jobs:
           REQUIRE_MAME_REF: "1"
 
       - name: Round-trip report
-        run: uv run python -m pcmre.roundtrip
-        env:
-          PYTHONPATH: analysis
+        run: uv run pcmre roundtrip
 
   firmware:
     runs-on: ubuntu-24.04

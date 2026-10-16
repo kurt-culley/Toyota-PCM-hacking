@@ -5,15 +5,15 @@
 - `cap2-151801-2860.bin`: provenance unknown.
 - `cap4.bin` is **consistent with** a capture of the same ROM. It holds 2 bytes of `$00`, then the first 100 bytes of 2860, then one corrupted byte (`$EE` where 2860 has `$8E`, at the position of `$F064`), then a complete copy of 2860. That fits a capture that restarted once with a read error. `cap2` may simply be `cap4` with the prefix trimmed, so it is not proof of two fully independent reads.
 
-**Method:** [`analysis/pcmre/crossver.py`](../../analysis/pcmre/crossver.py) does the following:
+**Method:** [`src/pcmre/crossver.py`](../../src/pcmre/crossver.py) does the following:
 - traces both ROMs from their vectors;
 - aligns the instruction streams and learns which RAM addresses moved;
 - ports each map by following the 0642 code that reads it;
 - checks every differing 16-bit operand and every data byte, in both directions.
 
 **Outputs:**
-- Generated report (every difference, with addresses): [`analysis/bluetop/crossver_2860.md`](../../analysis/bluetop/crossver_2860.md).
-- Ported definition file: [`analysis/defs/bluetop_2860.yaml`](../../analysis/defs/bluetop_2860.yaml), with maps, CSVs and a TunerPro XDF in [`analysis/bluetop_2860/`](../../analysis/bluetop_2860/).
+- Generated report (every difference, with addresses): [`roms/bluetop/crossver_2860.md`](../../roms/bluetop/crossver_2860.md).
+- Ported definition file: [`roms/bluetop_2860/defs.yaml`](../../roms/bluetop_2860/defs.yaml), with maps, CSVs and a TunerPro XDF in [`roms/bluetop_2860/`](../../roms/bluetop_2860/).
 - Tests: [`tests/test_crossver.py`](../../tests/test_crossver.py), including hand-written byte checks of the known differences.
 
 **Review:** an independent Verifier first returned FAIL on 2026-10-10: two changes were missed, one was wrong, and one was misread. This page is the corrected version.

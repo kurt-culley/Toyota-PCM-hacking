@@ -19,7 +19,7 @@
    Runs 3-5 used an earlier schedule of three points twice; `emu.chipdiff` reads the version from the log header.
 3. The Pico logs every change on every pin, inputs and outputs, timed in the chip's own E cycles.
 
-On the PC, `analysis/emu/chipdiff.py` replays exactly the inputs the chip received into the emulator and compares every output edge, pin by pin. If they all match, the emulator is identical to the chip, edge for edge.
+On the PC, `src/pcmre/emu/chipdiff.py` replays exactly the inputs the chip received into the emulator and compares every output edge, pin by pin. If they all match, the emulator is identical to the chip, edge for edge.
 
 **Every powered step needs the owner's confirmation at the time** (CLAUDE.md hardware safety). The power order is the reader's:
 - powering up: USB into the Pico, then the 5 V jumper in **last**;
@@ -187,10 +187,10 @@ Grey wires stay as on the reader; orange ones keep their Pico hole and move thei
 - **`clock`:** E frequency.
 - **`run [phases]`:** the schedule (1-8 phases of 6 s chip time; default 8). It prints `BEGIN`, one line per pin change (`<cycle hex> <pin word hex>`), then `END cycles=… late=… qfull=… dropped=…`. All three counts must be 0. It prints `ABORT …` instead if the Pico ever fell behind the chip.
 
-**PC side** ([`analysis/emu/chipdiff.py`](../../analysis/emu/chipdiff.py)):
+**PC side** ([`src/pcmre/emu/chipdiff.py`](../../src/pcmre/emu/chipdiff.py)):
 ```
-PYTHONPATH=analysis uv run --with pyserial python -m emu.chipdiff capture /dev/ttyACM0 run1.log
-PYTHONPATH=analysis uv run python -m emu.chipdiff analyse run1.log
+PYTHONPATH=analysis uv run --with pyserial python -m pcmre.emu.chipdiff capture /dev/ttyACM0 run1.log
+uv run python -m pcmre.emu.chipdiff analyse run1.log
 ```
 `analyse` finds the input offset, replays the logged inputs into the C emulator and prints, for each output pin: edge counts (chip, emulator), the latencies seen, and the first difference. `tests/test_chipdiff.py` runs the same pipeline with the emulator standing in for the chip: an exact match, and a single spark moved by one cycle is caught.
 
@@ -201,7 +201,7 @@ PYTHONPATH=analysis uv run python -m emu.chipdiff analyse run1.log
 ## Results
 
 **Run 3** (owner, 2026-10-15; one 800 rpm phase, 6 M E cycles):
-- **Log:** [`analysis/captures/chipdiff_17140_run3_2026-10-15.log`](../../analysis/captures/chipdiff_17140_run3_2026-10-15.log). All 6 000 000 cycles were sampled in 47 999 ms against 48 000 expected; nothing was dropped.
+- **Log:** [`data/captures/chipdiff_17140_run3_2026-10-15.log`](../../data/captures/chipdiff_17140_run3_2026-10-15.log). All 6 000 000 cycles were sampled in 47 999 ms against 48 000 expected; nothing was dropped.
 - **Edge counts:** with the emulator given exactly the chip's inputs, every output pin shows the same number of edges.
 - **Timing:**
   - all 318 spark edges (P11) and 162 injector edges (P21) at a constant 2 cycles;
@@ -218,18 +218,18 @@ PYTHONPATH=analysis uv run python -m emu.chipdiff analyse run1.log
 5. **Interrupt sampling:** an interrupt is taken after an instruction only if its flag counts at least 2 cycles before the instruction's end. A compare flag counts from the cycle after the match, a capture flag from the cycle before the input edge. This is fitted to the interrupts of run 3 (LIKELY).
 
 **Run 4** (owner, 2026-10-15; all 6 phases, 36 M cycles):
-- **Log:** [`analysis/captures/chipdiff_17140_run4_6phase_2026-10-15.log`](../../analysis/captures/chipdiff_17140_run4_6phase_2026-10-15.log), 287 999 ms against 288 000 expected, nothing dropped.
+- **Log:** [`data/captures/chipdiff_17140_run4_6phase_2026-10-15.log`](../../data/captures/chipdiff_17140_run4_6phase_2026-10-15.log), 287 999 ms against 288 000 expected, nothing dropped.
 - **The chip is deterministic:** its phase-1 output is identical, edge for edge, to run 3.
 - **Replay:** it matches as run 3 through phase 1. Shortly after the switch to 2000 rpm it drifts apart, with no interrupt near the first difference; the program state had already diverged, most likely from the 7 phase-1 ADC-start differences.
-- **Closed loop** (`python -m emu.chipdiff summary`: the emulator running free with the same engine model, as in the car):
+- **Closed loop** (`python -m pcmre.emu.chipdiff summary`: the emulator running free with the same engine model, as in the car):
   - every phase has the same number of sparks and injector pulses;
   - the spark sits at the usual 2-cycle offset at 800 and 2000 rpm, and 8 cycles early at 5000 rpm;
   - the injector pulse is 0.3-0.8 % shorter on the chip.
 - **Rig caveat:** the Pico applied 3420 engine reactions late in run 4 (`late=3420`), mostly the quick ADC conversions. Late ADC-end edges change the chip's readings, so a closed-loop comparison is only fair with `late=0`. The firmware now looks ahead 8 cycles instead of 16 (USB no longer runs on that core), so the reactions land on time.
 
 **Run 5** (owner, 2026-10-15; all 6 phases, look-ahead 8, `late=0`). Spark and fuel at steady points: LIKELY. The PASS criterion above is not yet met (see Verifier, below).
-- **Log:** [`analysis/captures/chipdiff_17140_run5_6phase_2026-10-15.log`](../../analysis/captures/chipdiff_17140_run5_6phase_2026-10-15.log).
-- **Closed loop, edge for edge** (`python -m emu.chipdiff summary`, the emulator running as in the car), over 36 s at 800, 2000 and 5000 rpm [EMU:tests/test_chip_vs_emulator.py]:
+- **Log:** [`data/captures/chipdiff_17140_run5_6phase_2026-10-15.log`](../../data/captures/chipdiff_17140_run5_6phase_2026-10-15.log).
+- **Closed loop, edge for edge** (`python -m pcmre.emu.chipdiff summary`, the emulator running as in the car), over 36 s at 800, 2000 and 5000 rpm [EMU:tests/test_chip_vs_emulator.py]:
   - **every spark edge (6 238) and every injector edge (3 130) of the real chip, at a constant 2-cycle offset;**
   - injector pulse widths equal to the cycle in every phase;
   - the ADC channel sequence on 99.3-99.6 % of edges; the rest are a few conversions shifted by one slot. Most of this residual comes from the rig: the Pico applies ADC-start 12-15 cycles after the edge it sees and ADC-end/IGF 2-3 cycles later than the model. With those latencies modelled, P15 rises to 17 978 of 18 002. It changes no spark or injector edge.

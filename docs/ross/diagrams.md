@@ -1,9 +1,10 @@
-# Ross's ECU logic as diagrams (P1)
+# Ross diagrams
 
-These diagrams show **what Ross says** the 89661-17030 (mk1a) ECU does, in the order he describes it ([PDF] *Lifting the Lid*, parts 2–4). Every box carries the claim IDs from [`claims.md`](claims.md).
-- **Nothing here is verified yet.** P2 (Bluetop) and P4 (17140 ROM) check each box against the code. A box is redrawn when the ROM disagrees, and the difference is logged in [`../STATUS.md`](../STATUS.md).
-- Digitised data for the maps is in [`figures/`](figures/README.md).
-- **Bench finding (17140):** Ross's secret-map "logic level" is most likely the factory jumper pair on **P32/P34** ([`../hardware/aw11_ecu.md`](../hardware/aw11_ecu.md)).
+## Summary
+
+These diagrams show the operation of the 89661-17030 (mk1a) ECU as Ross describes it [PDF] (*Lifting the Lid*, Parts 2–4). Each box gives the claim IDs of the [claim register](claims.md). The claim register gives the status of each claim for the 17140 and the Bluetop. The digitised data of the maps is in [figures](figures/README.md).
+
+The "logic level" of the Ross secret maps is LIKELY the factory jumper pair on **P32/P34** of the 17140 [BENCH] ([17140 hardware](../mr2/hardware.md)). The 17140 ROM selects its second ignition map and its rpm fuel correction with P34 (R-F12, R-I15).
 
 ## 1. Fuel chain (warm engine) [PDF p2–p10]
 
@@ -41,14 +42,14 @@ stateDiagram-v2
   Cut: injectors held off
   Normal --> Doubled: rpm ≥ 6000
   Doubled --> Normal: rpm < 6000
-  Normal --> Cut: closed throttle on overrun from high rpm (R-F25)
+  Normal --> Cut: closed throttle, deceleration from high rpm (R-F25)
   Normal --> Cut: rev limiter (R-F26)
   Normal --> Cut: several missed IGF confirmations (R-I16)
   Doubled --> Cut: rev limiter / IGF failure
   Cut --> Normal: throttle opened, rpm falls, or sparks confirmed
 ```
 
-Factory return thresholds for the overrun cut on the 1988 US car: 1600 rpm cut, 1200 rpm return (A/C off). See [`../hardware/repair_manual_aw11_1988.md`](../hardware/repair_manual_aw11_1988.md).
+The 1988 US repair manual gives the factory values of the closed-throttle fuel cut: cut at 1600 rpm, return at 1200 rpm (A/C off) ([factory data](../mr2/factory_data.md)).
 
 ## 2. Ignition chain [PDF p12–p16]
 
@@ -57,7 +58,7 @@ flowchart TD
   IDL{"throttle closed (IDL)?<br/>R-I07"} -->|"no: 'driven'"| SECI{"secret logic level set?"}
   SECI -->|"no (stock)"| BASE["Base 3D map 17 rpm × 8 MAP<br/>800–7200 rpm every 400, 8-bit, interpolated<br/>R-I02 R-I03 R-I04 R-I05"]
   SECI -->|yes| SECM["Secret 17×8 map<br/>R-I15"]
-  IDL -->|yes| IDLE["Idle/overrun map<br/>3 sites: 1200/1600/2000 rpm<br/>above 2000 uses the 2000 site<br/>R-I07"]
+  IDL -->|yes| IDLE["Idle map (also deceleration)<br/>3 sites: 1200/1600/2000 rpm<br/>above 2000 uses the 2000 site<br/>R-I07"]
   BASE --> WU
   SECM --> WU
   IDLE --> STAB["+ idle-stability step<br/>(closed throttle only)<br/>R-I13"] --> WU
@@ -71,7 +72,7 @@ flowchart TD
 
 ### T-VIS switching [PDF p15]
 
-Ross's figures, mk1a first, then mk1b. The 1984 EWD and the 1988 repair manual both give 4350 rpm.
+The values of Ross: mk1a first, then mk1b. The 1984 EWD and the 1988 repair manual give 4350 rpm.
 
 ```mermaid
 stateDiagram-v2
@@ -94,7 +95,7 @@ stateDiagram-v2
   Decay --> Kick: rpm dips again
 ```
 
-**In tuning terms:** this is the ECU's only closed-loop idle control on a UK car (no ISC valve, no O2 sensor). Idle speed is held by snapping the spark forward when rpm drops, then easing it back. It matters for goal 1: with the IACV removed there is less idle air, so this loop works harder on a cold engine. P5 measures how far it can compensate.
+**In tuning terms:** this is the only closed-loop idle control of the ECU on a UK car (no ISC valve, no O2 sensor). The ECU holds the idle speed with a quick spark advance when the rpm decreases, then a slow return. Without the IACV there is less idle air. Then this loop must do more work on a cold engine.
 
 ## 3. Mixture screw [PDF p17–p18]
 
@@ -114,7 +115,7 @@ flowchart LR
 
 ## 4. Cold start and warm-up as Ross describes it [PDF p14–p15]
 
-Ross says little about cold start; goal 1 (P5) fills this in from the ROM. This is the starting picture, with the factory-manual evidence added.
+Ross gives little information about the cold start. This diagram adds the evidence of the factory manuals ([factory data](../mr2/factory_data.md)).
 
 ```mermaid
 flowchart LR
@@ -122,11 +123,11 @@ flowchart LR
     WAX["wax air-bleed valve (IACV)<br/>~2000 rpm cold → 1000 warm<br/>R-I08"]
     CSI["cold start injector<br/>via start-injector time switch<br/>(1984 EWD, 1988 RM)"]
   end
-  subgraph ECU["ECU-side (to be traced in the ROM)"]
+  subgraph ECU["ECU-side"]
     GCFW["warm-up fuel in the global correction<br/>R-F13"]
     WUA["warm-up ignition advance<br/>R-I11"]
     STABE["idle-stability spark<br/>R-I13"]
-    VISC["start-up idle-up via VISC?<br/>(1988 US: cranking + 10 s; 17140 open, STATUS Q2)"]
+    VISC["start-up idle-up via VISC?<br/>(1988 US: cranking + 10 s; 17140: open items Q2)"]
   end
   THW["coolant temp (THW)"] --> GCFW
   THW --> WUA

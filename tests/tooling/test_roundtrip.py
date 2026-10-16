@@ -1,4 +1,4 @@
-"""P0 gate: the Bluetop ROM regenerates to byte-identical source (see docs/RE_PLAN.md)."""
+"""P0 gate: the Bluetop ROM regenerates to byte-identical source (see docs/project/roadmap.md)."""
 
 import hashlib
 

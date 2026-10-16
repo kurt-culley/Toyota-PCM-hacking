@@ -1,5 +1,5 @@
 # rpm correction for the mixture screw (17030 and 17140). Ross PDF p17, image img14.png. Claims: R-M02.
-# Digitised by analysis/ross/digitise.py; resolution about +/-0.65 mx2 per pixel. Evidence level [PDF]; not ROM data.
+# Digitised by src/pcmre/ross/digitise.py; resolution about +/-0.65 mx2 per pixel. Evidence level [PDF]; not ROM data.
 # Note: Gaps where Ross's yellow annotation arrows cover the line. Ross's text: 128 at 1000 rpm, 64 at 3600.
 rpm,mx2
 400,127.1

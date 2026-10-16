@@ -1,68 +1,175 @@
-# analysis/
+# pcmre tool guide
 
-Python tooling (`pcmre`) for the reverse-engineering playbook in [`../docs/RE_PLAN.md`](../docs/RE_PLAN.md).
+## Summary
 
-## Quick start
+`pcmre` is the Python package of this repository. It has the disassembly and source tools, the map generators, the support tools for the firmware, the simulator (`pcmre.emu`) and the Ross figure tool (`pcmre.ross`). The command `uv run pcmre <command>` starts each tool. A test makes sure that each generated file is current. The [roadmap](../../docs/project/roadmap.md) gives the phases that use the tools.
+
+## Install
 
 ```sh
-tools/setup_assemblers.sh            # builds asl/p2bin (primary) and dasm (cross-check) into .tools/
-uv sync                              # Python env (pytest, ruff)
-uv run pytest                        # all tests, including the P0 round-trip gate
-uv run python -m pcmre.roundtrip           # report
-uv run python -m pcmre.roundtrip --write   # regenerate roms/bluetop/cap.s
-uv run python -m pcmre.xref --write        # regenerate roms/bluetop/xref.md
-tools/setup_mame_ref.sh              # builds the MAME HD6301 reference for the emulator tests
+uv sync                     # Python environment: pyyaml, pytest, ruff, pillow
+uv sync --extra serial      # also pyserial, for live captures from the Pico 2 W
+tools/setup_assemblers.sh   # builds asl and p2bin (main) and dasm (cross-check) into .tools/
+tools/setup_mame_ref.sh     # builds the MAME HD6301 reference for the CPU tests into .tools/
 ```
 
-## Modules
+Both scripts can run again with no effect. `.tools/` is not in git. A test that needs `asl`, `dasm` or the MAME reference does not run if the tool is not built. GitHub Actions sets `REQUIRE_MAME_REF`, so there the MAME test must run.
+
+## Commands
+
+`uv run pcmre` lists the commands. `uv run pcmre <command> --help` gives the options of one command. Each command is the same as `uv run python -m <module>`. The list comes from `COMMANDS` in [`cli.py`](cli.py).
+
+| Group | Command | Module | Purpose |
+|---|---|---|---|
+| Disassembly and source | `roundtrip` | `pcmre.roundtrip` | AE86 ROM: the generated source reassembles to the same bytes |
+| | `xref` | `pcmre.xref` | Cross-reference and call graph of a ROM |
+| | `symlisting` | `pcmre.symlisting` | MR2 ROM: labelled source and cross-reference from `symbols.yaml` |
+| | `ingest` | `pcmre.ingest` | First report on a new ROM dump |
+| | `crossver` | `pcmre.crossver` | AE86 ROM: compare two software versions and port the maps |
+| Maps | `defs` | `pcmre.defs` | Map pages, CSV files and TunerPro XDF from `roms/<name>/defs.yaml` |
+| | `readable` | `pcmre.readable` | AE86 ignition table in degrees |
+| | `readable17140` | `pcmre.readable17140` | MR2 ignition maps in degrees |
+| | `checksum` | `pcmre.checksum` | Examine or correct the ROM word sum |
+| Hardware support | `romdump` | `pcmre.romdump` | Assemble the reader programs into the firmware header |
+| | `romcapture` | `pcmre.romcapture` | Capture a ROM from the reader over USB |
+| | `peeklog` | `pcmre.peeklog` | Decode a serial-link log into physical units |
+| | `wiring` | `pcmre.wiring` | Reader wiring tables and pictures |
+| | `chipdiff-wiring` | `pcmre.chipdiff_wiring` | Chip-test breadboard layout |
+| | `car-rig` | `pcmre.car_rig_diagram` | Car rig wiring table and pictures |
+| | `gen-hd6301-c` | `pcmre.gen_hd6301_c` | Generate the opcode and timing tables of the emulator (C) |
+| Emulator | `chipdiff` | `pcmre.emu.chipdiff` | Capture the chip test and compare it with the emulator |
+| | `loopback-ref` | `pcmre.emu.loopback_ref` | Reference checksums for the loopback firmware |
+| Reference data | `digitise` | `pcmre.ross.digitise` | Digitise the figures of the Ross articles |
+
+Examples:
+
+```sh
+uv run pcmre ingest roms/mr2_17140/89661-17140.bin --name mr2_17140
+uv run pcmre checksum edited.bin --fix
+uv run --extra serial pcmre romcapture /dev/ttyACM0
+uv run --extra serial pcmre chipdiff capture /dev/ttyACM0 run.log
+uv run pcmre chipdiff analyse run.log
+```
+
+## Package map
 
 | Module | Purpose |
 |---|---|
-| `pcmre/hd6301.py` | HD6301/6303 opcode table (230 opcodes: the 6801 set plus XGDX, SLP and AIM/OIM/EIM/TIM) and a single-instruction decoder. Verified against `asl` for every opcode. |
-| `pcmre/idalisting.py` | Imports labels, comments and the code/data split from a legacy IDA 4.9 `.asm` listing. The listing has no addresses, so they are rebuilt by walking it alongside the ROM bytes. Any disagreement raises `ListingMismatch`. |
-| `pcmre/emit.py` | Generates re-assemblable source for `asl` (primary) or `dasm` (legacy cross-check). Every byte comes from the ROM; the listing contributes only names and comments. |
-| `pcmre/xref.py` | Cross-references and Mermaid call graphs. It walks the code from the vectors with a small abstract state (X and B as value sets, and a stack whose return address is a symbol), so it follows Denso's indexed calls, RAM-wrapping indexed accesses, jump tables, inline-parameter routines and stack-argument routines. Checked against all 514 of IDA's own XREF comments in `cap.asm`. |
-| `emu/cpu.py` | HD6301V1 CPU core: all documented opcodes, cycle counts, TRAP on undefined opcodes, WAI/SLP, IRQ/NMI entry. Peripherals sit behind a `Bus` and call `irq()`/`nmi()`. Written from the Hitachi handbook tables 3-2-1 to 3-2-4, and checked against MAME (below). |
-| `emu/harness.py` | Runs one ROM routine (`call`) or a stretch of straight-line code (`run`) in the emulator, with preset registers, RAM, inline parameters and stacked arguments. Used to characterise lookups and maths helpers. |
-| `emu/periph.py` | HD6301V1 on-chip peripherals plus the D151801's second timer channel: FRC, input capture/output compare with the handbook flag-clear sequences, the serial ADC on the SCI, ports with external pins, the IS3 flag and an event queue. See [`../docs/bluetop/simulation.md`](../docs/bluetop/simulation.md). |
-| `emu/engine.py` | Engine and sensor stimulus: NE/G edges from rpm, the SE056 airflow delay, IGF after each spark, ADC readings from °F/volts, digital inputs. |
-| `emu/sim.py` | `Simulation`: boots a ROM from reset and runs it against `engine.py`. Probes give RAM by name, injector pulses and spark angle. |
-| `pcmre/tables.py` | Python model of the Bluetop interpolating lookups: the six entry points of the 1D helper at `$FF1B`–`$FF3F` and the 3D ignition-map lookup. `find_1d_uses()` lists every table the code reads. Proven equal to the emulator by `tests/test_tables.py`. |
-| `pcmre/checksum.py` | Bluetop ROM checksum (16-bit word sum = $AA55, balanced at the TRAP vector $FFEE, which is never reached in normal running). `--fix` re-balances an edited image. |
-| `pcmre/defs.py` → `bluetop/bluetop.xdf` | TunerPro RT definition generated from `defs/bluetop.yaml` (with `maps.md` and the CSVs). |
-| `pcmre/defs.py` | Generates `<rom>/maps.md` and `<rom>/maps/*.csv` from the single definition file `defs/<rom>.yaml`. |
-| `pcmre/roundtrip.py` | The P0 gate. It regenerates the source, assembles it with both assemblers and requires byte-identical output. |
+| `cli.py` | The `pcmre` command: one entry point for each tool |
+| `paths.py` | Each repository path that the tools use |
+| `hd6301.py` | HD6301 opcode table (the MC6801 set, plus XGDX, SLP and AIM/OIM/EIM/TIM) and a decoder for one instruction. `asl` agrees on each opcode |
+| `idalisting.py` | Imports labels, comments and the code/data split from the IDA 4.9 listing (`cap.asm`). It finds the addresses from the ROM bytes and stops on a mismatch (`ListingMismatch`) |
+| `emit.py` | Writes source for `asl` (main) or `dasm` (cross-check). Each byte comes from the ROM; the listing gives only names and comments |
+| `roundtrip.py` | Writes the AE86 source again and assembles it with both assemblers. The result must be the same bytes as the ROM |
+| `xref.py` | Cross-references and Mermaid call graphs. It follows the code from the vectors with a small model of X, B and the stack, so it follows Denso indexed calls, jump tables and inline parameters |
+| `symlisting.py` | Labelled source and cross-reference of the 17140 from `roms/mr2_17140/symbols.yaml`, with a round trip through `asl` |
+| `ingest.py` | First report on a new D151801 ROM: size, vectors, word sum, trace, alignment with the Bluetop, map port, candidate tables, Ross table search |
+| `crossver.py` | Compares the two Bluetop versions (0642 and 2860), ports the maps and lists the behaviour changes |
+| `tables.py` | Python model of the Bluetop table lookups (the 1D helper at `$FF1B`–`$FF3F` and the 3D ignition lookup). A test makes sure that it agrees with the simulator |
+| `defs.py` | Map page, CSV files and XDF from `roms/<name>/defs.yaml` |
+| `readable.py` | The Bluetop ignition table in degrees, with load as a percentage |
+| `readable17140.py` | The 17140 ignition maps in degrees over rpm and kPa |
+| `checksum.py` | The ROM word sum: the 16-bit sum of the words `$F000`–`$FFFF` must be `$AA55`. `--fix` balances it at `$FFEE` |
+| `readerdecode.py` | Python model of the bus rule of the reader firmware: when the reader drives the bus, and when it only listens |
+| `romdump.py` | Assembles the reader programs and writes the firmware header `romdump.h` |
+| `romcapture.py` | Captures the ROM from the reader (Intel HEX over USB) and writes the `.bin` and `.sha256` files. It does not write over a file with different bytes |
+| `peeklog.py` | Decodes a log of the serial-link logger into physical units (table or CSV) |
+| `wiring.py` | Reader wiring tables and pictures, from the `pins.h` file of the firmware |
+| `chipdiff_wiring.py` | Chip-test breadboard layout, as changes to the reader layout |
+| `car_rig_diagram.py` | Car rig wire table and pictures, from `hardware/ecu-emu/car/pins.h` |
+| `gen_hd6301_c.py` | Writes the instruction switch and the cycle tables of the C emulator from the Python opcode table |
+| `emu/cpu.py` | HD6301 CPU core: each documented opcode, cycle counts (HD6301 or MC6801), TRAP, WAI, SLP, interrupts. The peripherals are behind a `Bus` |
+| `emu/periph.py` | On-chip peripherals: timer 1, the second timer of the D151801, the serial ADC on the SCI, the ports, IS3 and an event queue |
+| `emu/harness.py` | Runs one ROM routine, or a part of the code, with preset registers, RAM and inline parameters |
+| `emu/engine.py` | Engine and sensor model of the Bluetop: NE, G, SE056 airflow, IGF, ADC readings, switches |
+| `emu/engine17140.py` | Engine and sensor model of the 17140: NE on IC2 (30° each edge), G on P35, the ADC on IC1, IGT on P11, the injector on P21 |
+| `emu/sensors.py` | Sensor models from `data/sensors` (PIM, coolant and intake-air NTC) |
+| `emu/sim.py` | `Simulation`: starts a ROM from reset and runs it against the engine model. Probes give RAM values by name, injector pulses and the spark angle |
+| `emu/peek17140.py` | Host side of the serial link of the 17140, for the simulator |
+| `emu/cboard.py` | The C emulator, called from Python, with the same interface as `Simulation`. Tests run both together |
+| `emu/chipdiff.py` | Chip test: capture the log of the Pico 2 W, replay the inputs into the emulator, compare each output edge |
+| `emu/loopback_ref.py` | The schedule of the loopback test and chip test, and the reference checksums `expected.h` |
+| `ross/digitise.py` | Extracts the figures of the Ross articles (`pdfimages`) and reads the curves by pixel into CSV |
+
+## Where data is
+
+[`paths.py`](paths.py) gives each path. In short:
+
+| Path | Contents |
+|---|---|
+| `roms/<name>/` | One folder for each ROM (`mr2_17140`, `bluetop`, `bluetop_2860`): the dump, `defs.yaml`, `symbols.yaml`, and the files made from them |
+| `data/sensors/` | Sensor curves from factory data |
+| `data/captures/` | Bench captures (dump log, chip test logs) |
+| `reference/` | Data books and the Ross articles (PDF) |
+| `docs/` | Documentation. Some pages and pictures come from generators |
+| `hardware/` | Firmware and the C emulator core |
+| `.tools/` | `asl`, `dasm` and the MAME reference, made by `tools/setup_*.sh` |
 
 ## Generated files
 
-- [`bluetop/cap.s`](bluetop/cap.s): the AE86 Bluetop ROM (`cap.bin`, D151801-0642) as `asl` source, with all of IDA's labels and comments.
-  - **Don't edit it by hand.** Regenerate it with `--write`. A test fails if the committed copy is out of date.
-  - New annotations go in the analysis docs and, later, in `defs/*.yaml`.
+Do not edit a generated file by hand. Change the source or the generator, then run the command again. The test in the table fails if the file is not current.
 
-- [`bluetop/xref.md`](bluetop/xref.md): readers and writers of every RAM variable and I/O register, ROM table users, routine callers and callees, routines with non-standard returns, and one Mermaid call graph per interrupt vector. Same rule: regenerate, don't edit; a test fails if it is stale.
+| File | Command | Test |
+|---|---|---|
+| `roms/bluetop/cap.s` | `pcmre roundtrip --write` | `tests/tooling/test_roundtrip.py` |
+| `roms/bluetop/xref.md` | `pcmre xref --write` | `tests/tooling/test_xref.py` |
+| `roms/mr2_17140/mr2_17140.asm`, `roms/mr2_17140/xref.md` | `pcmre symlisting mr2_17140 --write` | `tests/tooling/test_symlisting.py` |
+| `roms/bluetop/maps.md`, `maps/*.csv`, `bluetop.xdf` | `pcmre defs bluetop --write` | `tests/ae86/test_defs.py` |
+| `roms/bluetop/crossver_2860.md`, `roms/bluetop_2860/defs.yaml` and its maps and XDF | `pcmre crossver --write`, then `pcmre defs bluetop_2860 --write` | `tests/ae86/test_crossver.py` |
+| `docs/ae86/ignition_table.md`, `roms/bluetop/readable/ign_base_degrees.csv` | `pcmre readable --write` | `tests/ae86/test_readable.py` |
+| `docs/mr2/ignition_maps.md` | `pcmre readable17140 --write` | `tests/mr2/test_sim17140.py` |
+| `hardware/rp2350-reader/firmware/src/romdump.h` | `pcmre romdump --write` | `tests/hardware/test_romdump.py` |
+| Reader tables in `docs/procedures/rom_dump.md` | `pcmre wiring` (`--png` for the pictures) | `tests/hardware/test_wiring.py` |
+| Chip-test table in `docs/procedures/chip_test.md` | `pcmre chipdiff-wiring` (`--png` for the picture) | `tests/hardware/test_chipdiff_wiring.py` |
+| Car rig table in `docs/procedures/car_test.md` | `pcmre car-rig --table` | `tests/hardware/test_car_rig.py` |
+| `hardware/ecu-emu/core/hd6301_ops.inc`, `hd6301_timing.inc` | `pcmre gen-hd6301-c --write` | `tests/emu/test_hd6301_c.py` |
+| `hardware/ecu-emu/loopback/expected.h` | `pcmre loopback-ref --write` | `tests/hardware/test_loopback_engine.py` |
 
-- [`bluetop/maps.md`](bluetop/maps.md) and [`bluetop/maps/`](bluetop/maps/): the Bluetop map definitions, generated from [`defs/bluetop.yaml`](defs/bluetop.yaml).
+The `wiring`, `chipdiff-wiring` and `car-rig` commands print a table. Paste it into the page.
 
-## Notes and findings
+<details>
+<summary>Notes on the disassembly of the Bluetop</summary>
 
-- **Branches into the middle of an instruction.** The Bluetop code jumps into the middle of instructions in 6 places, a classic Denso size trick. For example, `cpx #$8DDE` hides a `bsr` in its operand bytes, and other code branches to `IC2low2+1` to execute that hidden `bsr`. The generator writes these targets as `label+offset`.
-- **IDA comment quirk.** IDA adds one-character ASCII hints to byte values (`; O`, `; '?'`). These are dropped. One of them, `; \`, would otherwise be read by `asl` as a line continuation and silently swallow the next line.
-- **`dasm` limitation.** The bundled `dasm` 6303 table mis-encodes AIM/OIM/EIM/TIM (it drops the immediate byte). The Bluetop ROM doesn't use them, so the cross-check works here; for a ROM that does, only `asl` is authoritative.
-- **Ghidra is optional.** It is not used for the gates. This text-based tooling is the primary disassembly path; Ghidra is only for the owner to browse ROMs interactively. See `docs/RE_PLAN.md` §2.
-- **Inline-parameter and stack-argument routines.** `boundData` / `boundDataneg` read two bound bytes placed after the call and return with `pulx` / `jmp $02,x`. `mulDbyStack` takes a byte the caller pushed and removes it on return (`ins` / `pulx` / `ins` / `jmp $00,x`). `xref.py` models both, so the code after each call is followed correctly.
-- **IDA error at `$F4C9`.** IDA disassembled the two inline bytes after `jsr boundData` at `$F4C6` as `suba $14,x`. They are data (bounds `$A0`/`$14`). This is the only listing code line the analyser never reaches.
-- **Analyser limits.** Loops are not enumerated: when a back edge changes X or B, it becomes unknown. 24 indexed data sites are reached with X unknown, either wholly or after a loop's first pass; `xref.md` counts and lists them, and its RAM table header states that the lists are therefore not complete. Among them is the ADC result store at `$54` + channel, so `ADC_*` variables show no writer. One indirect call stays open: `$F45F` `jsr $00,x`, a computed entry into the `lsrd` run in `DivDby16`.
+- **Branches into an instruction.** The Bluetop code jumps into the middle of an instruction at 6 locations. For example, `cpx #$8DDE` has a `bsr` in its operand bytes. The generator writes these targets as `label+offset`.
+- **IDA comment hints.** IDA adds ASCII hints of one character to byte values (`; O`). The importer removes them. One of them, `; \`, is a line continuation for `asl`.
+- **`dasm` limit.** The `dasm` 6303 table encodes AIM/OIM/EIM/TIM incorrectly (it drops the immediate byte). The Bluetop ROM does not use them. For a ROM that uses them, only `asl` is the reference.
+- **Inline parameters and stack arguments.** `boundData` reads two bound bytes after the call. `mulDbyStack` removes a byte that the caller pushed. `xref.py` models both.
+- **IDA error at `$F4C9`.** IDA shows the two inline bytes after `jsr boundData` at `$F4C6` as code. They are data (bounds `$A0`/`$14`).
+- **Limits of the analyser.** It does not follow each pass of a loop. If a loop changes X or B, the value becomes unknown. `xref.md` counts the indexed data sites with an unknown X, so its RAM lists are not complete.
 
-## Emulator reference (MAME)
+</details>
 
-`tests/test_emu_cpu.py` runs 64 random single-instruction cases per opcode through MAME's hd6301 instruction handlers and through `emu/cpu.py`, and requires identical registers, flags, memory writes and cycle counts.
-- The MAME source (BSD-3-Clause) is downloaded at tag `mame0275` and SHA-256-checked by `tools/setup_mame_ref.sh`. Its handlers are compiled unchanged inside `tools/mame_ref/harness.cpp`, and nothing from MAME is committed.
-- The cycle table in `emu/cpu.py` was transcribed from the handbook rather than copied from MAME, so the cycle comparison is a check between two independent sources.
+## MAME reference and the differences of the simulator
 
-Deliberate differences, all from the handbook:
-- CCR bits 7–6 always read as 1, so only bits 5–0 are compared.
-- `$12`/`$13` trap on the HD6301; MAME runs undocumented 6801 behaviour for them.
-- MAME's TRAP cycle count is a placeholder, so it is not compared.
-- DAA's V flag: the handbook contradicts itself. Table 3-2-1 (PDF p.190) marks V as affected; the instruction details (PDF p.89) say "not affected". The core clears V, as MAME does. The conflict is logged in `docs/STATUS.md`; the Bluetop never executes DAA.
-- Not modelled: the address trap for fetching from non-memory space (handbook §2.13). It belongs in the memory map behind the `Bus`.
-- Memory *reads* are not compared, only writes (in order). Reads only matter for clear-on-read I/O registers, which the peripheral models will handle.
+`tests/emu/test_emu_cpu.py` runs 64 random cases of one instruction for each opcode through the MAME hd6301 handlers and through `emu/cpu.py`. The registers, flags, memory writes (in order) and cycle counts must agree.
+
+- `tools/setup_mame_ref.sh` downloads the MAME source (BSD-3-Clause) at tag `mame0275` and examines its SHA-256. `tools/mame_ref/harness.cpp` compiles the MAME handlers without changes. No MAME code is in git.
+- The HD6301 cycle table in `emu/cpu.py` comes from the handbook, not from MAME. Thus the cycle comparison is between two independent sources.
+- The D151801 uses MC6801 instruction timing ([chip test](../../docs/procedures/chip_test.md)). The simulator uses `CYCLES_6801` (from the MAME `cycles_6803` table) for it: `HD6301(bus, timing="6801")`.
+
+The deliberate differences, all from the handbook:
+
+- CCR bits 7–6 always read as 1. The test compares only bits 5–0.
+- `$12` and `$13` cause a TRAP on the HD6301. MAME does undocumented MC6801 operations for them.
+- The TRAP cycle count of MAME is a placeholder. The test does not compare it.
+- DAA V flag: the handbook gives two different answers (table 3-2-1, PDF p.190: V changes; instruction detail, PDF p.89: V does not change). The core clears V, as MAME does. The conflict is in [open items](../../docs/project/open_items.md). The Bluetop and 17140 ROMs do not use DAA.
+- The address trap for an instruction fetch from a non-memory area (handbook §2.13) is not in the model.
+- The test compares memory writes, not reads. Reads are important only for I/O registers that clear on a read, and the peripheral models handle them.
+
+## Tests
+
+```sh
+uv run pytest                    # all tests
+uv run pytest tests/mr2          # one folder
+uv run ruff check                # lint
+```
+
+| Folder | Tests |
+|---|---|
+| `tests/tooling/` | Decoder, round trip, cross-reference, 17140 source, ingest |
+| `tests/emu/` | CPU core against MAME, harness, peripherals, profiles, sensor tables, C core and C peripherals against Python |
+| `tests/ae86/` | Bluetop tables, fuel chain, simulation, maps, versions, ignition table |
+| `tests/mr2/` | 17140 simulation, serial link, rev limit, Ross claims, Ross figures |
+| `tests/hardware/` | Reader rule and dump program, ROM capture, wiring, chip test, loopback, car firmware and car rig, serial-link logger |
+
+GitHub Actions runs the tests and builds the firmware.

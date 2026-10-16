@@ -11,14 +11,14 @@ import pytest
 
 from pcmre import car_rig_diagram as R
 from pcmre import chipdiff_wiring as C
-from pcmre.paths import ROOT
+from pcmre.paths import DOC_CAR_TEST, ROOT
 
 ROM = ROOT / "roms/mr2_17140/89661-17140.bin"
 CC = shutil.which("cc") or shutil.which("gcc")
 
 
 def test_doc_table_current():
-    doc = (ROOT / "docs/mr2/cpu_replacement.md").read_text()
+    doc = DOC_CAR_TEST.read_text()
     table = "\n".join("  " + line if line else line for line in R.table().splitlines())
     assert table in doc, "stale: rerun python -m pcmre.car_rig_diagram --table and paste it"
 

@@ -1,5 +1,5 @@
 # mk1 MR2 injector response (dead-time) correction, 17030 mk1a. Ross PDF p7, image img05.png. Claims: R-F17.
-# Digitised by analysis/ross/digitise.py; resolution about +/-6.9 extra_us per pixel. Evidence level [PDF]; not ROM data.
+# Digitised by src/pcmre/ross/digitise.py; resolution about +/-6.9 extra_us per pixel. Evidence level [PDF]; not ROM data.
 # Note: Legend box masked out; the plotted line runs from about 6.5 V to 16.5 V.
 volts,extra_us
 7.0,1413.8

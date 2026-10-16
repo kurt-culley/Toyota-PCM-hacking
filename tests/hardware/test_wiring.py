@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from pcmre.paths import ROOT
+from pcmre.paths import DOC_ROM_DUMP
 from pcmre.wiring import BOARDS, board_pins, local_table, table
 
-GUIDE = (ROOT / "docs/hardware/rp2350_reader_guide.md").read_text()
+GUIDE = DOC_ROM_DUMP.read_text()
 
 
 def test_guide_tables_current():

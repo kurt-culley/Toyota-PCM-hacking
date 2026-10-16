@@ -94,7 +94,7 @@ ram:
     note: NE edge counter 0..5, reset when PORT3 bit 5 (G) is seen [ROM:$FEC7-$FEDF] LIKELY
   0x99:
     name: ModeFlags
-    note: 'engine state, written at $F604 from the main-loop branches: bit 7 = throttle closed (IDL, P16 low for more than 37 ADC ticks, about 150 ms) or cranking; bit 6 = closed-throttle idle (rpm byte $75 <= $B0, about 1000 rpm); bit 1 = decel fuel cut (no injection [ROM:$FEFB-$FEFF]); bit 0 = cranking (more than $19 ADC ticks per 180 degrees) [ROM:$F478-$F51E, $F604] LIKELY (code, EMU:tests/test_ross17140.py)'
+    note: 'engine state, written at $F604 from the main-loop branches: bit 7 = throttle closed (IDL, P16 low for more than 37 ADC ticks, about 150 ms) or cranking; bit 6 = closed-throttle idle (rpm byte $75 <= $B0, about 1000 rpm); bit 1 = decel fuel cut (no injection [ROM:$FEFB-$FEFF]); bit 0 = cranking (more than $19 ADC ticks per 180 degrees) [ROM:$F478-$F51E, $F604] LIKELY (code, EMU:tests/mr2/test_ross17140.py)'
   0x9e:
     name: IgnEdge
     note: NE edge (0..5) on which the spark is scheduled [ROM:$F848, $FF5E] LIKELY
@@ -135,7 +135,7 @@ ram:
     note: 'rev-limit pass counter: $FD below the limit, +1 per FuelPulse above it; cut at $FF [ROM:$FA2B-$FA3E] CONFIRMED (code, EMU)'
   0x95:
     name: FuelCut
-    note: 'bit 3 = rev-limit fuel cut; SchedInj schedules nothing while $95 is non-zero [ROM:$FA3E, $FFBD] CONFIRMED (code, EMU:tests/test_rev_limiter17140.py)'
+    note: 'bit 3 = rev-limit fuel cut; SchedInj schedules nothing while $95 is non-zero [ROM:$FA3E, $FFBD] CONFIRMED (code, EMU:tests/mr2/test_rpm_limit17140.py)'
   0xb9:
     name: RevLimit
     note: 'armed rev limit as an NEsum: $07B6 (7600 rpm) or $07EB (7400 rpm) after a fast climb through 6000 rpm [ROM:$FA03-$FA29] CONFIRMED (code, EMU)'
@@ -147,7 +147,7 @@ ram:
     note: '8 saturating up-counters $64-$6B, all incremented together at $FBC8 [ROM:$FBC8-$FBCD] CONFIRMED (code); $6A is the link keep-alive timer'
   0x6a:
     name: LinkTimer
-    note: 'keep-alive timer for the serial link: every time it reaches $FA (about 1.0 s in the simulator) the link is checked [ROM:$F62E-$F641] CONFIRMED (code, EMU:tests/test_peek17140.py)'
+    note: 'keep-alive timer for the serial link: every time it reaches $FA (about 1.0 s in the simulator) the link is checked [ROM:$F62E-$F641] CONFIRMED (code, EMU:tests/mr2/test_peek17140.py)'
   0x4b:
     name: LoadLag
     note: 'lagged Load x 8 (16-bit): follows Load at 1/8 (1/2 for small steps) per EvLoad event; Load x 8 minus this is the transient used by the global factor [ROM:$F8DA-$F90E] LIKELY'
@@ -217,7 +217,7 @@ ram:
 labels:
   0xf769:
     name: Code51Check
-    note: 'with T shorted (P30 = 0) puts P16 OR P37 into bit 1 of the value stored at $AB: clear only with the throttle closed (IDL, P16 low) and P37 low. Toyota code 51, "IDL off or A/C on with T-E1 shorted", so P37 = A/C switch, high = on [ROM:$F769-$F797] [EMU:tests/test_ross17140.py::test_code_51_check_ors_idl_open_with_p37] LIKELY'
+    note: 'with T shorted (P30 = 0) puts P16 OR P37 into bit 1 of the value stored at $AB: clear only with the throttle closed (IDL, P16 low) and P37 low. Toyota code 51, "IDL off or A/C on with T-E1 shorted", so P37 = A/C switch, high = on [ROM:$F769-$F797] [EMU:tests/mr2/test_ross17140.py::test_code_51_check_ors_idl_open_with_p37] LIKELY'
   0xf4c9:
     name: IdlCheck
     note: 'closed-throttle branch: P16 (IDL) low for > $25 ADC ticks -> decel fuel cut above DecelCutRpm + $10, else closed-throttle idle state [ROM:$F4C9-$F51E] CONFIRMED (code, EMU) (Ross R-F25)'
@@ -328,7 +328,7 @@ labels:
       LIKELY'
   0xf7f2:
     name: IgnFixedTest
-    note: 'fixed spark sum $00AA instead of the maps when ModeFlags bit 7 = 1 (throttle closed or cranking), DiagFlags bit 7 = 0 and PORT3 bit 0 (P30) = 0 [ROM:$F7F2-$F800] CONFIRMED (code); so it is the closed-throttle T-terminal base timing, the factory 10 deg BTDC check [EMU:tests/test_ross17140.py] LIKELY'
+    note: 'fixed spark sum $00AA instead of the maps when ModeFlags bit 7 = 1 (throttle closed or cranking), DiagFlags bit 7 = 0 and PORT3 bit 0 (P30) = 0 [ROM:$F7F2-$F800] CONFIRMED (code); so it is the closed-throttle T-terminal base timing, the factory 10 deg BTDC check [EMU:tests/mr2/test_ross17140.py] LIKELY'
 data:
 - start: 0xf00d
   end: 0xf012
@@ -346,7 +346,7 @@ data:
 - start: 0xf044
   end: 0xf055
   name: AdcRefTbl
-  note: 'ADC ch7 reference -> AdcRef; (AdcRef + 410) x the ch7 time is constant (314,700 +/- 0.1 %), so every reading = 153.7 x V / V_ch7 [ROM:$FC4D-$FC5B] CONFIRMED (EMU:tests/test_ross17140.py)'
+  note: 'ADC ch7 reference -> AdcRef; (AdcRef + 410) x the ch7 time is constant (314,700 +/- 0.1 %), so every reading = 153.7 x V / V_ch7 [ROM:$FC4D-$FC5B] CONFIRMED (EMU:tests/mr2/test_ross17140.py)'
 - start: 0xf056
   end: 0xf05e
   name: AfterStartTbl

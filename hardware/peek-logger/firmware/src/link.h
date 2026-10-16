@@ -2,7 +2,7 @@
 //
 // Pure logic, no hardware access: main.c feeds it the time, the ECU-power sense and each
 // received byte, and applies what it asks for (TX line mode, a byte to send, a record to
-// print). tests/test_peek_logger.py compiles this same header for the host and drives it
+// print). tests/hardware/test_peek_logger.py compiles this same header for the host and drives it
 // against the whole-ROM simulator.
 //
 // The ECU's protocol:

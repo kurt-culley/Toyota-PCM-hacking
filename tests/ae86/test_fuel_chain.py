@@ -1,4 +1,4 @@
-"""P2: arithmetic in the Bluetop fuel chain, proven in the emulator (docs/bluetop/fuel_chain.md)."""
+"""P2: arithmetic in the Bluetop fuel chain, proven in the emulator (docs/ae86/fuel_chain.md)."""
 
 import random
 

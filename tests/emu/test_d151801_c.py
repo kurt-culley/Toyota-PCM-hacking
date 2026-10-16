@@ -2,7 +2,7 @@
 
 Same ROM, same engine model, same inputs: every spark, every injector edge, every ADC
 conversion, the interrupt counts and the whole RAM must come out identical. This is step 3 of
-the validation path in docs/mr2/cpu_replacement.md.
+the validation path in docs/emulator/validation.md.
 """
 
 from __future__ import annotations

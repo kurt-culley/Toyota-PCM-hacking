@@ -1,4 +1,4 @@
-# Chip-in-isolation test of the real D151801 against the emulator (docs/hardware/chip_diff_test.md):
+# Chip-in-isolation test of the real D151801 against the emulator (docs/procedures/chip_test.md):
 #   cmake -B build -DPICO_BOARD=pico2_w && cmake --build build
 # The Pico clocks the chip, plays the engine around it one E cycle at a time (chipdiff.h, the
 # loopback's engine model) and logs every pin change over USB for src/pcmre/emu/chipdiff.py.

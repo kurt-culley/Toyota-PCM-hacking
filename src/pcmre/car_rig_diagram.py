@@ -1,13 +1,13 @@
 # ruff: noqa: E501  (a drawing: long literal label lists)
-"""Pictures and wire table of the proposed in-car test rig (docs/mr2/cpu_replacement.md, "In-car test rig").
+"""Pictures and wire table of the proposed in-car test rig (docs/procedures/car_test.md).
 
     uv run python -m pcmre.car_rig_diagram            # both pictures
     uv run python -m pcmre.car_rig_diagram --table    # the wire table
 
 No breadboard: one female-to-male jumper per signal from the Pico 2 W's header straight to a spare
 turned-pin DIP-40 socket pressed into the spare ECU's CPU socket. The pin map is the car firmware's
-hardware/ecu-emu/car/pins.h; tests/test_car_rig.py checks it against the ROM's port directions and the
-5 V rule. Writes docs/hardware/photos/car_rig/car_rig.png (overview) and wiring_car.png (pin by pin).
+hardware/ecu-emu/car/pins.h; tests/hardware/test_car_rig.py checks it against the ROM's port directions and the
+5 V rule. Writes docs/images/car_rig/car_rig.png (overview) and wiring_car.png (pin by pin).
 """
 
 from __future__ import annotations
@@ -17,11 +17,11 @@ import re
 from PIL import Image, ImageDraw, ImageFont
 
 from . import wiring as BB
-from .paths import ROOT
+from .paths import PICS_CAR_RIG, ROOT
 
 PINS_H = ROOT / "hardware/ecu-emu/car/pins.h"
-OUT = ROOT / "docs/hardware/photos/car_rig/car_rig.png"
-WIRING = ROOT / "docs/hardware/photos/car_rig/wiring_car.png"
+OUT = PICS_CAR_RIG / "car_rig.png"
+WIRING = PICS_CAR_RIG / "wiring_car.png"
 W, H = 1900, 1140
 BG, INK = (250, 250, 247), (30, 30, 30)
 RED, BLUE, GREY, ORANGE, GREEN, PURPLE = (

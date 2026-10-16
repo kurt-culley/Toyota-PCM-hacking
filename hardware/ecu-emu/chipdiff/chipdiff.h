@@ -1,6 +1,6 @@
-// Chip-in-isolation test (docs/hardware/chip_diff_test.md): the engine around a real D151801,
+// Chip-in-isolation test (docs/procedures/chip_test.md): the engine around a real D151801,
 // one E cycle at a time. Shared by the RP2350 firmware (main.c) and the host self-test
-// (tests/test_chipdiff.py), which uses the C emulator as the "chip".
+// (tests/hardware/test_chipdiff.py), which uses the C emulator as the "chip".
 //
 // Time is in E cycles from the release of /RES: cycle k starts when E rises. In each cycle the
 // firmware drives the chip's inputs with cd_word(k), computed a few cycles ahead, and samples

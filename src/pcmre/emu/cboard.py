@@ -3,7 +3,7 @@
 ``CSimulation`` has the same interface as ``emu.sim.Simulation`` for the 17140, but the CPU,
 the peripherals and the memory run in the C code the RP2350 firmware uses. The engine model
 (``Engine17140``) is unchanged: it talks to ``CPeripherals``, which forwards pin changes and
-reads into the C peripherals and keeps the engine's scheduled events. tests/test_d151801_c.py
+reads into the C peripherals and keeps the engine's scheduled events. tests/emu/test_d151801_c.py
 runs both side by side and requires identical outputs.
 
 The shared library is built with the host C compiler on first use (cached by source hash).

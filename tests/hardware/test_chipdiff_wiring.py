@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from pcmre import chipdiff_wiring as C
 from pcmre import wiring as W
-from pcmre.paths import ROOT
+from pcmre.paths import DOC_CHIP_TEST
 
-DOC = (ROOT / "docs/hardware/chip_diff_test.md").read_text()
+DOC = DOC_CHIP_TEST.read_text()
 
 
 def same_strip(hole: str, part_hole: tuple[str, int]) -> bool:

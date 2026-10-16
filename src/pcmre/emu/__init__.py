@@ -1,1 +1,1 @@
-"""HD6301 emulation for the Denso/Toyota ECU project (see docs/RE_PLAN.md, P0)."""
+"""HD6301 emulation for the Denso/Toyota ECU project (see docs/project/roadmap.md, P0)."""

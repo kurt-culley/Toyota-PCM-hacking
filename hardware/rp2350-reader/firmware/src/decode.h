@@ -1,5 +1,5 @@
 // The reader's drive/listen rule. Mirrors src/pcmre/readerdecode.py line for line;
-// tests/test_romdump.py runs that model against the dump program in the emulator.
+// tests/hardware/test_romdump.py runs that model against the dump program in the emulator.
 #pragma once
 
 #include <stdbool.h>

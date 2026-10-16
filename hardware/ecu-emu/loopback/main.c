@@ -11,11 +11,11 @@
 // Core 0 queues the crank edges ahead of time and reads the spark pin back through its pad to
 // measure its timing against the compare time.
 //
-// The schedule (800 rpm / 35 kPa, 2000 / 50, 5000 / 95, 6 s each) is the one emu.loopback_ref
-// runs on the host. At the end of each phase core 1 checksums every output edge of seconds 3-6
-// and the RAM; core 0 prints PASS if they equal the host's (expected.h): the real-time emulator
-// is then bit-exact to the simulator. tests/test_loopback_engine.py runs engine.h on the host
-// against the same expected.h.
+// The schedule is the one pcmre.emu.loopback_ref runs on the host (REF_PHASES phases of
+// REF_PHASE_US each, from cranking to 5000 rpm). At the end of each phase core 1 checksums every
+// output edge after REF_MEASURE_FROM_US and the RAM; core 0 prints PASS if they equal the
+// host's (expected.h): the real-time emulator is then bit-exact to the simulator.
+// tests/hardware/test_loopback_engine.py runs engine.h on the host against the same expected.h.
 
 #include <stdio.h>
 

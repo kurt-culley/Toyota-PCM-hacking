@@ -1,6 +1,6 @@
 """Engine and sensor stimulus for the MR2 89661-17140 ROM (P4 step 3).
 
-The 17140 is wired differently from the Bluetop (docs/mr2/architecture.md, maps.md), so it
+The 17140 is wired differently from the Bluetop (docs/mr2/program.md, maps.md), so it
 has its own model. Every signal is what the ECU's input circuits are assumed to deliver to
 the CPU pins; the ROM fixes most of it, the rest is marked GUESS.
 
@@ -39,7 +39,7 @@ the CPU pins; the ROM fixes most of it, the rest is marked GUESS.
   1900 rpm cut) under the decel fuel-cut rpm [ROM:$F4EC-$F4F4], the 1988 RM's A/C-on figures; and the
   T-shorted check at $F769-$F797, which ORs P3-7 with P1-6 into one fault bit, set unless the throttle
   is closed (P1-6 low) and P3-7 is low: Toyota's code 51, "IDL off or A/C on with T-E1 shorted"
-  [EMU:tests/test_ross17140.py::test_code_51_check_ors_idl_open_with_p37]. ``p37`` drives it (default 0 =
+  [EMU:tests/mr2/test_ross17140.py::test_code_51_check_ors_idl_open_with_p37]. ``p37`` drives it (default 0 =
   A/C off; the loopback reference pins the pin's earlier level, 1).
 """
 

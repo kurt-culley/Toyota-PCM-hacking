@@ -5,7 +5,7 @@ Two kinds of evidence:
   [offset, max, data...] stepped by 256 / A input counts), or run the ROM's own code in the routine
   harness.
 - **Behaviour** runs in the whole-ROM simulator. These tests use the C-backed ``CSimulation``,
-  which tests/test_d151801_c.py holds bit-identical to the Python simulator, because it is faster.
+  which tests/emu/test_d151801_c.py holds bit-identical to the Python simulator, because it is faster.
 
 Units: RpmIndex `$73` = rpm / 25 and RpmWord `$77` = rpm x 0.32 (docs/mr2/maps.md); a fuel factor v
 multiplies by (v + 410) / 512, so 102 = x1.00. ``ref_v=3.0`` selects the 256-counts-per-5-V ADC

@@ -8,7 +8,7 @@ The ROM fixes most of it; the rest is marked GUESS.
   spark: with the T terminal shorted the ROM fires on it, and the factory spec for that
   state is 10° BTDC [ROM:$F2AC, $F814] [repair manual]. The period between falling edges
   is ``deltaNE = 30e6 / rpm`` µs. That relation fits the ROM's 7400 rpm rev-limit
-  constant ($0FD6) [ROM:$F431], and tests/test_sim.py checks it against the ROM's own
+  constant ($0FD6) [ROM:$F431], and tests/ae86/test_sim.py checks it against the ROM's own
   rpm variables. The high part of each period is ``ne_duty`` (default 50 %, GUESS).
 - **G+ on P3-7.** Low around every fourth NE falling edge. The ROM resets its
   cylinder counter ``IC2LowCnt`` there and uses bit 1 of it to pick the injector group

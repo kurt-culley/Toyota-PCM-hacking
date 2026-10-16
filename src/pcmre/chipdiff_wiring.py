@@ -3,10 +3,10 @@
     uv run python -m pcmre.chipdiff_wiring          # print the tables
     uv run python -m pcmre.chipdiff_wiring --png    # also redraw the picture
 
-The test (docs/hardware/chip_diff_test.md) runs the D151801 in single-chip mode on the same
+The test (docs/procedures/chip_test.md) runs the D151801 in single-chip mode on the same
 breadboard as the reader (pcmre.wiring). The pin map comes from the firmware's chipdiff.h, the
 reader's from its pins.h, so this layout lists exactly what to change: wires that stay, wires
-whose chip end moves, new wires, and the resistors that change. tests/test_chipdiff_wiring.py
+whose chip end moves, new wires, and the resistors that change. tests/hardware/test_chipdiff_wiring.py
 checks the layout and that the guide's table is current.
 """
 
@@ -18,10 +18,10 @@ import re
 import sys
 
 from . import wiring as W
-from .paths import ROOT
+from .paths import PICS_CHIP_TEST, ROOT
 
 CHIPDIFF_H = ROOT / "hardware/ecu-emu/chipdiff/chipdiff.h"
-PNG = ROOT / "docs/hardware/photos/chip_diff_test/breadboard_chipdiff.png"
+PNG = PICS_CHIP_TEST / "breadboard_chipdiff.png"
 
 # Pin names in single-chip mode (mode 7): the reader's bus pins become ports 3 and 4
 DIP7 = {

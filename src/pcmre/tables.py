@@ -21,7 +21,7 @@ The result (in A) is linear interpolation between t[n] and t[n+1]::
     t[n+1] + ((t[n] - t[n+1]) * (256 - f)) >> 8   if falling (and f != 0)
 
 so a falling segment rounds towards t[n+1], not t[n]. X points at t[0].
-``tests/test_tables.py`` proves this model equals the emulator for every
+``tests/ae86/test_tables.py`` proves this model equals the emulator for every
 table the ROM passes to these helpers.
 """
 

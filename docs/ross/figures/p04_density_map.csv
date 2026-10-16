@@ -1,5 +1,5 @@
 # 17030 density map (fuel vs MAP site). Ross PDF p4, image img00.png. Claims: R-F03, R-F05.
-# Digitised by analysis/ross/digitise.py; resolution about +/-0.91 efi per pixel. Evidence level [PDF]; not ROM data.
+# Digitised by src/pcmre/ross/digitise.py; resolution about +/-0.91 efi per pixel. Evidence level [PDF]; not ROM data.
 # Note: Site 1 of the <3200 rpm series is hidden under the >3200 marker (both read about 18-20).
 map_site,below_3200rpm,above_3200rpm
 1,,20.0

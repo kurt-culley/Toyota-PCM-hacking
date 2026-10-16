@@ -527,7 +527,7 @@ def render(x: Xref, listing: Listing, title: str) -> str:
         "The analyser follows the code from the interrupt vectors and tracks the X register when it holds a",
         "constant, so it resolves Denso's indexed calls (`ldx #$FFCF` / `jsr $14,x`) and indexed accesses that",
         "wrap past `$FFFF` into RAM. Accesses marked † were resolved that way. IDA's own `XREF` comments in",
-        "`cap.asm` are checked against this analysis by `tests/test_xref.py`.",
+        "`cap.asm` are checked against this analysis by `tests/tooling/test_xref.py`.",
         "",
         "## Summary",
         "",

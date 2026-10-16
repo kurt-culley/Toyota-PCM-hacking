@@ -9,7 +9,7 @@ ROM: `roms/bluetop_2860/cap2-151801-2860.bin` (sha256 `7444a4747ffa…`), base `
 | Variable | RAM | Unit | To physical | Evidence | Confidence |
 |---|---|---|---|---|---|
 | `RPMish` | `$64` | rpm index | rpm ~= (RPMish + 32) * 25 below RPMish 160 (4800 rpm); rpm ~= (RPMish - 64) * 50 above | [ROM:$F4B8 staa RPMish] [EMU:sweep of CalcRPM $F446 with deltaNE = 30e6/rpm] | LIKELY (assumes rpm = 30,000,000 / deltaNE, from the ROM's 7400 rpm rev-limit constant $0FD6) |
-| `Load` | `$7F` | us (air-temperature-corrected airflow delay) | Load = Calc72(SE056plstime) = 3/4 x + x*ThAcorr/512, x = SE056 delay after the NE edge in us; mass-flow meaning unknown until the SE056 is measured | [ROM:$F550-$F556, $F6FC-$F709] [EMU:tests/test_fuel_chain.py, tests/test_sim.py] | LIKELY (formula and unit); GUESS (airflow per stroke) |
+| `Load` | `$7F` | us (air-temperature-corrected airflow delay) | Load = Calc72(SE056plstime) = 3/4 x + x*ThAcorr/512, x = SE056 delay after the NE edge in us; mass-flow meaning unknown until the SE056 is measured | [ROM:$F550-$F556, $F6FC-$F709] [EMU:tests/ae86/test_fuel_chain.py, tests/ae86/test_sim.py] | LIKELY (formula and unit); GUESS (airflow per stroke) |
 | `ADC_ThW` | `$57` | degF (after the $FEF0 linearisation) | degC = (raw - 32) / 1.8 | [ROM:$FAD3 ldx #$FEF0 / jsr $38,x; bounded to 241] [cap.asm comments 'water temp in fahrenheit'] | LIKELY |
 | `ADC_12V` | `$55` | raw ADC | volts = raw * 25 / 255 (+B1 divided by 5, 5 V reference) | [ROM:$FC8F-$FCAF] [cap.asm comment '+B1 terminal divided by 5'] | LIKELY |
 
@@ -41,9 +41,9 @@ ROM: `roms/bluetop_2860/cap2-151801-2860.bin` (sha256 `7444a4747ffa…`), base `
 
 **Base ignition advance (3D)** at `$FF5A`.
 
-- Cells: raw advance. Warm (ThW_tADV = 28) the spark is about v*90/256 - 0.9 deg BTDC plus a fixed 256 us lead [EMU:sim, docs/bluetop/simulation.md]. The PWRr staircase ($FF94) is subtracted, and 8 is added once T-VIS has opened (above 4350 rpm; TVIScounter >= 0) [ROM:$FC47-$FC6D, $F89F]. Readable table in degrees: docs/bluetop/ignition_table.md
+- Cells: raw advance. Warm (ThW_tADV = 28) the spark is about v*90/256 - 0.9 deg BTDC plus a fixed 256 us lead [EMU:sim, docs/ae86/simulation.md]. The PWRr staircase ($FF94) is subtracted, and 8 is added once T-VIS has opened (above 4350 rpm; TVIScounter >= 0) [ROM:$FC47-$FC6D, $F89F]. Readable table in degrees: docs/ae86/ignition_table.md
 - Ross claims: R-I02, R-I05
-- Evidence: [PORT:pcmre.crossver CONFIRMED, from 0642 $FF40] [ROM:$F86C-$F89F] [EMU:tests/test_tables.py::test_3d_ignition_lookup_matches_emulator]
+- Evidence: [PORT:pcmre.crossver CONFIRMED, from 0642 $FF40] [ROM:$F86C-$F89F] [EMU:tests/ae86/test_tables.py::test_3d_ignition_lookup_matches_emulator]
 - Confidence: CONFIRMED (layout and interpolation); LIKELY (rpm axis, degrees)
 - Rows: `Load` raw $0200, $0400, $0600, $0800, $0A00, $0C00. row r at Load = $200 + r*$200; Load is clamped to $0BFF, so row 5 is reached only as an interpolation target
 - Columns: `RPMish` raw 0, 16, 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208 = 800, 1200, 1600, 2000, 2400, 2800, 3200, 3600, 4000, 4400, 4800, 5600, 6400, 7200 rpm
@@ -62,7 +62,7 @@ ROM: `roms/bluetop_2860/cap2-151801-2860.bin` (sha256 `7444a4747ffa…`), base `
 **Coolant sensor linearisation (raw ADC -> degF)** at `$FF0B`, read through helper entry `$FF42`.
 
 - Cells: degF (bounded 241 by the caller)
-- Evidence: [PORT:pcmre.crossver CONFIRMED, from 0642 $FEF0] [ROM:$FAD3] [EMU:tests/test_tables.py::test_model_matches_emulator_for_every_rom_table]
+- Evidence: [PORT:pcmre.crossver CONFIRMED, from 0642 $FEF0] [ROM:$FAD3] [EMU:tests/ae86/test_tables.py::test_model_matches_emulator_for_every_rom_table]
 - Confidence: LIKELY
 - Axis: `raw coolant ADC` (raw ADC), raw points every 16
 
@@ -90,7 +90,7 @@ ROM: `roms/bluetop_2860/cap2-151801-2860.bin` (sha256 `7444a4747ffa…`), base `
 
 - Cells: raw. InjDeadTime = v*8 + 464 us (the helper's A:B/32 + $1D0); 255 -> 2504 us at 8.1 V or less. Input is at most $AC, so entries 7-8 (which overlap $FEF0) are never reached
 - Ross claims: R-F17
-- Evidence: [PORT:pcmre.crossver CONFIRMED, from 0642 $FEE9] [ROM:$FC8F-$FC9E suba #$53 / ldx #$FEE9 / DivDby32 / addd #$01D0 / std InjDeadTime] [EMU:tests/test_sim.py 1183 us at 14 V]
+- Evidence: [PORT:pcmre.crossver CONFIRMED, from 0642 $FEE9] [ROM:$FC8F-$FC9E suba #$53 / ldx #$FEE9 / DivDby32 / addd #$01D0 / std InjDeadTime] [EMU:tests/ae86/test_sim.py 1183 us at 14 V]
 - Confidence: CONFIRMED (use and scaling); LIKELY (volts axis)
 - Axis: `ADC_12V - $53 (0 below 8.1 V)` (raw ADC), raw points every 32
 
@@ -143,7 +143,7 @@ ROM: `roms/bluetop_2860/cap2-151801-2860.bin` (sha256 `7444a4747ffa…`), base `
 
 - Cells: raw advance (replaces ThW_tADV). 28 at 218 F falling to 6 from 226 F: about -7.7 deg. Above 218 F it applies only off idle with Load >= $9C4; there ThW_tADV is otherwise 28. Below 218 F ThW_tADV comes from thw_FF0A. Shares bytes with $FF12
 - Ross claims: R-I12
-- Evidence: [PORT:pcmre.crossver CONFIRMED, from 0642 $FF11] [ROM:$FC03-$FC1E] [EMU:tests/test_sim.py::test_overheat_retard_only_at_high_load]
+- Evidence: [PORT:pcmre.crossver CONFIRMED, from 0642 $FF11] [ROM:$FC03-$FC1E] [EMU:tests/ae86/test_sim.py::test_overheat_retard_only_at_high_load]
 - Confidence: CONFIRMED
 - Axis: `ADC_ThW - 218 F, bounded 0..15` (degF above 218), raw points every 8
 
@@ -157,7 +157,7 @@ ROM: `roms/bluetop_2860/cap2-151801-2860.bin` (sha256 `7444a4747ffa…`), base `
 
 - Cells: raw advance subtracted from the 3D-map value
 - Ross claims: R-F10
-- Evidence: [PORT:pcmre.crossver CONFIRMED, from 0642 $FF94] [ROM:$F8A5 ldx #$FF94 / jsr $10,x -> $FFA4: ldab ADC_PWRr / lsrb x5 / abx / suba 0,x] [EMU:tests/test_sim.py::test_pwr_input_selects_a_staircase_trim]
+- Evidence: [PORT:pcmre.crossver CONFIRMED, from 0642 $FF94] [ROM:$F8A5 ldx #$FF94 / jsr $10,x -> $FFA4: ldab ADC_PWRr / lsrb x5 / abx / suba 0,x] [EMU:tests/ae86/test_sim.py::test_pwr_input_selects_a_staircase_trim]
 - Confidence: CONFIRMED (structure); GUESS (what PWRr is: likely a calibration or option resistor)
 - Axis: `ADC_PWRr` (raw ADC), raw points every 32
 
@@ -288,7 +288,7 @@ ROM: `roms/bluetop_2860/cap2-151801-2860.bin` (sha256 `7444a4747ffa…`), base `
 **Warm-up advance ThW_tADV vs coolant (below 218 F)** at `$FF25`, read through helper entry `$FF35`.
 
 - Cells: raw advance added to the base (28 = no extra advance)
-- Evidence: [PORT:pcmre.crossver CONFIRMED, from 0642 $FF0A] [ROM:$FBFA ldx #$FF0A / jsr $11,x / staa ThW_tADV] [EMU:tests/test_sim.py, 56 cold -> 28 warm]
+- Evidence: [PORT:pcmre.crossver CONFIRMED, from 0642 $FF0A] [ROM:$FBFA ldx #$FF0A / jsr $11,x / staa ThW_tADV] [EMU:tests/ae86/test_sim.py, 56 cold -> 28 warm]
 - Confidence: CONFIRMED
 - Axis: `ADC_ThW` (degF), raw points every 32
 

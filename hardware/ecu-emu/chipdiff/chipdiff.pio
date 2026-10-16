@@ -1,4 +1,4 @@
-; chipio: one pass per E cycle of the real D151801 (docs/hardware/chip_diff_test.md).
+; chipio: one pass per E cycle of the real D151801 (docs/procedures/chip_test.md).
 ;   out pins: GP0-28 (only the chip-input pins have their direction set to output)
 ;   in pins:  GP0-31, autopush every pass;  side-set: /RES (GP8) pin direction
 ; The TX FIFO first gives the number of E cycles to hold /RES low, then the sample delay in

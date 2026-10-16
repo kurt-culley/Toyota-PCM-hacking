@@ -7,7 +7,7 @@ The single source of truth for opcodes, addressing modes and cycle counts is
 D151801). This writes ``hardware/ecu-emu/core/hd6301_ops.inc``: one ``case`` per defined opcode,
 fully specialised (no runtime decode of mode or mnemonic), for the RP2350 CPU-replacement
 firmware; and ``hd6301_timing.inc``: the cycle and data-access-cycle tables for both timings.
-tests/test_hd6301_c.py runs the C core against the Python one.
+tests/emu/test_hd6301_c.py runs the C core against the Python one.
 """
 
 from __future__ import annotations

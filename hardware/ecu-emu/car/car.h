@@ -1,6 +1,6 @@
-// In-car firmware logic (docs/mr2/cpu_replacement.md, "In-car test rig"): the emulated D151801
+// In-car firmware logic (docs/procedures/car_test.md): the emulated D151801
 // on the ECU board's real pins. Shared by the RP2350 firmware (main.c) and the host test
-// (tests/test_car_fw.py), so everything here is plain C with no SDK calls.
+// (tests/hardware/test_car_fw.py), so everything here is plain C with no SDK calls.
 //
 // Time: two rings of pin words, one word per microsecond, run by PIO from the same clock:
 //   input ring:  every pin sampled each us (DMA writes it); index = real us since sampling began.
@@ -17,7 +17,7 @@
 // Safety (CAR_HOLD, default on): the IGT (P11) and injector (P21) pins are held at the level the
 // real chip drives when the engine is not turning, 1 for both [BENCH: chip test run 5: P11 high
 // from the port set-up to the first crank-driven edge at cycle 64507, P21 to cycle 32417] (key-on,
-// engine off, the ROM makes no IGT or injector edge [EMU:tests/test_car_fw.py::test_koeo_no_spark_or_fuel]).
+// engine off, the ROM makes no IGT or injector edge [EMU:tests/hardware/test_car_fw.py::test_koeo_no_spark_or_fuel]).
 // With the hold on, the emulator computes spark and injection as normal (counted in the
 // statistics) but neither pin ever moves, so the engine cannot run on this build.
 

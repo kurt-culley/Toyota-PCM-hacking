@@ -5,9 +5,9 @@ from pathlib import Path
 
 import pytest
 
-from pcmre.paths import ROOT
+from pcmre.paths import ROSS_FIGURES
 
-FIG = ROOT / "docs/ross/figures"
+FIG = ROSS_FIGURES
 PIL = pytest.importorskip("PIL.Image")
 
 

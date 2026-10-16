@@ -4,7 +4,7 @@
     uv run python -m pcmre.wiring --png    # also redraw the pictures
 
 pins.h is the single source of truth: the guide's tables are checked against this
-output by tests/test_wiring.py, so the guide cannot drift from the firmware.
+output by tests/hardware/test_wiring.py, so the guide cannot drift from the firmware.
 """
 
 from __future__ import annotations
@@ -14,10 +14,10 @@ import re
 import sys
 from pathlib import Path
 
-from .paths import ROOT
+from .paths import PICS_READER, ROOT
 
 PINS_H = ROOT / "hardware/rp2350-reader/firmware/src/pins.h"
-PNG_DIR = ROOT / "docs/hardware/photos/rp2350_reader"
+PNG_DIR = PICS_READER
 BOARDS = {"pico2w": "RASPBERRYPI_PICO2_W", "bb48": "OLIMEX_RP2350_PICO2_BB48"}
 
 # HD6301V1 DIP-40, component-side top view: pin -> name

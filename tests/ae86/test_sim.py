@@ -261,3 +261,25 @@ def test_learned_values_survive_a_restart_in_standby_ram():
     s3.periph.mem[0x40:0x4B] = kept
     s3.run_ms(300)
     assert s3.ram("word_42", 2) == 0x807F
+
+
+def test_warm_up_fuel_and_cold_advance():
+    """Steady warm-up fuel after the after-start enrichment decays: 1.7 x the warm ratio at 0 °C (32 °F),
+    none left at 60 °C (140 °F). Cold advance: ThW_tADV 56 against 28 warm, +28 raw = about +10°."""
+
+    def settled(coolant_f, ms):
+        s = Simulation()
+        i = s.inputs
+        i.coolant_f = i.intake_f = coolant_f
+        i.rpm, i.airflow_us, i.o2_v = 1000, 800, 0.1
+        s.engine.update_sensors()
+        s.run_ms(ms)
+        return s
+
+    warm, hot, cold = settled(176, 10_000), settled(140, 10_000), settled(32, 40_000)
+    assert cold.ram("byte_84") == 0  # the after-start enrichment has decayed
+    assert cold.ram("FuelRatioH", 2) / warm.ram("FuelRatioH", 2) == pytest.approx(1.7, abs=0.05)
+    assert hot.ram("FuelRatioH", 2) / warm.ram("FuelRatioH", 2) == pytest.approx(1.0, abs=0.03)
+    assert cold.ram("ThW_tADV") - warm.ram("ThW_tADV") == 28
+    extra = advance_from_rom_formula(0x60, 56, 0, 30_000) - advance_from_rom_formula(0x60, 28, 0, 30_000)
+    assert extra == pytest.approx(10, abs=0.3)  # degrees at 1000 rpm [ROM:$F8CD-$F90D]

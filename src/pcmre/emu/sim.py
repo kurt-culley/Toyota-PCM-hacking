@@ -7,7 +7,7 @@
     sim.ram("FuelRatioH", 2), sim.injector_pulses("#20")[-1], sim.advance_deg()
 
 Times are E-clock cycles (µs; the E clock is 1 MHz [ROM:$F168 CalcInjOffTime]).
-See docs/bluetop/simulation.md for what is modelled and what is GUESS.
+See docs/ae86/simulation.md for what is modelled and what is GUESS.
 """
 
 from __future__ import annotations

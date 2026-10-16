@@ -141,7 +141,7 @@ L_F037:
 	rts
 	db	$A5,$84,$6A,$55,$43,$34,$27,$1C
 	db	$12
-; ADC ch7 reference -> AdcRef; (AdcRef + 410) x the ch7 time is constant (314,700 +/- 0.1 %), so every reading = 153.7 x V / V_ch7 [ROM:$FC4D-$FC5B] CONFIRMED (EMU:tests/test_ross17140.py)
+; ADC ch7 reference -> AdcRef; (AdcRef + 410) x the ch7 time is constant (314,700 +/- 0.1 %), so every reading = 153.7 x V / V_ch7 [ROM:$FC4D-$FC5B] CONFIRMED (EMU:tests/mr2/test_ross17140.py)
 AdcRefTbl:
 	db	$20,$68,$0E,$C5,$B3,$A2,$92,$83
 	db	$74,$66,$59,$4D,$41,$36,$2B,$21
@@ -1088,7 +1088,7 @@ L_F758:
 	bsr	L_F717
 	cli
 Code51Check:
-	ldaa	PORT1		; with T shorted (P30 = 0) puts P16 OR P37 into bit 1 of the value stored at $AB: clear only with the throttle closed (IDL, P16 low) and P37 low. Toyota code 51, "IDL off or A/C on with T-E1 shorted", so P37 = A/C switch, high = on [ROM:$F769-$F797] [EMU:tests/test_ross17140.py::test_code_51_check_ors_idl_open_with_p37] LIKELY
+	ldaa	PORT1		; with T shorted (P30 = 0) puts P16 OR P37 into bit 1 of the value stored at $AB: clear only with the throttle closed (IDL, P16 low) and P37 low. Toyota code 51, "IDL off or A/C on with T-E1 shorted", so P37 = A/C switch, high = on [ROM:$F769-$F797] [EMU:tests/mr2/test_ross17140.py::test_code_51_check_ors_idl_open_with_p37] LIKELY
 	asla
 	eora	#$80
 	coma
@@ -1175,7 +1175,7 @@ SvcIgnition:
 	ldab	IgnBase
 	stab	$AB
 IgnFixedTest:
-	clra		; fixed spark sum $00AA instead of the maps when ModeFlags bit 7 = 1 (throttle closed or cranking), DiagFlags bit 7 = 0 and PORT3 bit 0 (P30) = 0 [ROM:$F7F2-$F800] CONFIRMED (code); so it is the closed-throttle T-terminal base timing, the factory 10 deg BTDC check [EMU:tests/test_ross17140.py] LIKELY
+	clra		; fixed spark sum $00AA instead of the maps when ModeFlags bit 7 = 1 (throttle closed or cranking), DiagFlags bit 7 = 0 and PORT3 bit 0 (P30) = 0 [ROM:$F7F2-$F800] CONFIRMED (code); so it is the closed-throttle T-terminal base timing, the factory 10 deg BTDC check [EMU:tests/mr2/test_ross17140.py] LIKELY
 	ldab	ModeFlags
 	bpl	L_F802
 	ldab	DiagFlags

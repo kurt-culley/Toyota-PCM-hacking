@@ -3,7 +3,7 @@
 Written from the Hitachi HD6301/HD6303 Series Handbook (1989), tables 3-2-1 to
 3-2-4 (instruction semantics, flags and cycle counts). It is checked
 instruction-by-instruction against MAME's hd6301 core in
-``tests/test_emu_cpu.py`` (see ``tools/setup_mame_ref.sh``).
+``tests/emu/test_emu_cpu.py`` (see ``tools/setup_mame_ref.sh``).
 
 Peripherals (timer, SCI, ports) are not part of the core: they sit behind the
 ``Bus`` and call ``irq()`` / ``nmi()``. Undefined opcodes take the TRAP

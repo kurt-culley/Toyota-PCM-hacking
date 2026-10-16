@@ -1,8 +1,6 @@
 # Map definitions for 89661-17140.bin.
-# The day-one auto-port from the Bluetop found no maps (the programs share only 4 % of their
-# instructions), and its copied RAM variables did not apply to this ROM, so they were removed.
-# The maps found in P4 step 2 are described in docs/mr2/maps.md and named in
-# roms/mr2_17140/symbols.yaml; they are added here once their units are calibrated.
+# No maps are defined yet. docs/mr2/maps.md describes the maps, and roms/mr2_17140/symbols.yaml
+# names them. Add each map here when its units are calibrated.
 rom: mr2_17140
 file: roms/mr2_17140/89661-17140.bin
 base: 0xF000

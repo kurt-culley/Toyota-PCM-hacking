@@ -1,4 +1,4 @@
-"""Chip-in-isolation test: compare the real D151801 with the emulator (docs/hardware/chip_diff_test.md).
+"""Chip-in-isolation test: compare the real D151801 with the emulator (docs/procedures/chip_test.md).
 
     # run the test on the Pico (chip on the breadboard) and save the log
     uv run --extra serial python -m pcmre.emu.chipdiff capture /dev/ttyACM0 run.log
@@ -363,7 +363,9 @@ def main() -> int:
     c = sub.add_parser("capture")
     c.add_argument("port")
     c.add_argument("out", type=Path)
-    c.add_argument("--phases", type=int, default=6)
+    from . import loopback_ref as L
+
+    c.add_argument("--phases", type=int, default=len(L.SCHEDULE))
     a = sub.add_parser("analyse")
     a.add_argument("log", type=Path)
     a.add_argument("--offset", type=int)

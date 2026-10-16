@@ -11,7 +11,7 @@
 ;   bytes 1..   every byte from START to $FFFF (4096 bytes for START = $F000)
 ; then the chip goes to sleep (SLP).
 ;
-; Rules this program keeps (checked by tests/test_romdump.py in the emulator):
+; Rules this program keeps (checked by tests/hardware/test_romdump.py in the emulator):
 ;   - no stack: no JSR/BSR/PSH/PUL, no RAM writes, interrupts stay masked from reset;
 ;   - only three writes, all to on-chip SCI registers (RMCR, TRCSR, TDR);
 ;   - TDR is written only after TRCSR has been read with TDRE set.

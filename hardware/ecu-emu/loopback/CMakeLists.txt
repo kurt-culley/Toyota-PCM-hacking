@@ -1,4 +1,4 @@
-# Loopback test of the real-time emulator on one Pico 2 W, no wiring (docs/mr2/cpu_replacement.md):
+# Loopback test of the real-time emulator on one Pico 2 W, no wiring (docs/emulator/design.md):
 #   cmake -B build -DPICO_BOARD=pico2_w && cmake --build build
 # Core 1 runs the emulated D151801 with the 17140 ROM locked to real time; core 0 plays the
 # engine on GPIO pins and measures the emulator's outputs through the same pads.

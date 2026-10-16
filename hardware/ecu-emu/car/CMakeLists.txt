@@ -1,4 +1,4 @@
-# In-car test firmware (docs/mr2/cpu_replacement.md, "In-car test rig"):
+# In-car test firmware (docs/procedures/car_test.md):
 #   cmake -B build -DPICO_BOARD=pico2_w && cmake --build build
 # The emulated D151801 with the 17140 ROM on the ECU board's pins (pins.h, car.h). The IGT and
 # injector pins are held at their engine-stopped level: this build cannot run the engine.

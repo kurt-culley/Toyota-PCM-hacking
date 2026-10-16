@@ -1,4 +1,4 @@
-"""The 17140's rev limiter in the whole-ROM simulator (docs/mr2/rev_limiter.md).
+"""The 17140's rev limiter in the whole-ROM simulator (docs/mr2/program.md, "Speed limit").
 
 Fuel only: the cut flag $95 bit 3 stops SchedInj. The limit is NEsum <= $07B6 (7600 rpm), or
 $07EB (7400 rpm) after a fast climb through 6000 rpm [ROM:$FA03-$FA3E, $FFB7-$FFC1].

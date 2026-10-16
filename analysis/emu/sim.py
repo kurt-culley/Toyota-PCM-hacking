@@ -17,11 +17,18 @@ from functools import cache
 from pathlib import Path
 
 from .cpu import HD6301, VEC_TRAP
-from .engine import BLUETOP_ROM, Engine, EngineInputs
+from .engine import BLUETOP, BLUETOP_ROM, EcuProfile, Engine, EngineInputs
 from .periph import Peripherals
 
 ROOT = Path(__file__).resolve().parents[2]
 LISTING = ROOT / "analysis/bluetop/cap.s"
+# Interrupt sampling, fitted to the owner's chip (chip-in-isolation run 3, 2026-10-15: all 162
+# injector and 318 spark edges and 2994 of 3001 ADC-start edges exact over 6 s). An interrupt is
+# taken after an instruction only if its flag counts IRQ_WINDOW cycles before the instruction's
+# end; a compare flag counts from the cycle after the match, a capture flag from the cycle before
+# the input edge (emu.periph). LIKELY: the per-instruction detail of the 6801's sampling point is
+# not known; board.c keeps a per-opcode table (all 2) for when it is.
+IRQ_WINDOW = 2
 
 
 class SimulationError(RuntimeError):
@@ -41,15 +48,21 @@ def symbols(listing: Path = LISTING) -> dict[str, int]:
 
 class Simulation:
     def __init__(
-        self, rom: bytes | None = None, inputs: EngineInputs | None = None, extra: dict[int, bytes] | None = None
+        self,
+        rom: bytes | None = None,
+        inputs: EngineInputs | None = None,
+        extra: dict[int, bytes] | None = None,
+        profile: EcuProfile = BLUETOP,
+        engine: type = Engine,
     ):
         """``extra`` maps addresses to code or data outside the ROM (external memory, as on the P7 board)."""
         self.rom = rom if rom is not None else BLUETOP_ROM.read_bytes()
-        self.periph = Peripherals(self.rom)
+        self.rom_base = 0x10000 - len(self.rom)  # 4 KB at $F000 (Bluetop); larger ROMs end at $FFFF too
+        self.periph = Peripherals(self.rom, self.rom_base)
         for addr, data in (extra or {}).items():
             self.periph.mem[addr : addr + len(data)] = data
-        self.cpu = HD6301(self.periph)
-        self.engine = Engine(self.periph, self.rom, inputs)
+        self.cpu = HD6301(self.periph, timing="6801")  # the D151801 runs MC6801 timing (emu.cpu.CYCLES_6801)
+        self.engine = engine(self.periph, self.rom, inputs, profile)
         self.inputs = self.engine.inputs
         self.irq_counts: dict[int, int] = {}
         self.cpu.reset()
@@ -62,9 +75,21 @@ class Simulation:
             t = p.next_event_time()
             cpu.cycles += max(1, (t - p.now) if t is not None else 1)
         else:
-            if cpu.pc == self.rom[VEC_TRAP - 0xF000] << 8 | self.rom[VEC_TRAP - 0xF000 + 1]:
+            trap = VEC_TRAP - self.rom_base
+            if cpu.pc == self.rom[trap] << 8 | self.rom[trap + 1]:
                 raise SimulationError(f"TRAP taken (undefined opcode) at cycle {p.now}")
+            start = p.now
+            p.begin_insn(cpu.access_offsets(p.mem[cpu.pc]))
             cpu.step()
+            p.end_insn()
+            end = start + (cpu.cycles - before)
+            p.advance(end - p.now)
+            vec = p.irq_vector(at=end - IRQ_WINDOW)
+            before = cpu.cycles
+            if vec is not None and cpu.irq(vec):
+                self.irq_counts[vec] = self.irq_counts.get(vec, 0) + 1
+                p.advance(cpu.cycles - before)
+            return
         p.advance(cpu.cycles - before)
         vec = p.irq_vector()
         if vec is not None:

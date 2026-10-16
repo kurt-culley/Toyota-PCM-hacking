@@ -22,7 +22,11 @@ def intel_hex(data: bytes, base: int) -> list[str]:
 
 def console(done: str = "DONE OK") -> str:
     return "\n".join(
-        ["> dump", "run 1: 4097/4097 bytes, mode byte $10, late cycles 0", "mode 0 (want 0), runs identical: yes"]
+        [
+            "> dump",
+            "run 1: 4097/4097 bytes, mode byte $10, late cycles 0",
+            "mode bits 0 in any run (want 0); ROM bytes that differ between runs: 0 (want 0)",
+        ]
         + intel_hex(CAP, 0xF000)
         + [done, "> "]
     )

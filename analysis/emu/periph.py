@@ -68,6 +68,8 @@ class Channel:
     armed: int = 0  # flags seen set by a TCSR read; the second step of the clear sequence clears them
     pin_in: int = 0  # level on the input-capture pin
     pin_out: int = 1  # output-compare flip-flop
+    icf_t: int = 0  # when ICF / OCF last rose (irq_vector(at=...))
+    ocf_t: int = 0
 
     def read_tcsr(self) -> int:
         self.armed = self.tcsr & (ICF | OCF | TOF)
@@ -106,8 +108,14 @@ class Peripherals:
         self.t1 = Channel()
         self.t2 = Channel()
         self.tof = 0  # TOF lives in TCSR1 only
+        self.tof_t = self.sci_t = 0  # when TOF / the SCI receive flag last rose
         self.ddr = [0, 0, 0, 0]
-        self.latch = [0, 0, 0, 0]
+        # Port data latches at reset. Port 4 reads back high: on the owner's chip P40/P41 stay high
+        # when DDR4 makes them outputs, until the program writes port 4 (run 2, 2026-10-15). LIKELY.
+        self.latch = [0, 0, 0, 0xFF]
+        self._insn: tuple[int, tuple[int, int]] | None = None  # set by Simulation.step (begin_insn)
+        self._acc = 0
+        self._frc_lo_latch: int | None = None
         # External pin levels (inputs); index 0..3 = ports 1..4. Default: pulled high.
         self.pins = [0xFF, 0xFF, 0xFF, 0xFF]
         self.p3csr = 0
@@ -159,6 +167,8 @@ class Peripherals:
                 self._compare_match()
         self.now = end
         if self.frc < f0 or n >= 0x10000:  # wrapped through $0000
+            if not self.tof:
+                self.tof_t = self.now - self.frc
             self.tof = 1
 
     def _next_compare(self, end: int) -> int | None:
@@ -174,21 +184,30 @@ class Peripherals:
     def _compare_match(self) -> None:
         for ch in (self.t1, self.t2):
             if ch.ocr == self.frc:
+                if not ch.tcsr & OCF:
+                    ch.ocf_t = self.now + 1  # counts for interrupts a cycle after the match
                 ch.tcsr |= OCF
                 ch.pin_out = ch.tcsr & OLVL
                 self._outputs_changed()
 
     # -- interrupts --------------------------------------------------------------------
-    def irq_vector(self) -> int | None:
-        """Highest-priority pending maskable interrupt vector (handbook: ICF > OCF > TOF > SCI)."""
-        p1, p2 = self.t1.pending(), self.t2.pending()
-        if (p1 | p2) & ICF:
+    def irq_vector(self, at: int | None = None) -> int | None:
+        """Highest-priority pending maskable interrupt vector (handbook: ICF > OCF > TOF > SCI).
+
+        With ``at``, only flags that had risen by that time count (Simulation.step: IRQ_WINDOW).
+        """
+        t = self.now if at is None else at
+        p = 0
+        for ch in (self.t1, self.t2):
+            q = ch.pending()
+            p |= (q & ICF if ch.icf_t <= t else 0) | (q & OCF if ch.ocf_t <= t else 0)
+        if p & ICF:
             return VEC_ICF
-        if (p1 | p2) & OCF:
+        if p & OCF:
             return VEC_OCF
-        if self.tof and self.t1.tcsr & ETOI:
+        if self.tof and self.t1.tcsr & ETOI and self.tof_t <= t:
             return VEC_TOF
-        if self.trcsr & RIE and self.trcsr & (RDRF | ORFE):
+        if self.trcsr & RIE and self.trcsr & (RDRF | ORFE) and self.sci_t <= t:
             return VEC_SCI
         return None
 
@@ -211,6 +230,8 @@ class Peripherals:
         ch.pin_in = level
         if bool(ch.tcsr & IEDG) == bool(level):
             ch.icr = self.frc
+            if not ch.tcsr & ICF:
+                ch.icf_t = self.now - 1  # counts for interrupts from the cycle before the edge
             ch.tcsr |= ICF
 
     def is3_falling_edge(self) -> None:
@@ -247,6 +268,7 @@ class Peripherals:
     def read(self, addr: int) -> int:
         if addr >= 0x20:
             return self.mem[addr]
+        self._sync_access()
         return self._read_io(addr)
 
     def write(self, addr: int, value: int) -> None:
@@ -254,7 +276,27 @@ class Peripherals:
             if addr < self.rom_base:
                 self.mem[addr] = value
             return
+        self._sync_access()
         self._write_io(addr, value)
+
+    # -- bus-cycle timing of I/O accesses ------------------------------------------------
+    def begin_insn(self, offsets: tuple[int, int]) -> None:
+        """An instruction starts now; its 1st/2nd I/O access fall ``offsets`` cycles in (access_offsets)."""
+        self._insn = (self.now, offsets)
+        self._acc = 0
+
+    def end_insn(self) -> None:
+        self._insn = None
+
+    def _sync_access(self) -> None:
+        """Bring time up to the bus cycle of this I/O access, so pins and the counter change then."""
+        if self._insn is None:
+            return
+        start, offs = self._insn
+        t = start + offs[min(self._acc, 1)]
+        self._acc += 1
+        if t > self.now:
+            self.advance(t - self.now)
 
     def _read_io(self, a: int) -> int:
         if a in (PORT1, PORT2, PORT3, PORT4):
@@ -274,9 +316,11 @@ class Peripherals:
             if self.t1.armed & TOF:
                 self.tof = 0
                 self.t1.armed &= ~TOF
+            self._frc_lo_latch = self.frc & 0xFF  # the LSB is latched when the MSB is read
             return self.frc >> 8
         if a == FRC_L:
-            return self.frc & 0xFF
+            v, self._frc_lo_latch = self._frc_lo_latch, None
+            return self.frc & 0xFF if v is None else v
         if a == OCR1_H:
             return self.t1.ocr >> 8
         if a == OCR1_L:
@@ -329,7 +373,7 @@ class Peripherals:
             self._frc_hi_written = v
             self._set_frc(0xFFF8)
         elif a == FRC_L:
-            self._set_frc((self._frc_hi_written << 8) | v)
+            pass  # MC6801: a counter write only presets $FFF8 (above); the low byte is not loaded
         elif a in (OCR1_H, OCR1_L, OCR2_H, OCR2_L):
             ch = self.t1 if a in (OCR1_H, OCR1_L) else self.t2
             if a in (OCR1_H, OCR2_H):
@@ -370,6 +414,8 @@ class Peripherals:
                 self.adc_log.append((self.now, ch))
                 if self.trcsr & RDRF:
                     self.trcsr |= ORFE
+                elif not self.trcsr & ORFE:
+                    self.sci_t = self.now
                 self.rdr = bitrev8(self.adc[ch])
                 self.trcsr |= RDRF
 

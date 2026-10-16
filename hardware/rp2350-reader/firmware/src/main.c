@@ -31,10 +31,12 @@
 #include "reader.pio.h"
 #include "romdump.h"
 
-#define EXTAL_HZ 1000000u
+#define EXTAL_HZ 500000u  // E = 125 kHz: doubles the bus phases core 1 must answer within
+                           // (EXTAL 1 MHz left too little margin on back-to-back vector cycles);
+                           // spec minimum is 0.4 MHz
 #define E_HZ (EXTAL_HZ / 4u)
 #define SCI_BAUD (E_HZ / 16u)  // RMCR = $04: E/16
-#define SNOOP_DELAY_NS 1200u   // sample AD 1.2 us into the ~2 us E-high phase
+#define SNOOP_DELAY_NS (300000000u / E_HZ)  // 60 % into the E-high phase (2.4 us at 125 kHz)
 #define LOG_N 64u
 #define RUNS 3u
 #define MAX_STREAM (1u + 0x2000u)  // mode byte + $E000-$FFFF
@@ -417,15 +419,19 @@ static void cmd_listen(void) {
     // With nothing driving, the vector reads float and echo the address low byte
     // ($FE, $FF). Real data there means the chip drove its vector internally, so the
     // reader must not serve it: probe and dump would collide with the chip.
+    // Only the first cycles after RES rises can be the vector fetch: later $FFFE/$FFFF reads
+    // are stack pulls (the stack pointer starts near $FFFF) and must not be mistaken for it.
     int fffe = -1, fffe_at = -1;
-    for (uint32_t i = 0; i + 1 < log_count && i < LOG_N - 1; i++)
+    for (uint32_t i = 0; i + 1 < log_count && i < LOG_N - 1 && i <= VECTOR_WINDOW; i++)
         if (cycle_log[i].addr == 0xFFFE && cycle_log[i + 1].addr == 0xFFFF) {
             fffe = cycle_log[i].data << 8 | cycle_log[i + 1].data;
             fffe_at = (int)i;
             break;
         }
     if (fffe < 0)
-        printf("listen: no $FFFE/$FFFF fetch seen -> FAIL (check AS, E, R/W, RES and the straps)\n");
+        printf("listen: no $FFFE/$FFFF fetch in the first %u cycles -> STOP: check AS, E, R/W, RES and the\n"
+               "        straps, and send this log to the agent\n",
+               VECTOR_WINDOW + 1);
     else if (fffe_at >= (int)VECTOR_WINDOW)
         printf("listen: vector fetch at cycle %d, after the %u-cycle window -> STOP, send this log to the agent\n",
                fffe_at, VECTOR_WINDOW);
@@ -512,8 +518,16 @@ static void cmd_dump(void) {
     }
     const uint32_t len = 0x10000u - ROMDUMP_START;
     const uint8_t *rom = runs[0] + 1;
-    uint mode = runs[0][0] >> 5;
-    bool same = !memcmp(runs[0], runs[1], len + 1) && !memcmp(runs[0], runs[2], len + 1);
+    // The first byte is Port 2: bits 7-5 are the latched mode, bits 4-0 are live pin levels
+    // (P20-P24), which may differ between runs. Every run must be in mode 0; only the ROM
+    // bytes have to match.
+    uint mode = 0;
+    for (uint r = 0; r < RUNS; r++)
+        mode |= runs[r][0] >> 5;
+    uint32_t differ = 0;
+    for (uint32_t i = 1; i <= len; i++)
+        differ += runs[0][i] != runs[1][i] || runs[0][i] != runs[2][i];
+    bool same = differ == 0;
     uint32_t seen = 0, agree = 0, sum = 0;
     for (uint32_t i = 0; i < len - 1; i++) {  // $FFFF: dummy cycles overwrite its snoop
         uint32_t a = ROMDUMP_START + i;
@@ -524,7 +538,8 @@ static void cmd_dump(void) {
     }
     for (uint32_t i = 0; i < len; i += 2)
         sum += (uint32_t)(rom[i] << 8 | rom[i + 1]);
-    printf("mode %u (want 0), runs identical: %s\n", mode, same ? "yes" : "NO");
+    printf("mode bits %u in any run (want 0); ROM bytes that differ between runs: %lu (want 0)\n", mode,
+           (unsigned long)differ);
     printf("snoop channel: %lu of %lu bytes seen, %lu agree with the SCI copy ($FFFF not compared)\n",
            (unsigned long)seen, (unsigned long)(len - 1), (unsigned long)agree);
     printf("word sum $%04lX (the Bluetop convention is $AA55)\n", (unsigned long)(sum & 0xFFFF));

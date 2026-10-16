@@ -57,13 +57,13 @@ flowchart TD
   TEST -->|no| IDL{"throttle closed?<br/>byte_95 bit 7"}
   IDL -->|yes| IDLE["idle advance: $2D (+$0E with A/C, +$0E at low load)<br/>+ IDLcompADV = idle-stability term<br/>(IdleRPMfilt − IdleRPMs) × $88<br/>[ROM:$F82C–$F857]"]
   IDL -->|no| MAP3["3D map $FF40: 6 load rows × 14 rpm columns<br/>[EMU:test_3d_ignition_lookup]"]
-  MAP3 --> TVIS{"TVIScounter ≥ 0?<br/>(T-VIS off)"}
+  MAP3 --> TVIS{"TVIScounter ≥ 0?<br/>(T-VIS open, above 4350 rpm)"}
   TVIS -->|yes| TV8["+8 (≈3°)"] --> PWR
-  TVIS -->|"no (T-VIS open)"| PWR["PWRr trim (table $FF94)<br/>[ROM:$F8A5]"]
+  TVIS -->|"no (T-VIS shut)"| PWR["PWRr trim (table $FF94)<br/>[ROM:$F8A5]"]
   PWR --> SUM
   IDLE --> SUM
   WU["ThW_tADV: warm-up advance from coolant<br/>(min 28; 15 when overheating)<br/>[ROM:$FC1E]"] --> SUM
-  SUM["BaseAdvance + ThW_tADV + IDLcompADV<br/>clamped to $1F–$B8 (≈11°–65°), then −$1C<br/>[ROM:$F8CD–$F8EE]"] --> US["convert to µs from the NE period<br/>(deltaNE, referenced to the NE edge at 10° BTDC)<br/>→ AdvanceinUS, Dwell<br/>[ROM:$F8F0–$F92B]"]
+  SUM["BaseAdvance + ThW_tADV + IDLcompADV<br/>clamped to $1F–$B8 (≈0.2°–54° BTDC), then −$1C<br/>[ROM:$F8CD–$F8EE]"] --> US["convert to µs from the NE period<br/>(deltaNE, referenced to the NE edge at 10° BTDC)<br/>→ AdvanceinUS, Dwell<br/>[ROM:$F8F0–$F92B]"]
   US --> IGT["OC1 → IGT"]
 ```
 

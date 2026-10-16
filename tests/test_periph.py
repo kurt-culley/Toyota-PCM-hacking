@@ -54,10 +54,11 @@ def test_frc_counts_cycles_and_high_byte_write_presets_fff8(p):
     assert (p.read(FRC_H) << 8 | p.read(FRC_L)) == 0x1234
     p.write(FRC_H, 0x55)
     assert p.frc == 0xFFF8
-    wr16(p, FRC_H, 0x5AF3)  # double store loads the word (handbook fig. 2-5-2)
-    assert p.frc == 0x5AF3
+    p.advance(4)
+    wr16(p, FRC_H, 0x5AF3)  # MC6801, as the D151801: any counter write presets $FFF8; the low byte
+    assert p.frc == 0xFFF8  # is not loaded (an HD6301 would load the word) [BENCH: chipdiff run 3]
     p.advance(10)
-    assert p.frc == 0x5AFD
+    assert p.frc == 0x0002
 
 
 def test_input_capture_on_selected_edge_only(p):

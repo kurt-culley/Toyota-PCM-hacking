@@ -7,7 +7,7 @@ This repo is used to reverse-engineer Denso/Toyota ECUs. The active project is t
 
 ## Fundamental rules
 
-1. **RP2350-first, minimal purchases.** Design every hardware task around the project's two RP2350 boards: the **Olimex RP2350-PICO2-BB48R** (wired, real-time work) and the **Raspberry Pi Pico 2 WH** (wireless link, spare). Buy a part only when they cannot do the job, and write the reason in [`hardware/BOM.md`](hardware/BOM.md). Any new exception needs the owner's approval, logged in `STATUS.md`. **The RP2350's digital pads take 5 V only while the board is powered:** power the 5 V side last and remove it first; drive 5 V-CMOS inputs (RES, STBY, EXTAL) open-drain with a pull-up; use dividers or clamps for 12 V, flyback, VR and ADC-pin signals; never enable internal pull-downs (erratum E9).
+1. **RP2350-first, minimal purchases.** Design every hardware task around the project's RP2350 board, the **Raspberry Pi Pico 2 W** (with headers): ROM reader, serial-link logger and Wi-Fi dashboard, real-CPU harness, bench stimulus and timing, and the in-car modified-ROM board (P7: an RP2350 that replaces the CPU and emulates it, [`docs/mr2/cpu_replacement.md`](docs/mr2/cpu_replacement.md)). Buy a part only when the Pico 2 W cannot do the job, and write the reason in [`hardware/BOM.md`](hardware/BOM.md). Any new exception needs the owner's approval, logged in `STATUS.md`. **The RP2350's digital pads take 5 V only while the board is powered:** power the 5 V side last and remove it first; drive 5 V-CMOS inputs (RES, STBY, EXTAL) open-drain with a pull-up; use dividers or clamps for 12 V, flyback, VR and ADC-pin signals; never enable internal pull-downs (erratum E9).
 2. **Modernise.** Use the current toolchain:
    - Python disassembly tooling (`analysis/pcmre`): verified decoder, generated source, cross-references and call graphs
    - the `asl` assembler
@@ -49,7 +49,7 @@ This repo is used to reverse-engineer Denso/Toyota ECUs. The active project is t
 
 - Bring the D151801 supply up **before** releasing /RES.
 - Use ESD precautions. Keep a known-good ECU aside.
-- Never run the engine on untested code. Bench outputs must match the stock ECU first.
+- Never run the engine on untested code. The emulator must first match the stock CPU (the chip-in-isolation test, [`docs/hardware/chip_diff_test.md`](docs/hardware/chip_diff_test.md)).
 - Agents may draft posts for the upstream repo, but must never post without the owner's approval.
 
 ## Repo map

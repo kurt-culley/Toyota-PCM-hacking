@@ -58,6 +58,13 @@ sim.injector_pulses("#10")[-1]             # µs the injector was open
 sim.spark_advance()[-1]                    # degrees BTDC
 ```
 
+**Other ECU variants:** `Simulation(rom, profile=...)` selects how inputs are wired (`emu.engine.EcuProfile`):
+- which sensor feeds each serial-ADC channel: `tps`, `batt`, `tha`, `thw`, `pwr`, `o2`, `pim`, `co`;
+- the ROM's coolant linearisation table;
+- whether the SE056 airflow edge exists.
+
+`BLUETOP` is the default. `mr2_dtype(adc, thw_table)` builds a MAP-sensor profile for the 17140 once its channel map is read from the dump. The 17140 board has a serial ADC and no SE056, so PIM is expected on an ADC channel (GUESS until P4). `inputs.map_kpa` drives PIM through the factory vacuum-sensor curve ([`../../analysis/emu/sensors.py`](../../analysis/emu/sensors.py): V = 0.6 + 0.03 × kPa, a straight line through the EWD points, LIKELY). `inputs.mixture_raw` drives a mixture-screw channel. ROMs larger than 4 KB load so that they end at `$FFFF` [EMU:tests/test_profiles.py].
+
 `Simulation(rom, extra={0xE000: code})` adds code or data outside the 4 KB ROM, as external memory on the P7 board. `pcmre.patch.build()` produces both from an asl patch source; see [`rev_limiter.md`](rev_limiter.md).
 
 Run `PYTHONPATH=analysis uv run python ...` from the repo root. Speed is about real time: one simulated second takes about one second of CPU.
@@ -91,7 +98,7 @@ Items 1–6 and the cranking behaviour in item 8 are asserted in `tests/test_sim
    - The fuel per cycle is the same in both modes. The dead time is added per pulse, so it is **not doubled** in the grouped mode. That matches Ross R-F24's "dead time not doubled", although on the Bluetop the switch depends on coolant temperature, not on 6000 rpm.
    - `InjLoadPulse` = `SE056plstime` × `FuelRatioH`/256 [ROM:$F1F0–$F217].
 3. **Ignition.**
-   - Off idle, `BaseAdvance` is exactly the 3D-map value from `pcmre.tables.lookup_3d`, plus 8 while T-VIS is shut [ROM:$F8A3].
+   - Off idle, `BaseAdvance` is exactly the 3D-map value from `pcmre.tables.lookup_3d`, plus 8 once T-VIS has opened (above 4350 rpm) [ROM:$F8A3].
    - The spark lands where the ROM's own µs conversion puts it [ROM:$F8CD–$F90D], within 0.15°.
    - At idle the base is the fixed $2D.
    - With the T terminal shorted, the spark is at **10.3° BTDC** at 900 rpm, against the factory spec of 10°.

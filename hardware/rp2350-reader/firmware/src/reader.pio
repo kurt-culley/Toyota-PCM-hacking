@@ -1,13 +1,13 @@
 ; PIO programs for the HD6301 ROM reader.
 
 ; ---------------------------------------------------------------------------------------
-; bus6301: one pass per 6301 bus cycle (multiplexed bus, E = 250 kHz).
+; bus6301: one pass per 6301 bus cycle (multiplexed bus, E = 125 kHz).
 ;   in_base  = BUS_BASE (pins.h layout: AD +0..7, A8-15 +10..17, AS +18, E +19, R/W +20)
 ;   out_base = AD0, 8 pins;  jmp_pin = E
 ;   Y        = snoop delay after E rises (2 PIO clocks per pass), loaded once at start.
 ;
 ; Words to the CPU, tagged by bit 31:
-;   address sample, bit 31 = 0: the 21 bus pins at AS falling;
+;   address sample, bit 31 = 0: the 21 bus pins ~0.1 us after AS falls;
 ;   snoop sample,   bit 31 = 1: 0xFFFFFF00 | AD0-7 read while E is high (bit 8 set);
 ;   early-release marker: 0xFFFFFE00 (E fell before the snoop delay ended).
 ; Words from the CPU: bits 0-7 data, bits 8-15 pin directions (0xFF = drive). The CPU
@@ -28,7 +28,13 @@ cycle:
 .wrap_target
     wait 1 pin 18           ; AS high: a new cycle begins
     pull noblock            ; discard any stale answer
-    wait 0 pin 18           ; AS falls: AD0-7 hold the low address byte
+    wait 0 pin 18 [15]      ; AS falls; sample 16 PIO clocks later (~107 ns at 150 MHz; fixed in
+                            ; PIO clocks, so it scales with the system clock). On the first cycle
+                            ; after reset AD0 was seen still settling at the edge itself; the
+                            ; address then stays on AD0-7 (driven, then held by the floating
+                            ; bus). AS falls to E rise is estimated at ~1 us at E = 125 kHz
+                            ; (not yet measured): core 1 must answer before E rises, so the delay
+                            ; is kept short; a late answer is listen-only (probe reports it)
     in pins, 21
     push noblock
     mov x, null             ; default answer: listen

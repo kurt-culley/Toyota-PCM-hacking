@@ -64,3 +64,73 @@ jobs:
         with:
           name: rp2350_reader_${{ matrix.board }}
           path: build/rp2350_reader_${{ matrix.board }}.uf2
+
+      - name: Build the serial-link logger UF2 (Pico 2 W only; warnings are errors)
+        if: matrix.board == 'pico2_w'
+        env:
+          PICO_SDK_PATH: ${{ runner.temp }}/pico-sdk
+        run: |
+          cmake -S hardware/peek-logger/firmware -B build-logger -G Ninja -DPICO_BOARD=pico2_w
+          cmake --build build-logger
+
+      - uses: actions/upload-artifact@v4
+        if: matrix.board == 'pico2_w'
+        with:
+          name: peek_logger_pico2_w
+          path: build-logger/peek_logger_pico2_w.uf2
+
+      - name: Build the emulator speed-test UF2 (Pico 2 W only; warnings are errors)
+        if: matrix.board == 'pico2_w'
+        env:
+          PICO_SDK_PATH: ${{ runner.temp }}/pico-sdk
+        run: |
+          cmake -S hardware/ecu-emu/bench -B build-emubench -G Ninja -DPICO_BOARD=pico2_w
+          cmake --build build-emubench
+
+      - uses: actions/upload-artifact@v4
+        if: matrix.board == 'pico2_w'
+        with:
+          name: ecu_emu_bench_pico2_w
+          path: build-emubench/ecu_emu_bench_pico2_w.uf2
+
+      - name: Build the emulator loopback UF2 (Pico 2 W only; warnings are errors)
+        if: matrix.board == 'pico2_w'
+        env:
+          PICO_SDK_PATH: ${{ runner.temp }}/pico-sdk
+        run: |
+          cmake -S hardware/ecu-emu/loopback -B build-loopback -G Ninja -DPICO_BOARD=pico2_w
+          cmake --build build-loopback
+
+      - uses: actions/upload-artifact@v4
+        if: matrix.board == 'pico2_w'
+        with:
+          name: ecu_emu_loopback_pico2_w
+          path: build-loopback/ecu_emu_loopback_pico2_w.uf2
+
+      - name: Build the chip-in-isolation test UF2 (Pico 2 W only; warnings are errors)
+        if: matrix.board == 'pico2_w'
+        env:
+          PICO_SDK_PATH: ${{ runner.temp }}/pico-sdk
+        run: |
+          cmake -S hardware/ecu-emu/chipdiff -B build-chipdiff -G Ninja -DPICO_BOARD=pico2_w
+          cmake --build build-chipdiff
+
+      - uses: actions/upload-artifact@v4
+        if: matrix.board == 'pico2_w'
+        with:
+          name: ecu_chipdiff_pico2_w
+          path: build-chipdiff/ecu_chipdiff_pico2_w.uf2
+
+      - name: Build the in-car test UF2 (Pico 2 W only; warnings are errors)
+        if: matrix.board == 'pico2_w'
+        env:
+          PICO_SDK_PATH: ${{ runner.temp }}/pico-sdk
+        run: |
+          cmake -S hardware/ecu-emu/car -B build-car -G Ninja -DPICO_BOARD=pico2_w
+          cmake --build build-car
+
+      - uses: actions/upload-artifact@v4
+        if: matrix.board == 'pico2_w'
+        with:
+          name: ecu_emu_car_pico2_w
+          path: build-car/ecu_emu_car_pico2_w.uf2

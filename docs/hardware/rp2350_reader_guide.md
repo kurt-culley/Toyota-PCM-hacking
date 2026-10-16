@@ -47,7 +47,8 @@ The agent asks for your go-ahead before each powered step (CLAUDE.md, hardware s
    - run Chip Quik low-melt alloy along both rows, keeping them molten, and lift the chip evenly;
    - then remove **all** the low-melt alloy from the pads with braid and fresh solder before fitting the socket. Leftover low-melt alloy makes weak joints.
 6. **Fit the turned-pin DIP-40 socket** with its notch at the same end as the chip's was, and solder it. Check with the meter that socket hole 1 beeps to the ECU ground and hole 21 to the ECU's +5 V.
-7. Put the chip in anti-static foam or foil, with pin 1 marked.
+7. **Check the chip for bridges:** beep every neighbouring pair of legs (1–2, 2–3 … 39–40). All must read open. A tiny sliver of solder or copper left between two legs after desoldering connects two bus lines, and `listen` then shows those two address bits reading 0 whenever they differ.
+8. Put the chip in anti-static foam or foil, with pin 1 marked.
 
 **Optional measurement (open question Q10):** with the chip out, node N and pins 8–10 can be measured in the **powered** ECU. This is done only with your confirmation at the time; the agent will walk you through it.
 
@@ -77,7 +78,7 @@ Unplug USB again before wiring.
 
 ## 3. Wire the breadboard (chip NOT fitted)
 
-Put the board along one end of the breadboard and leave room for the chip to straddle the centre gap, notch towards the board. Wire the chip's holes, not the chip. "The 5 V rail" is a separate breadboard rail strip, fed by **one** jumper from the board's VBUS: this is the **5 V jumper**, and it stays out until step 6.
+Put the board along one end of the breadboard and leave room for the chip to straddle the centre gap. On the Pico 2 WH, follow the [breadboard layout](#breadboard-layout-pico-2-wh-830-point-board) below. Wire the chip's holes, not the chip. "The 5 V rail" is a separate breadboard rail strip, fed by **one** jumper from the board's VBUS: this is the **5 V jumper**, and it stays out until step 6.
 
 <!-- generated: python -m pcmre.wiring (from pins.h); tests/test_wiring.py checks these tables -->
 
@@ -160,6 +161,75 @@ The 5 V jumper runs from Pico pin 40 (VBUS) to the 5 V rail.
 
 The 10 µF capacitor is polarised: its + leg goes to pin 21 (the 5 V side). Keep the two capacitors' legs short.
 
+### Breadboard layout (Pico 2 WH, 830-point board)
+
+One tested arrangement of the tables above, hole by hole.
+
+![Breadboard layout](photos/rp2350_reader/breadboard_pico2w.png)
+
+- **The Pico** sits face up across the centre gap in columns **c and h**, USB off the row-1 end, so its pin 1 (GP0) is in **c1**. That leaves holes a–b and i–j free in each of its rows.
+- **The chip** (step 6 only) sits face up in columns **d and h**, rows 25–44, with its **notch towards row 44**. Its pin 1 is **h44** and pin 21 is **d25**. It is turned this way round so its bus pins face the Pico's GP0–15 side. Until step 6, wire its holes.
+- **Rails:**
+  - The + and − strips are the ones marked red and blue on your board. The picture follows the common layout: on the left the + strip is outermost, with the − strip beside column a; on the right the + strip is beside column j, with the − strip outermost. If your board differs, go by the red and blue markings, not the position.
+  - Dots in the picture mark the holes a wire or part plugs into. Where a wire crosses a strip without a dot, it just passes over it.
+  - Many 830-point boards break each rail strip near the middle (about rows 30–32), even when the printed line looks continuous. The layout bridges all four strips with a short wire from row 28 to row 34 (wires B…). Check each strip beeps from row 1 to row 63.
+  - The two + rails become the switched 5 V rail. They are fed only by the **5 V jumper** from the Pico's VBUS.
+
+<!-- generated: python -m pcmre.wiring (breadboard); tests/test_wiring.py checks this table -->
+
+| Wire | From | To | What |
+|---|---|---|---|
+| 1 | b26 | i19 | A15 (pin 22) → GP17 (Pico pin 22) |
+| 2 | b27 | i20 | A14 (pin 23) → GP16 (Pico pin 21) |
+| 3 | b28 | b20 | A13 (pin 24) → GP15 (Pico pin 20) |
+| 4 | b29 | b19 | A12 (pin 25) → GP14 (Pico pin 19) |
+| 5 | b30 | b17 | A11 (pin 26) → GP13 (Pico pin 17) |
+| 6 | b31 | b16 | A10 (pin 27) → GP12 (Pico pin 16) |
+| 7 | b32 | b15 | A9 (pin 28) → GP11 (Pico pin 15) |
+| 8 | b33 | b14 | A8 (pin 29) → GP10 (Pico pin 14) |
+| 9 | b34 | b10 | AD7 (pin 30) → GP7 (Pico pin 10) |
+| 10 | b35 | b9 | AD6 (pin 31) → GP6 (Pico pin 9) |
+| 11 | b36 | b7 | AD5 (pin 32) → GP5 (Pico pin 7) |
+| 12 | b37 | b6 | AD4 (pin 33) → GP4 (Pico pin 6) |
+| 13 | b38 | b5 | AD3 (pin 34) → GP3 (Pico pin 5) |
+| 14 | b39 | b4 | AD2 (pin 35) → GP2 (Pico pin 4) |
+| 15 | b40 | b2 | AD1 (pin 36) → GP1 (Pico pin 2) |
+| 16 | b41 | b1 | AD0 (pin 37) → GP0 (Pico pin 1) |
+| 17 | b42 | i15 | R/W (pin 38) → GP20 (Pico pin 26) |
+| 18 | b43 | i17 | AS (pin 39) → GP18 (Pico pin 24) |
+| 19 | b44 | i16 | E (pin 40) → GP19 (Pico pin 25) |
+| 20 | i33 | i14 | P24/TX (pin 12) → GP21 (Pico pin 27) |
+| 21 | i39 | b11 | /RES (pin 6) → GP8 (Pico pin 11) |
+| 22 | i42 | b12 | EXTAL (pin 3) → GP9 (Pico pin 12) |
+| 5V | i1 | + rail beside j (row 1) | THE 5 V JUMPER: Pico VBUS → + rail beside j. Last in, first out |
+| G1 | b3 | − rail beside a (row 3) | Pico GND → − rail beside a |
+| G2 | i3 | − rail beside j (row 3) | Pico GND → − rail beside j |
+| L+ | + rail beside a (row 50) | + rail beside j (row 50) | link the two + rails |
+| L− | − rail beside a (row 52) | − rail beside j (row 52) | link the two − rails |
+| Ba+ | + rail beside a (row 28) | + rail beside a (row 34) | bridge the mid-board break: + rail beside a |
+| Ba- | − rail beside a (row 28) | − rail beside a (row 34) | bridge the mid-board break: − rail beside a |
+| Bj+ | + rail beside j (row 28) | + rail beside j (row 34) | bridge the mid-board break: + rail beside j |
+| Bj- | − rail beside j (row 28) | − rail beside j (row 34) | bridge the mid-board break: − rail beside j |
+| Vcc | b25 | + rail beside a (row 25) | 6301 pin 21 Vcc → + rail beside a |
+| Vss | i44 | − rail beside j (row 44) | 6301 pin 1 Vss → − rail beside j |
+| /NMI | j41 | + rail beside j (row 41) | 6301 pin 4 /NMI → + rail beside j |
+| /IRQ1 | j40 | + rail beside j (row 40) | 6301 pin 5 /IRQ1 → + rail beside j |
+| /STBY | j38 | + rail beside j (row 38) | 6301 pin 7 /STBY → + rail beside j |
+
+| Part | From | To |
+|---|---|---|
+| 100 nF (or 47 nF '473'), either way round | + rail beside a (row 26) | − rail beside a (row 26) |
+| 10 µF, + leg on the + rail | + rail beside a (row 24) | − rail beside a (row 24) |
+| 330 Ω, EXTAL pull-up part 1 | j42 | j45 |
+| 220 Ω, EXTAL pull-up part 2 | i45 | + rail beside j (row 45) |
+| 10 kΩ | j39 | + rail beside j (row 39) |
+| 10 kΩ | j33 | + rail beside j (row 33) |
+| 10 kΩ | j37 | − rail beside j (row 37) |
+| 10 kΩ | j36 | − rail beside j (row 36) |
+| 10 kΩ | j35 | − rail beside j (row 35) |
+
+<!-- end generated -->
+
 The unused port pins (11, 13–20) are CMOS inputs left open. That is safe for short runs. If you have spare resistors, 47–100 kΩ from each to the 5 V rail keeps them quiet; never tie them straight to a rail.
 
 ## 4. Multimeter checklist (nothing powered)
@@ -169,7 +239,7 @@ The agent goes through this with you **one line at a time**. Report each reading
 1. **Every signal wire:** beep from the chip hole to the board pin, for each row of the board table (22 rows).
 2. **Neighbours:** no beep between adjacent chip holes on each side (1–2, 2–3 … 39–40). A beep means a short.
 3. **Resistors:**
-   - chip hole 3 to the 5 V rail: 470 Ω;
+   - chip hole 3 to the 5 V rail: 470 Ω (550 Ω with the 330 Ω + 220 Ω pair of the breadboard layout);
    - holes 6 and 12 to the rail: 10 kΩ;
    - holes 8, 9 and 10 to GND: 10 kΩ each.
 4. **Rail straps:** holes 21, 7, 4 and 5 beep to the 5 V rail; hole 1 beeps to GND.
@@ -186,18 +256,18 @@ Plug in USB and type `rigcheck`. It pulls every bus line up gently, then pulls e
 rigcheck: PASS (no stuck or shorted lines)
 ```
 
-If it reports that the 5 V rail is on, the jumper is in: take it out. Any other failure names the 6301 pins involved; fix the wiring and repeat.
+If it reports that the 5 V rail is on, the jumper is in: take it out. "Out" means **both ends out of the board**. A jumper with one end still plugged in can touch the rail or the strip and keep the rail powered. Any other failure names the 6301 pins involved; fix the wiring and repeat.
 
 ## 6. Fit the chip and power it
 
-1. **Unplug USB.** Fit the chip, with the notch towards the board, straddling the gap and fully seated.
+1. **Unplug USB.** Fit the chip face up, straddling the gap and fully seated. On the Pico 2 WH layout, its notch points to row 44, away from the Pico: pin 1 in h44, pin 21 in d25.
 2. Plug in USB and wait for the banner. RES is now held low and the clock is running.
 3. **Plug in the 5 V jumper.**
 
 ### `clock`
 
 ```
-E: 250000 Hz, high 50% of the time (want 250000 Hz, about 50%)
+E: 125000 Hz, high 50% of the time (want 125000 Hz, about 50%)
 clock: PASS
 ```
 
@@ -240,7 +310,7 @@ Run it through the capture tool, so the result is saved and checked (close the s
 PYTHONPATH=analysis uv run --with pyserial python -m pcmre.romcapture <port>
 ```
 
-The reader runs the dump **three times** (about 3 s each). It checks four things before printing the ROM:
+The reader runs the dump **three times** (about 5 s each). It checks four things before printing the ROM:
 - the latched mode is 0;
 - all three runs are identical;
 - how much of the snoop channel agrees (`$FFFF` is not compared: the 6301's dummy cycles read it too);
@@ -275,5 +345,7 @@ An independent Verifier re-checks the capture before P4 starts:
 - the hashes;
 - that the snoop and SCI channels agree;
 - that `pcmre` disassembles the image cleanly.
+
+Then the agent runs the day-one analysis (`python -m pcmre.ingest`, RE_PLAN P4), which turns the dump into a first map of the program.
 
 Keep the chip in its socket in the spare ECU. The socket also serves the P4 real-CPU harness.

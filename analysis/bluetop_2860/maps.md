@@ -41,7 +41,7 @@ ROM: `TOYOTA Bluetop PCM/cap2-151801-2860.bin` (sha256 `7444a4747ffa…`), base 
 
 **Base ignition advance (3D)** at `$FF5A`.
 
-- Cells: raw advance. Warm (ThW_tADV = 28) the spark is about v*90/256 - 0.9 deg BTDC plus a fixed 256 us lead [EMU:sim, docs/bluetop/simulation.md]. The PWRr staircase ($FF94) is subtracted, and 8 is added while T-VIS is shut
+- Cells: raw advance. Warm (ThW_tADV = 28) the spark is about v*90/256 - 0.9 deg BTDC plus a fixed 256 us lead [EMU:sim, docs/bluetop/simulation.md]. The PWRr staircase ($FF94) is subtracted, and 8 is added once T-VIS has opened (above 4350 rpm; TVIScounter >= 0) [ROM:$FC47-$FC6D, $F89F]. Readable table in degrees: docs/bluetop/ignition_table.md
 - Ross claims: R-I02, R-I05
 - Evidence: [PORT:pcmre.crossver CONFIRMED, from 0642 $FF40] [ROM:$F86C-$F89F] [EMU:tests/test_tables.py::test_3d_ignition_lookup_matches_emulator]
 - Confidence: CONFIRMED (layout and interpolation); LIKELY (rpm axis, degrees)

@@ -1,0 +1,9 @@
+# Map definitions for 89661-17140.bin.
+# No maps are defined yet. docs/mr2/maps.md describes the maps, and roms/mr2_17140/symbols.yaml
+# names them. Add each map here when its units are calibrated.
+rom: mr2_17140
+file: roms/mr2_17140/89661-17140.bin
+base: 0xF000
+sha256: 0cfc1fdd36fc4514cf0693e18ef7e4b47594a4b78f72beadd30766a36f271f6e
+variables: {}
+maps: []

@@ -1,5 +1,5 @@
 // Speed test of the C HD6301 core on the RP2350: runs the 17140 ROM with pseudo-random reads
-// of the I/O registers (as tests/test_hd6301_c.py does) and an interrupt every 97
+// of the I/O registers (as tests/emu/test_hd6301_c.py does) and an interrupt every 97
 // instructions, and prints the speed as a multiple of the real chip (E = 1 MHz).
 // No wiring: plug in USB, open the serial port, read the numbers.
 

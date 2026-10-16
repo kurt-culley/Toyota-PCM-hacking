@@ -1,8 +1,8 @@
 // Serial-link logger for the MR2 89661-17140 ECU, Raspberry Pi Pico 2 W.
 //
 // Polls the ECU's factory RAM-peek link (docs/mr2/serial_link.md) and prints every reply on
-// the USB serial port; analysis/pcmre/peeklog.py turns the log into physical units. The
-// protocol logic is in link.h (tested against the simulator: tests/test_peek_logger.py).
+// the USB serial port; src/pcmre/peeklog.py turns the log into physical units. The
+// protocol logic is in link.h (tested against the simulator: tests/hardware/test_peek_logger.py).
 //
 // Wiring (docs/mr2/serial_link.md, "Hardware"):
 //   GP0 (UART0 TX) -- 1 kOhm --> ECU chip pin 11 (P23, SCI RX)

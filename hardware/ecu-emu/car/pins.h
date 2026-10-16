@@ -1,7 +1,7 @@
-// In-car test rig pin map (docs/mr2/cpu_replacement.md, "In-car test rig"): the Pico 2 W in place of
+// In-car test rig pin map (docs/procedures/car_test.md): the Pico 2 W in place of
 // the D151801, one female-to-male jumper per signal from its header to a spare DIP-40 socket in the
 // ECU's CPU socket. For the car firmware (still to write); parsed and checked by
-// analysis/pcmre/car_rig_diagram.py, which generates the wire table and the wiring picture.
+// src/pcmre/car_rig_diagram.py, which generates the wire table and the wiring picture.
 //
 // Direction is the CPU's, as the 17140 ROM sets it [ROM:$F2CA-$F2EB reset, $F371-$F380 every main-loop
 // pass] CONFIRMED (code):

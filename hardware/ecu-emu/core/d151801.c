@@ -1,4 +1,4 @@
-// D151801 peripherals: see d151801.h. Semantics follow analysis/emu/periph.py.
+// D151801 peripherals: see d151801.h. Semantics follow src/pcmre/emu/periph.py.
 
 #include "d151801.h"
 

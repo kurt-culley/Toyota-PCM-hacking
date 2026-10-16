@@ -1,5 +1,5 @@
 // The emulated D151801: HD6301 core + peripherals + 64 KB memory image, stepped the same way
-// as analysis/emu/sim.py's Simulation.step (one instruction, then advance peripheral time by
+// as src/pcmre/emu/sim.py's Simulation.step (one instruction, then advance peripheral time by
 // its cycles, then take the highest-priority pending interrupt).
 
 #ifndef BOARD_H

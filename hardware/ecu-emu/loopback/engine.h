@@ -1,6 +1,6 @@
-// The loopback's engine model in plain C: the same behaviour as analysis/emu/engine17140.py,
+// The loopback's engine model in plain C: the same behaviour as src/pcmre/emu/engine17140.py,
 // driven through the board's event hooks. Used by the RP2350 firmware (main.c, in real time)
-// and by tests/test_loopback_engine.py (on the host, as fast as it runs), which must both
+// and by tests/hardware/test_loopback_engine.py (on the host, as fast as it runs), which must both
 // reproduce the simulator's checksums in expected.h. Include once, after board.h and expected.h.
 //
 // Schedule: one REF row per 6 s phase (emu.loopback_ref.SCHEDULE): rpm, MAP, TPS and the switch

@@ -1,5 +1,5 @@
 # 17030 idle/overrun ignition map (raw 8-bit). Ross PDF p14, image img12.png. Claims: R-I07.
-# Digitised by analysis/ross/digitise.py; resolution about +/-0.79 raw_advance per pixel. Evidence level [PDF]; not ROM data.
+# Digitised by src/pcmre/ross/digitise.py; resolution about +/-0.79 raw_advance per pixel. Evidence level [PDF]; not ROM data.
 rpm,raw_advance
 400,67.9
 500,67.9

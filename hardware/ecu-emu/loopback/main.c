@@ -2,7 +2,7 @@
 //
 // Core 1 runs the emulated chip (hd6301 + d151801 + the 17140 ROM) locked to real time: it
 // never runs ahead of the 1 us clock, nor past the last crank edge core 0 has queued. The
-// engine model (engine.h: the same behaviour as analysis/emu/engine17140.py) runs inside it at
+// engine model (engine.h: the same behaviour as src/pcmre/emu/engine17140.py) runs inside it at
 // exact emulated times, and the emulator drives its output pins as they change (IGT GP6, ADC
 // select GP7-9, hold GP10, injector GP11).
 // v3: the emulator predicts each output compare (d_next_match) and arms a hardware timer
@@ -11,11 +11,11 @@
 // Core 0 queues the crank edges ahead of time and reads the spark pin back through its pad to
 // measure its timing against the compare time.
 //
-// The schedule (800 rpm / 35 kPa, 2000 / 50, 5000 / 95, 6 s each) is the one emu.loopback_ref
-// runs on the host. At the end of each phase core 1 checksums every output edge of seconds 3-6
-// and the RAM; core 0 prints PASS if they equal the host's (expected.h): the real-time emulator
-// is then bit-exact to the simulator. tests/test_loopback_engine.py runs engine.h on the host
-// against the same expected.h.
+// The schedule is the one pcmre.emu.loopback_ref runs on the host (REF_PHASES phases of
+// REF_PHASE_US each, from cranking to 5000 rpm). At the end of each phase core 1 checksums every
+// output edge after REF_MEASURE_FROM_US and the RAM; core 0 prints PASS if they equal the
+// host's (expected.h): the real-time emulator is then bit-exact to the simulator.
+// tests/hardware/test_loopback_engine.py runs engine.h on the host against the same expected.h.
 
 #include <stdio.h>
 

@@ -1,12 +1,19 @@
-# Ross figures: extracted and digitised (P1)
+# Ross figures
 
-These are the 16 images embedded in *Lifting the Lid on the mk1 MR2 ECU* (Jeremy Ross), extracted by [`analysis/ross/digitise.py`](../../../analysis/ross/digitise.py).
-- The PDF stores every image upside down; the script flips them upright.
-- The graph data is read off pixels, and each CSV states its source page, linked claims and resolution.
+## Summary
 
-**Evidence level:** `[PDF]`. These are Ross's plots of the **17030** (mk1a) ECU, not ROM data. They are the targets that P4 must reproduce from the 17140 ROM (see [`../claims.md`](../claims.md)).
+This folder holds the 16 images of the Ross PDF (*Lifting the Lid on the mk1 MR2 ECU*) and the data read from their graphs. The command `uv run pcmre digitise` ([`digitise.py`](../../../src/pcmre/ross/digitise.py)) makes all the PNG and CSV files. Do not edit them by hand. The data shows the **17030** (mk1a) ECU, not ROM data, so its evidence level is `[PDF]`. The [claim register](../claims.md) compares it with the 17140 and the Bluetop ROMs.
 
-Regenerate with `PYTHONPATH=analysis uv run python -m ross.digitise`. `tests/test_ross_figures.py` checks the files.
+<details>
+<summary>How the files are made</summary>
+
+- The PDF stores each image upside down. The script turns them upright.
+- The script reads the graph data from the pixels. Each CSV gives its source page, its claims and its resolution in its header.
+- [`tests/mr2/test_ross_figures.py`](../../../tests/mr2/test_ross_figures.py) examines the files.
+
+</details>
+
+## Figures
 
 | Image | Page | Content | Data | Claims |
 |---|---|---|---|---|
@@ -29,16 +36,19 @@ Regenerate with `PYTHONPATH=analysis uv run python -m ross.digitise`. `tests/tes
 
 ## Checks
 
-- **The ignition table transcription agrees with Ross's own chart.** MAP 1, MAP 2 and the low band of MAP 8 match the p13 line chart to within 1 count at every rpm site. The cells that looked like 6/8 ambiguities (MAP 8 at 2000–4000 rpm) read 81 and 85, not 61 and 65.
-- **The mixture correction agrees with Ross's text:** 128 at 1000 rpm and 64 at 3600 rpm.
-- **Resolution:** readings are good to about ±1 pixel, which each CSV header converts into data units (for example ±0.9 EFI units on the density map and ±6.9 µs on the dead-time curve).
+- **The ignition table agrees with the Ross chart.** MAP 1, MAP 2 and the low band of MAP 8 agree with the p13 line chart. The difference is 1 count or less at each rpm site. The cells at MAP 8, 2000–4000 rpm, read 81 and 85, not 61 and 65 [EMU:test_ross_figures.py::test_ignition_table_matches_p13_chart].
+- **The mixture correction agrees with the Ross text:** 128 at 1000 rpm and 64 at 3600 rpm [EMU:test_ross_figures.py::test_mixture_correction_matches_ross_text].
+- **Resolution:** the readings are correct to about ±1 pixel. Each CSV header gives this in data units (for example ±0.9 EFI units on the density map and ±6.9 µs on the dead-time curve).
 
-## Observations to carry into P4
+## Observations
 
-- **The <3200 rpm speed-correction points are not evenly spaced in rpm.** They sit at about 533, 800, 1067, 1333, 1600, 2000, 2400, 2800 and 3200 rpm, so the step is 267 rpm below 1600 rpm and 400 rpm above. The ECU probably indexes this table by engine period (time per revolution) or by a non-linear rpm scale, not linear rpm. GUESS, to be checked against the ROM lookup.
-- **Idle/overrun ignition:** a flat 68 (raw) up to 1200 rpm, rising to 162 at about 2000 rpm, then flat. For goal 1, this is the ignition that applies while the throttle is closed. It is relevant to how the idle behaves when the IACV's extra air is missing.
-- **Dead time:** it falls from about 1410 µs at 7 V to 270 µs at 16.5 V.
+- **The <3200 rpm speed-correction points are not at equal rpm steps.**
+  - They are at about 533, 800, 1067, 1333, 1600, 2000, 2400, 2800 and 3200 rpm.
+  - Thus the step is 267 rpm below 1600 rpm and 400 rpm above it.
+  - The 17140 table `$F1AE` also has closer sites at low rpm (R-F08).
+- **Idle and closed-throttle ignition:** a flat 68 (raw) up to 1200 rpm, up to 162 at about 2000 rpm, then flat. The 17140 idle table has the same values (R-I07). This ignition applies while the throttle is closed. Thus it controls the idle when there is no IACV air.
+- **Dead time:** it decreases from about 1410 µs at 7 V to 270 µs at 16.5 V.
 
 ### In tuning terms
 
-The density map is the base fuel against load (MAP site). The speed tables are a volumetric-efficiency trim against rpm, from −15 % to +11 % below 3200 rpm and −10 % to +7 % above. Hard-driving and air-temperature corrections multiply on top. The ignition table is a conventional 17 rpm × 8 load map. Higher raw numbers mean more advance; Ross's degrees chart (p16) has the same shape. Advance falls as cylinder filling rises, as you would expect. Its raw-to-degrees conversion is still open (STATUS Q3, R-I06).
+The density map is the base fuel against load (MAP site). The speed tables are a volumetric-efficiency trim against rpm: −15 % to +11 % below 3200 rpm and −10 % to +7 % above. The hard-driving and air-temperature corrections multiply the result. The ignition table is a conventional map of 17 rpm × 8 load sites. Higher raw values give more advance, and the Ross degrees chart (p16) has the same shape. The advance decreases when the cylinder filling increases. The conversion from raw to degrees is open (R-I06).

@@ -1,8 +1,8 @@
-// HD6301 CPU core in C, for the RP2350 CPU-replacement firmware (docs/mr2/cpu_replacement.md).
+// HD6301 CPU core in C, for the RP2350 CPU-replacement firmware (docs/emulator/design.md).
 //
-// A port of the MAME-verified Python core (analysis/emu/cpu.py); the instruction switch is
+// A port of the MAME-verified Python core (src/pcmre/emu/cpu.py); the instruction switch is
 // generated from the same opcode table (hd6301_ops.inc, pcmre.gen_hd6301_c), and
-// tests/test_hd6301_c.py checks this core against the Python one instruction by instruction.
+// tests/emu/test_hd6301_c.py checks this core against the Python one instruction by instruction.
 // Peripherals are not part of the core: they sit behind the read/write callbacks and call
 // hd6301_irq() / hd6301_nmi().
 

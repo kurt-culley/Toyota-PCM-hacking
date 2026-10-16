@@ -1,4 +1,4 @@
-// HD6301 CPU core: see hd6301.h. Semantics follow analysis/emu/cpu.py line for line.
+// HD6301 CPU core: see hd6301.h. Semantics follow src/pcmre/emu/cpu.py line for line.
 
 #include "hd6301.h"
 

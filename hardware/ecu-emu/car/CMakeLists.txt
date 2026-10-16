@@ -1,16 +1,16 @@
-# In-car test firmware (docs/mr2/cpu_replacement.md, "In-car test rig"):
+# In-car test firmware (docs/procedures/car_test.md):
 #   cmake -B build -DPICO_BOARD=pico2_w && cmake --build build
 # The emulated D151801 with the 17140 ROM on the ECU board's pins (pins.h, car.h). The IGT and
 # injector pins are held at their engine-stopped level: this build cannot run the engine.
 cmake_minimum_required(VERSION 3.13)
 
 set(PICO_PLATFORM rp2350)
-include(pico_sdk_import.cmake)
+include(${CMAKE_CURRENT_LIST_DIR}/../../cmake/pico_sdk_import.cmake)
 project(ecu_emu_car C CXX ASM)
 set(CMAKE_C_STANDARD 11)
 pico_sdk_init()
 
-file(READ "${CMAKE_CURRENT_LIST_DIR}/../../../AW11 MR2 PCM/89661-17140.bin" ROM_HEX HEX)
+file(READ "${CMAKE_CURRENT_LIST_DIR}/../../../roms/mr2_17140/89661-17140.bin" ROM_HEX HEX)
 string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," ROM_ARRAY "${ROM_HEX}")
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/rom17140.h "static const unsigned char ROM17140[4096] = {${ROM_ARRAY}};\n")
 

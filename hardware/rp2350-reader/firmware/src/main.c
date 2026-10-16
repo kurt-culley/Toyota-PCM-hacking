@@ -6,7 +6,7 @@
 // read on the bus as a second, independent copy.
 //
 // Core 1 serves the bus (one PIO word in, one word out per 6301 cycle) and nothing else.
-// Core 0 runs the USB console. See docs/hardware/rp2350_reader_guide.md for the wiring
+// Core 0 runs the USB console. See docs/procedures/rom_dump.md for the wiring
 // and the bring-up order: rigcheck, clock, listen, probe, dump.
 //
 // Safety rules kept here:

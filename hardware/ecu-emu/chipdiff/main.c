@@ -1,4 +1,4 @@
-// Chip-in-isolation test (docs/hardware/chip_diff_test.md): the real D151801 runs its own 17140
+// Chip-in-isolation test (docs/procedures/chip_test.md): the real D151801 runs its own 17140
 // program in mode 7 on the reader breadboard; this Pico 2 W clocks it, plays the engine around
 // it one E cycle at a time, and logs every pin change over USB.
 //
@@ -9,7 +9,7 @@
 //         LOOKAHEAD cycles ahead (cd_word: crank schedule and reactions), both from chipdiff.h.
 //   Core 1: prints the pin changes, one line each: "<cycle hex> <pin word hex>".
 //
-// analysis/emu/chipdiff.py captures the log and replays it into the emulator.
+// src/pcmre/emu/chipdiff.py captures the log and replays it into the emulator.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -372,9 +372,10 @@ static void cmd_rigcheck(void) {
 }
 
 static void help(void) {
-    printf("ecu_chipdiff: the real D151801 against the emulator (docs/hardware/chip_diff_test.md)\n");
+    printf("ecu_chipdiff: the real D151801 against the emulator (docs/procedures/chip_test.md)\n");
     printf("/RES is held low. Plug the chip's 5 V jumper in only now; unplug it before USB.\n");
-    printf("Commands: rigcheck  clock  run [phases, 1-6, default 6; any key stops it]  help\n");
+    printf("Commands: rigcheck  clock  run [phases, 1-%d, default %d; any key stops it]  help\n", REF_PHASES,
+           REF_PHASES);
 }
 
 int main(void) {

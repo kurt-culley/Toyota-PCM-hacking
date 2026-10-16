@@ -1,4 +1,4 @@
-// In-car test firmware (docs/mr2/cpu_replacement.md, "In-car test rig"): the Pico 2 W in place of
+// In-car test firmware (docs/procedures/car_test.md): the Pico 2 W in place of
 // the D151801 in the spare ECU, wired by jumpers to its CPU socket (pins.h).
 //
 //   PIO0 sm car_in:  every GPIO sampled once per us into the input ring (DMA, endless).

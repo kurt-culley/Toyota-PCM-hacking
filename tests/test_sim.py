@@ -200,12 +200,27 @@ def test_overheat_retard_only_at_high_load():
     assert s.ram("byte_95") >= 0x80 and s.ram("ThW_tADV") == 28
 
 
+def start(coolant_f: float, *, idle_rpm: float = 1000, airflow_us: float = 800) -> Simulation:
+    """Key on 0.3 s, crank at 250 rpm with STA high for 1.5 s, then idle at a fixed airflow signal."""
+    sim = Simulation()
+    i = sim.inputs
+    i.coolant_f = i.intake_f = coolant_f
+    i.airflow_us = airflow_us
+    i.o2_v = 0.1  # keeps the O2 trim word_76 at its neutral $8000
+    sim.engine.update_sensors()
+    sim.run_ms(300)
+    i.starter, i.rpm = True, 250
+    sim.engine.update_sensors()
+    sim.run_ms(1500)
+    i.starter, i.rpm = False, idle_rpm
+    sim.engine.update_sensors()
+    return sim
+
+
 @pytest.mark.parametrize("coolant_f", [32, 176])
 def test_p1_5_output_on_for_ten_seconds_after_start(coolant_f):
     """P1-5 is on from key-on through cranking until about 10 s after start, the same cold and warm in these
     runs [ROM:$FCBB-$FCD4]. The 1988 repair manual gives the same timing for the V-ISC idle-up VSV (FI-119)."""
-    from emu.scenarios import start
-
     s = start(coolant_f)  # key on 0.3 s, crank 1.5 s, then idle
     events = []
     s.periph.listeners.append(lambda n, lv, t: events.append((t, lv)) if n == "P1-5" else None)
@@ -218,8 +233,6 @@ def test_p1_5_output_on_for_ten_seconds_after_start(coolant_f):
 
 def test_p1_5_stays_on_at_idle_while_learned_trim_is_low():
     """Second path: at idle P1-5 is held on while word_42's high byte is below $42 [ROM:$FCBB-$FCC7]."""
-    from emu.scenarios import start
-
     s = Simulation()
     s.run_ms(300)
     kept = bytearray(s.periph.mem[0x40:0x4B])

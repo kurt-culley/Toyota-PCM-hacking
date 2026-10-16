@@ -288,7 +288,7 @@ ROM: `TOYOTA Bluetop PCM/cap.bin` (sha256 `62b2a3f29039…`), base `$F000`.
 **Warm-up advance ThW_tADV vs coolant (below 218 F)** at `$FF0A`, read through helper entry `$FF1B`.
 
 - Cells: raw advance added to the base (28 = no extra advance)
-- Evidence: [ROM:$FBFA ldx #$FF0A / jsr $11,x / staa ThW_tADV] [EMU:docs/bluetop/warmup_sim.md 56 cold -> 28 warm]
+- Evidence: [ROM:$FBFA ldx #$FF0A / jsr $11,x / staa ThW_tADV] [EMU:tests/test_sim.py, 56 cold -> 28 warm]
 - Confidence: CONFIRMED
 - Axis: `ADC_ThW` (degF), raw points every 32
 

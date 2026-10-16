@@ -232,4 +232,4 @@ maps:
      axis: {var: ADC_ThW, shift: 5, unit: degF}, cell: {unit: raw multiplier}, evidence: "[ROM:$F59B]", confidence: CONFIRMED (layout); LIKELY warm-up fuel}
   - {category: Ignition, id: thw_FF0A, name: "Warm-up advance ThW_tADV vs coolant (below 218 F)", addr: 0xFF0A, kind: 1d, entry: 0xFF1B, length: 7,
      axis: {var: ADC_ThW, shift: 5, unit: degF}, cell: {unit: raw advance added to the base (28 = no extra advance)},
-     evidence: "[ROM:$FBFA ldx #$FF0A / jsr $11,x / staa ThW_tADV] [EMU:docs/bluetop/warmup_sim.md 56 cold -> 28 warm]", confidence: CONFIRMED}
+     evidence: "[ROM:$FBFA ldx #$FF0A / jsr $11,x / staa ThW_tADV] [EMU:tests/test_sim.py, 56 cold -> 28 warm]", confidence: CONFIRMED}

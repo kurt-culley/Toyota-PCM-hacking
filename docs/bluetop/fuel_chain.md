@@ -42,7 +42,6 @@ Notes:
 
 ### Warm-up numbers
 
-Realistic warm-up and after-start numbers come from the whole-ROM simulation: [`warmup_sim.md`](warmup_sim.md) [EMU:sim].
 - **Steady warm-up fuel:** 2.0× warm at −10 °C, 1.7× at 0 °C, gone by about 60 °C.
 - **After-start boost:** on top of that, bleeding off over a fixed number of revolutions (about 33 s at 1000 rpm from 0 °C).
 - **Extra cold advance:** about +10° at idle.

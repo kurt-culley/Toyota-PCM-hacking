@@ -4,8 +4,6 @@
 
 **Tests:** [`tests/test_rev_limiter17140.py`](../../tests/test_rev_limiter17140.py) [EMU].
 
-**Bluetop comparison:** [`../bluetop/rev_limiter.md`](../bluetop/rev_limiter.md). It is the same idea, but different code: none of the Bluetop constants or patches carry over.
-
 ## Mechanism
 
 The ROM compares the crank period, not rpm. `$82` is the NE period sum (`NEperiodSum`, stored by the crank interrupt at edge 0), and **rpm ≈ 15,000,000 / `$82`** [EMU: 2499 at 6000 rpm]. All rpm figures here assume E = 1 MHz (the 4 MHz crystal) and 30° of crank per NE edge, both LIKELY; the constants themselves are CONFIRMED (code).
@@ -41,8 +39,6 @@ flowchart TD
 
 The stock cut is a soft, fuel-only limiter at 7600 rpm (7400 in a hard low-gear pull) that re-fuels the instant rpm dips. Above 5600 rpm, the ignition map's last column, the timing is simply that column held.
 
-**Changing it:**
-- **A different limit** is two 2-byte constants in code: `$FA1F` (slow) and `$FA27` (fast), with the value = 15,000,000 / rpm. Set the fast one at or below the slow one (stock: 200 rpm lower), or both equal. Then rebalance the checksum word `$FFEE` (the ROM sum must stay `$AA55`; the reset only checks it with the test inputs set, but keep it valid).
-- **Hysteresis or a harder cut** (spark cut, alternating cylinders) needs new code. **A spark cut runs into the IGF check:** two withheld sparks stop injection and four log the IGF fault. A pops-and-bangs or "fuel stays on" spark cut must also hold off that counter while limiting, as the Bluetop prototype does ([`../../analysis/patches/bluetop_sparkcut.asm`](../../analysis/patches/bluetop_sparkcut.asm)). The open bench question from that prototype (does hardware outside the CPU fire the coil when dwell is withheld?) applies here too.
-- **Running a modified image** needs the P7 board. The 17140's reset already accepts mode 2 (external memory), so no mode-check patch is needed.
+**Where the limits are:**
+- The two limits are 2-byte constants in code: `$FA1F` (slow climb) and `$FA27` (fast climb). The value is 15,000,000 / rpm. A changed ROM must keep the word sum `$AA55` (balance word `$FFEE`).
 - **The serial link** ([`serial_link.md`](serial_link.md)) can watch `$95` (cut active), `$82` (true rpm) and `$B9` (which limit is armed) live. It is read-only, so it can log a limiter test but not change it.

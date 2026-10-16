@@ -27,7 +27,6 @@ tools/setup_mame_ref.sh              # builds the MAME HD6301 reference for the 
 | `emu/periph.py` | HD6301V1 on-chip peripherals plus the D151801's second timer channel: FRC, input capture/output compare with the handbook flag-clear sequences, the serial ADC on the SCI, ports with external pins, the IS3 flag and an event queue. See [`../docs/bluetop/simulation.md`](../docs/bluetop/simulation.md). |
 | `emu/engine.py` | Engine and sensor stimulus: NE/G edges from rpm, the SE056 airflow delay, IGF after each spark, ADC readings from °F/volts, digital inputs. |
 | `emu/sim.py` | `Simulation`: boots a ROM from reset and runs it against `engine.py`. Probes give RAM by name, injector pulses and spark angle. |
-| `emu/scenarios.py` | Warm-up experiments (cold start, after-start decay, steady values vs coolant) → `bluetop/sim/*.csv`, written up in [`../docs/bluetop/warmup_sim.md`](../docs/bluetop/warmup_sim.md). |
 | `pcmre/tables.py` | Python model of the Bluetop interpolating lookups: the six entry points of the 1D helper at `$FF1B`–`$FF3F` and the 3D ignition-map lookup. `find_1d_uses()` lists every table the code reads. Proven equal to the emulator by `tests/test_tables.py`. |
 | `pcmre/checksum.py` | Bluetop ROM checksum (16-bit word sum = $AA55, balanced at the TRAP vector $FFEE, which is never reached in normal running). `--fix` re-balances an edited image. |
 | `pcmre/defs.py` → `bluetop/bluetop.xdf` | TunerPro RT definition generated from `defs/bluetop.yaml` (with `maps.md` and the CSVs). |

@@ -884,7 +884,7 @@
   </XDFTABLE>
   <XDFTABLE uniqueid="0x13" flags="0x0">
     <title>thw_FF0A: Warm-up advance ThW_tADV vs coolant (below 218 F)</title>
-    <description>Warm-up advance ThW_tADV vs coolant (below 218 F). Evidence: [PORT:pcmre.crossver CONFIRMED, from 0642 $FF0A] [ROM:$FBFA ldx #$FF0A / jsr $11,x / staa ThW_tADV] [EMU:docs/bluetop/warmup_sim.md 56 cold -&gt; 28 warm]. Confidence: CONFIRMED.</description>
+    <description>Warm-up advance ThW_tADV vs coolant (below 218 F). Evidence: [PORT:pcmre.crossver CONFIRMED, from 0642 $FF0A] [ROM:$FBFA ldx #$FF0A / jsr $11,x / staa ThW_tADV] [EMU:tests/test_sim.py, 56 cold -&gt; 28 warm]. Confidence: CONFIRMED.</description>
     <CATEGORYMEM index="0" category="3" />
     <XDFAXIS id="x" uniqueid="0x0">
       <EMBEDDEDDATA mmedelementsizebits="8" mmedmajorstridebits="-32" mmedminorstridebits="0" />

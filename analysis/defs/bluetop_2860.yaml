@@ -422,5 +422,5 @@ maps:
   cell:
     unit: raw advance added to the base (28 = no extra advance)
   evidence: '[PORT:pcmre.crossver CONFIRMED, from 0642 $FF0A] [ROM:$FBFA ldx #$FF0A / jsr $11,x / staa ThW_tADV]
-    [EMU:docs/bluetop/warmup_sim.md 56 cold -> 28 warm]'
+    [EMU:tests/test_sim.py, 56 cold -> 28 warm]'
   confidence: CONFIRMED

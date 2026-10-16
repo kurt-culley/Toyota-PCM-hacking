@@ -152,15 +152,21 @@ The injector pulse differed by up to 6 %. The cause is that the ECU's fuelling d
 - **Meter check before the first power-up** (unpowered, chip out, spare socket in): resistance from socket pins 15, 16 and 17 each to pin 21 (5 V), measured both ways round. A pull-up reads the same both ways; a reading that changes when the leads swap is a diode inside a chip, not a pull-up. **Pass:** no same-both-ways reading below 3 kΩ. If one fails, that signal moves to GP9 (free and 5 V tolerant) before anything is powered.
 - **Power:** the Pico runs from the laptop's USB. USB goes in before key-on and comes out after key-off, the same "Pico first" order as on the bench, so nothing taps the ECU's supply.
 - **Output levels:** the Pico drives 3.3 V. The D151801 runs MC6801 timing; if it is an NMOS part like the MC6801, its outputs only guarantee TTL highs, the ECU board accepts those, and no buffers are needed. One check settles it: the chip's supply current on the bench (an NMOS 6801 draws about 100 mA or more, a CMOS HD6301 a few mA). If the chip is CMOS, two 74HCT541 buffers go on a small breadboard between the Pico and the socket, powered by one more jumper from ECU pin 21.
-- **Firmware still to write:** the emulator on the real ECU pins:
-  - inputs timestamped by PIO;
-  - spark and injector on hardware-timed compares;
-  - /RES read from the ECU;
+- **Firmware:** [`hardware/ecu-emu/car/`](../../hardware/ecu-emu/car/) (`ecu_emu_car_pico2_w.uf2`, a CI artefact) runs the 17140 ROM on the emulated chip, on the real pins:
+  - inputs sampled every µs by PIO, so NE, ADC-end and IGF edges keep their exact time;
+  - outputs played back from a second PIO ring a constant 100 µs after the emulated chip makes them;
+  - pin directions follow the emulated DDRs;
+  - /RES read from the board;
   - E at 1 MHz on pin 40;
-  - live values and tune flashing over USB.
+  - status and RAM variables over USB.
+
+  The logic (`car.h`) runs on the host against the chip test's engine model: with the hold off, every output edge matches the emulator at one constant 100 µs delay; with it on, IGT and the injector never move [EMU:tests/test_car_fw.py].
+
+  **This build holds IGT and the injector at their engine-stopped level and cannot run the engine.** Its procedure is [`../hardware/car_first_test.md`](../hardware/car_first_test.md) (key on, engine off). A running build adds hardware-timed compares for IGT and the injector (as the loopback firmware has) and comes only after the strict bench gate.
 - **Use, each powered step with the owner's confirmation on the day:**
-  1. key on, engine off: fault lamp, fuel-pump prime, and live coolant/MAP/TPS against the stock ECU's readings over the serial link;
-  2. crank and idle: a timing light shows 16° BTDC with T open and 10° with T-E1 shorted.
+  1. key on, engine off, with IGT and the injector held ([`car_first_test.md`](../hardware/car_first_test.md)): lamp, switches and ADC readings against the stock ECU;
+  2. crank with the outputs still held: NE/G and rpm;
+  3. only after the strict bench gate, with a build that drives IGT and the injector: crank and idle, with a timing light showing 16° BTDC with T open and 10° with T-E1 shorted.
 
   **Stationary only:** jumpers can shake loose, so driving waits for the PCB.
 - **Final board:** a KiCad PCB, factory-assembled (JLCPCB PCBA). It carries the RP2350 (or a castellated Pico 2 W), SMD 74HCT541s, the buck, USB-C reachable for flashing, and turned-pin DIP-40 legs underneath. Its outline waits for a photo of the clearance above the CPU socket.

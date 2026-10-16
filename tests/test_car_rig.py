@@ -75,3 +75,11 @@ def test_header_static_assert(tmp_path):
     src = tmp_path / "t.c"
     src.write_text('#include "pins.h"\nint main(void) { return 0; }\n')
     subprocess.run([CC, "-std=c11", "-fsyntax-only", "-I", str(R.PINS_H.parent), str(src)], check=True)
+
+
+def test_same_chip_pin_for_each_port_bit_as_the_chip_test():
+    """pins.h and chipdiff.h agree on which chip pin every (port, bit) is (the HD6301V1 pinout)."""
+    pat = r"X\((\d+), (\d), (\d), (?:IN|OUT|IO)\)\s*/\*.*?pin (\d+)"
+    car = {(int(m[2]), int(m[3])): int(m[4]) for m in re.finditer(pat, R.PINS_H.read_text())}
+    cd = {(int(m[2]), int(m[3])): int(m[4]) for m in re.finditer(pat, C.CHIPDIFF_H.read_text())}
+    assert car == cd

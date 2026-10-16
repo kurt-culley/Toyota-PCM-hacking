@@ -23,6 +23,8 @@ typedef struct {
 typedef void (*d_output_fn)(void *ctx, int port, int bit, int level, int64_t t);
 // A byte written to TDR while the transmitter is enabled.
 typedef void (*d_tx_fn)(void *ctx, uint8_t byte, int64_t t);
+// A data-direction register written (port 1..4), at its bus cycle; optional.
+typedef void (*d_ddr_fn)(void *ctx, int port, uint8_t ddr, int64_t t);
 // External events (host side): time of the next one (or -1), and run it.
 typedef int64_t (*d_next_event_fn)(void *ctx);
 typedef void (*d_run_event_fn)(void *ctx);
@@ -41,6 +43,7 @@ typedef struct {
     uint8_t regs[0x20];  // registers without a model (RAMCR $14, unused ones)
     d_output_fn on_output;
     d_tx_fn on_tx;
+    d_ddr_fn on_ddr;
     void *ctx;
     uint8_t oc_dirty;  // set when an output-compare prediction may have changed (see d_next_match)
 } d151801_t;

@@ -146,10 +146,13 @@ static void write_ocr(d151801_t *d, d_channel_t *ch, int hi, uint8_t v) {
 
 void d_write(d151801_t *d, uint16_t a, uint8_t v) {
     switch (a) {
-    case DDR1: d->ddr[0] = v; outputs_changed(d); break;
-    case DDR2: d->ddr[1] = v; outputs_changed(d); break;
-    case DDR3: d->ddr[2] = v; outputs_changed(d); break;
-    case DDR4: d->ddr[3] = v; outputs_changed(d); break;
+    case DDR1: case DDR2: case DDR3: case DDR4: {
+        int i = a == DDR1 ? 0 : a == DDR2 ? 1 : a == DDR3 ? 2 : 3;
+        d->ddr[i] = v;
+        outputs_changed(d);
+        if (d->on_ddr) d->on_ddr(d->ctx, i + 1, v, d->now);
+        break;
+    }
     case PORT1: d->latch[0] = v; outputs_changed(d); break;
     case PORT2: d->latch[1] = v; outputs_changed(d); break;
     case PORT3: d->latch[2] = v; outputs_changed(d); break;

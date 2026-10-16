@@ -1,0 +1,12 @@
+; In-car firmware (car.h): two state machines on one PIO block, started together, both clocked at
+; exactly 1 MHz (clkdiv = clk_sys / 1 MHz), so input sample j and output slot j share a microsecond.
+
+; Every GPIO, once per microsecond, into the input ring (autopush, DMA).
+.program car_in
+    in pins, 32
+
+; One output word per microsecond from the output ring onto GPIO 0-28 (autopull, DMA). Only the
+; pins given to this PIO follow it; whether each one drives at all is set by its pad's output-enable
+; override (the emulated chip's DDR).
+.program car_out
+    out pins, 32

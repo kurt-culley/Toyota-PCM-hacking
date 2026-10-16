@@ -30,10 +30,12 @@ static void io_write(void *ctx, uint16_t a, uint8_t v) {
 void board_init(board_t *b, const uint8_t *rom, int len) {
     d_output_fn on_output = b->io.on_output;  // keep callbacks set by the host
     d_tx_fn on_tx = b->io.on_tx;
+    d_ddr_fn on_ddr = b->io.on_ddr;
     void *ctx = b->io.ctx;
     d_init(&b->io);
     b->io.on_output = on_output;
     b->io.on_tx = on_tx;
+    b->io.on_ddr = on_ddr;
     b->io.ctx = ctx;
     for (int i = 0; i < 0x10000; i++) b->mem[i] = 0;
     b->rom_base = (uint16_t)(0x10000 - len);

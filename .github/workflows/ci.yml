@@ -120,3 +120,17 @@ jobs:
         with:
           name: ecu_chipdiff_pico2_w
           path: build-chipdiff/ecu_chipdiff_pico2_w.uf2
+
+      - name: Build the in-car test UF2 (Pico 2 W only; warnings are errors)
+        if: matrix.board == 'pico2_w'
+        env:
+          PICO_SDK_PATH: ${{ runner.temp }}/pico-sdk
+        run: |
+          cmake -S hardware/ecu-emu/car -B build-car -G Ninja -DPICO_BOARD=pico2_w
+          cmake --build build-car
+
+      - uses: actions/upload-artifact@v4
+        if: matrix.board == 'pico2_w'
+        with:
+          name: ecu_emu_car_pico2_w
+          path: build-car/ecu_emu_car_pico2_w.uf2
